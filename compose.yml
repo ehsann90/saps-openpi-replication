@@ -1,0 +1,63 @@
+services:
+  runtime:
+    image: libero
+    depends_on:
+      - openpi_server
+    init: true
+    tty: true
+    privileged: true
+    network_mode: host
+    working_dir: /workspace
+
+    volumes:
+      - ./third_party/openpi:/app
+      - ./:/workspace
+      - /tmp/.X11-unix:/tmp/.X11-unix:ro
+
+    environment:
+      DISPLAY: ${DISPLAY}
+      MUJOCO_GL: ${MUJOCO_GL:-egl}
+      MUJOCO_EGL_DEVICE_ID: "0"
+      NVIDIA_DRIVER_CAPABILITIES: all
+      PYOPENGL_PLATFORM: egl
+      PYTHONPATH: /workspace/src:/app:/app/packages/openpi-client/src:/app/third_party/libero
+      SAPS_RUNTIME_ARGS: ${SAPS_RUNTIME_ARGS:-}
+
+    command:
+      - /bin/bash
+      - -lc
+      - >-
+        source /.venv/bin/activate &&
+        python /workspace/scripts/run_libero.py
+        $$SAPS_RUNTIME_ARGS
+
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  openpi_server:
+    image: openpi_server
+    init: true
+    tty: true
+    network_mode: host
+
+    volumes:
+      - ./third_party/openpi:/app
+      - ${OPENPI_DATA_HOME:-~/.cache/openpi}:/openpi_assets
+
+    environment:
+      SERVER_ARGS: ${SERVER_ARGS:-"--env LIBERO"}
+      OPENPI_DATA_HOME: /openpi_assets
+      IS_DOCKER: "true"
+
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
