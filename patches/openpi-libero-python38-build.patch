@@ -1,0 +1,30 @@
+diff --git a/examples/libero/Dockerfile b/examples/libero/Dockerfile
+index e7ff546..48007aa 100644
+--- a/examples/libero/Dockerfile
++++ b/examples/libero/Dockerfile
+@@ -43,7 +43,24 @@ COPY ./packages/openpi-client/pyproject.toml /tmp/openpi-client/pyproject.toml
+ 
+ # Install python dependencies.
+ RUN uv venv --python 3.8 $UV_PROJECT_ENVIRONMENT
+-RUN uv pip sync /tmp/requirements.txt /tmp/requirements-libero.txt /tmp/openpi-client/pyproject.toml --extra-index-url https://download.pytorch.org/whl/cu113 --index-strategy=unsafe-best-match
++
++# Install Python-3.8-compatible build tools in the LIBERO environment.
++# Legacy source packages are then built in this environment rather than in
++# temporary isolated environments with unconstrained build dependencies.
++RUN uv pip install \
++    --python $UV_PROJECT_ENVIRONMENT/bin/python \
++    setuptools==75.3.0 \
++    wheel==0.45.1
++
++RUN uv pip sync \
++    --python $UV_PROJECT_ENVIRONMENT/bin/python \
++    /tmp/requirements.txt \
++    /tmp/requirements-libero.txt \
++    /tmp/openpi-client/pyproject.toml \
++    --extra-index-url https://download.pytorch.org/whl/cu113 \
++    --index-strategy=unsafe-best-match \
++    --no-build-isolation
++
+ ENV PYTHONPATH=/app:/app/packages/openpi-client/src:/app/third_party/libero
+ 
+ # Create a default config file to avoid an input prompt from LIBERO's init script.
