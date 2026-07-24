@@ -1,5 +1,22 @@
 #!/usr/bin/env python3
-"""Analyze the completed autonomous LIBERO displacement experiment."""
+"""
+Analyze the completed autonomous LIBERO displacement experiment.
+
+Usage:
+    LOCAL_UID="$(id -u)" \
+    LOCAL_GID="$(id -g)" \
+    docker compose \
+        -f compose.yml \
+        run --rm --no-deps \
+        runtime \
+        /bin/bash -lc \
+        'source /.venv/bin/activate &&
+        python /workspace/scripts/analyze_autonomous_results.py \
+            /workspace/outputs/autonomous_n20_state0/sweep_summary.json \
+            --output-dir /workspace/results/autonomous_n20_state0 &&
+        chown -R "$LOCAL_UID:$LOCAL_GID" \
+            /workspace/results'
+"""
 
 from __future__ import annotations
 
