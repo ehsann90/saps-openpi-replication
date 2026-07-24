@@ -22,13 +22,14 @@ services:
       PYOPENGL_PLATFORM: egl
       PYTHONPATH: /workspace/src:/app:/app/packages/openpi-client/src:/app/third_party/libero
       SAPS_RUNTIME_ARGS: ${SAPS_RUNTIME_ARGS:-}
+      SAPS_SCRIPT: ${SAPS_SCRIPT:-/workspace/scripts/run_libero.py}
 
     command:
       - /bin/bash
       - -lc
       - >-
         source /.venv/bin/activate &&
-        python /workspace/scripts/run_libero.py
+        python $$SAPS_SCRIPT
         $$SAPS_RUNTIME_ARGS
 
     deploy:

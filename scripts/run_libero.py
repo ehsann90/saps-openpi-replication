@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run the paper's LIBERO cream-cheese task with autonomous OpenPI."""
+"""Run the SAPS LIBERO cream-cheese task with autonomous OpenPI."""
 
 from __future__ import annotations
 
@@ -12,13 +12,14 @@ from typing import Any
 import tyro
 
 from saps.environments.libero_env import create_libero_task
-from saps.evaluation.runner import EpisodeResult, run_episode
+from saps.evaluation.runner import EpisodeResult
+from saps.evaluation.runner import run_episode
 from saps.policies.openpi_client import OpenPiLiberoPolicy
 
 
 @dataclasses.dataclass
 class Args:
-    # OpenPI policy server
+    # OpenPI server
     host: str = "0.0.0.0"
     port: int = 8000
 
@@ -27,6 +28,13 @@ class Args:
     task_id: int = 1
     initial_state_index: int = 0
     num_trials: int = 1
+
+    # Perturbation
+    condition_id: str = "nominal"
+    object_joint_name: str = "cream_cheese_1_joint0"
+    object_body_name: str = "cream_cheese_1_main"
+    delta_x: float = 0.0
+    delta_y: float = 0.0
 
     # Upstream-compatible settings
     seed: int = 7
@@ -37,8 +45,8 @@ class Args:
     max_steps: int = 280
     video_fps: int = 10
 
-    # Outputs
-    output_dir: str = "outputs/phase1_nominal"
+    # Output
+    output_dir: str = "outputs/phase1_conditions"
 
 
 def main(args: Args) -> None:
@@ -59,16 +67,23 @@ def main(args: Args) -> None:
         logging.info("Task suite: %s", args.task_suite_name)
         logging.info("Task ID: %d", args.task_id)
         logging.info("Task: %s", task_description)
+        logging.info(
+            "Condition: %s, dx=%.3f, dy=%.3f",
+            args.condition_id,
+            args.delta_x,
+            args.delta_y,
+        )
 
         if "cream cheese" not in task_description.lower():
             raise ValueError(
-                "The selected task is not the expected cream-cheese task: "
+                "Selected task is not the expected cream-cheese task: "
                 f"{task_description!r}"
             )
 
         final_state_index = (
             args.initial_state_index + args.num_trials - 1
         )
+
         if final_state_index >= len(initial_states):
             raise ValueError(
                 f"Requested initial states "
@@ -83,7 +98,9 @@ def main(args: Args) -> None:
         )
 
         for trial_index in range(args.num_trials):
-            state_index = args.initial_state_index + trial_index
+            state_index = (
+                args.initial_state_index + trial_index
+            )
 
             logging.info(
                 "Starting trial %d with initial state %d",
@@ -94,26 +111,32 @@ def main(args: Args) -> None:
             result = run_episode(
                 env=env,
                 policy=policy,
+                condition_id=args.condition_id,
                 task_id=args.task_id,
                 task_description=task_description,
                 initial_state=initial_states[state_index],
                 initial_state_index=state_index,
                 trial_index=trial_index,
                 output_root=output_root,
+                object_joint_name=args.object_joint_name,
+                object_body_name=args.object_body_name,
+                delta_x=args.delta_x,
+                delta_y=args.delta_y,
                 replan_steps=args.replan_steps,
                 num_steps_wait=args.num_steps_wait,
                 max_steps=args.max_steps,
                 video_fps=args.video_fps,
             )
+
             results.append(result)
 
             logging.info(
-                "Trial %d finished: success=%s, control_steps=%d, "
-                "elapsed=%.2fs",
+                "Trial %d: success=%s, control_steps=%d, "
+                "control_time=%.2fs",
                 trial_index,
                 result.success,
                 result.control_steps,
-                result.elapsed_seconds,
+                result.control_elapsed_seconds,
             )
 
     finally:
@@ -123,22 +146,26 @@ def main(args: Args) -> None:
                 close()
 
     successes = sum(result.success for result in results)
+
     run_summary = {
         "arguments": dataclasses.asdict(args),
-        "task_description": (
-            results[0].task_description if results else None
-        ),
         "episodes": len(results),
         "successes": successes,
         "success_rate": (
             successes / len(results) if results else 0.0
         ),
         "results": [
-            dataclasses.asdict(result) for result in results
+            dataclasses.asdict(result)
+            for result in results
         ],
     }
 
-    with (output_root / "run_summary.json").open(
+    condition_directory = (
+        output_root / args.condition_id
+    )
+    condition_directory.mkdir(parents=True, exist_ok=True)
+
+    with (condition_directory / "run_summary.json").open(
         "w",
         encoding="utf-8",
     ) as file:
