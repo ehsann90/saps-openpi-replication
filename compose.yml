@@ -16,6 +16,8 @@ services:
 
     environment:
       DISPLAY: ${DISPLAY}
+      LOCAL_UID: ${LOCAL_UID:-1000}
+      LOCAL_GID: ${LOCAL_GID:-1000}
       MUJOCO_GL: ${MUJOCO_GL:-egl}
       MUJOCO_EGL_DEVICE_ID: "0"
       NVIDIA_DRIVER_CAPABILITIES: all
@@ -27,10 +29,17 @@ services:
     command:
       - /bin/bash
       - -lc
-      - >-
-        source /.venv/bin/activate &&
-        python $$SAPS_SCRIPT
-        $$SAPS_RUNTIME_ARGS
+      - |
+        source /.venv/bin/activate
+
+        status=0
+        python "$$SAPS_SCRIPT" $$SAPS_RUNTIME_ARGS || status=$$?
+
+        if [ -d /workspace/outputs ]; then
+          chown -R "$$LOCAL_UID:$$LOCAL_GID" /workspace/outputs
+        fi
+
+        exit $$status
 
     deploy:
       resources:

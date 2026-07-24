@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Run an autonomous π0.5 sweep over cream-cheese perturbations."""
+"""Run a resumable autonomous π0.5 cream-cheese perturbation sweep."""
 
 from __future__ import annotations
 
 import dataclasses
 import json
 import logging
+import math
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +26,7 @@ class Args:
     condition_ids: str = ""
     num_trials: int = 1
     initial_state_index: int = 0
+    resume: bool = True
 
     # OpenPI server
     host: str = "0.0.0.0"
@@ -46,7 +48,9 @@ class Args:
 
 def load_config(path: Path) -> dict[str, Any]:
     if not path.is_file():
-        raise FileNotFoundError(f"Configuration file does not exist: {path}")
+        raise FileNotFoundError(
+            f"Configuration file does not exist: {path}"
+        )
 
     with path.open("r", encoding="utf-8") as file:
         config = json.load(file)
@@ -62,11 +66,22 @@ def load_config(path: Path) -> dict[str, Any]:
 
     if missing:
         raise ValueError(
-            f"Configuration is missing required fields: {sorted(missing)}"
+            f"Configuration is missing fields: {sorted(missing)}"
         )
 
-    if not isinstance(config["offsets"], list) or not config["offsets"]:
-        raise ValueError("Configuration must contain at least one offset.")
+    offsets = config["offsets"]
+
+    if not isinstance(offsets, list) or not offsets:
+        raise ValueError(
+            "Configuration must contain at least one offset."
+        )
+
+    condition_ids = [str(offset["id"]) for offset in offsets]
+
+    if len(condition_ids) != len(set(condition_ids)):
+        raise ValueError(
+            "Condition IDs in the configuration must be unique."
+        )
 
     return config
 
@@ -84,28 +99,344 @@ def select_conditions(
         if item.strip()
     ]
 
-    offset_by_id = {str(offset["id"]): offset for offset in offsets}
+    offset_by_id = {
+        str(offset["id"]): offset
+        for offset in offsets
+    }
 
     unknown = [
         condition_id
         for condition_id in selected_ids
         if condition_id not in offset_by_id
     ]
+
     if unknown:
         raise ValueError(
-            f"Unknown condition IDs: {unknown}. "
-            f"Available conditions: {sorted(offset_by_id)}"
+            f"Unknown conditions: {unknown}. "
+            f"Available: {sorted(offset_by_id)}"
         )
 
-    return [offset_by_id[condition_id] for condition_id in selected_ids]
+    return [
+        offset_by_id[condition_id]
+        for condition_id in selected_ids
+    ]
+
+
+def cyclic_condition_order(
+    conditions: list[dict[str, Any]],
+    trial_index: int,
+) -> list[dict[str, Any]]:
+    """Rotate the starting condition for each round.
+
+    With 10 conditions and 20 trials, each condition occupies every
+    execution-order position exactly twice.
+    """
+
+    if not conditions:
+        return []
+
+    shift = trial_index % len(conditions)
+
+    return (
+        conditions[shift:]
+        + conditions[:shift]
+    )
+
+
+def episode_summary_path(
+    *,
+    output_root: Path,
+    condition_id: str,
+    task_id: int,
+    initial_state_index: int,
+    trial_index: int,
+) -> Path:
+    return (
+        output_root
+        / condition_id
+        / f"task_{task_id:02d}"
+        / f"init_{initial_state_index:03d}"
+        / f"trial_{trial_index:03d}"
+        / "summary.json"
+    )
+
+
+def load_completed_result(
+    path: Path,
+    *,
+    condition_id: str,
+    trial_index: int,
+    initial_state_index: int,
+    delta_x: float,
+    delta_y: float,
+) -> EpisodeResult | None:
+    """Load a completed compatible episode for resume support."""
+
+    if not path.is_file():
+        return None
+
+    try:
+        with path.open("r", encoding="utf-8") as file:
+            data = json.load(file)
+
+        if data["condition_id"] != condition_id:
+            return None
+
+        if int(data["trial_index"]) != trial_index:
+            return None
+
+        if int(data["initial_state_index"]) != initial_state_index:
+            return None
+
+        if not math.isclose(
+            float(data["delta_x"]),
+            delta_x,
+            abs_tol=1e-12,
+        ):
+            return None
+
+        if not math.isclose(
+            float(data["delta_y"]),
+            delta_y,
+            abs_tol=1e-12,
+        ):
+            return None
+
+        result_fields = {
+            field.name
+            for field in dataclasses.fields(EpisodeResult)
+        }
+
+        if not result_fields.issubset(data):
+            return None
+
+        return EpisodeResult(
+            **{
+                field_name: data[field_name]
+                for field_name in result_fields
+            }
+        )
+
+    except (
+        OSError,
+        KeyError,
+        TypeError,
+        ValueError,
+        json.JSONDecodeError,
+    ) as error:
+        logging.warning(
+            "Could not resume from %s: %s",
+            path,
+            error,
+        )
+        return None
+
+
+def summarize_condition(
+    *,
+    condition: dict[str, Any],
+    results: list[EpisodeResult],
+    initial_state_index: int,
+    expected_episodes: int,
+    control_frequency_hz: float,
+) -> dict[str, Any]:
+    ordered_results = sorted(
+        results,
+        key=lambda result: result.trial_index,
+    )
+
+    successes = [
+        result
+        for result in ordered_results
+        if result.success
+    ]
+    failures = [
+        result
+        for result in ordered_results
+        if not result.success
+    ]
+
+    all_steps = np.asarray(
+        [result.control_steps for result in ordered_results],
+        dtype=np.float64,
+    )
+    successful_steps = np.asarray(
+        [result.control_steps for result in successes],
+        dtype=np.float64,
+    )
+
+    all_durations = (
+        all_steps / control_frequency_hz
+        if len(all_steps)
+        else np.asarray([], dtype=np.float64)
+    )
+    successful_durations = (
+        successful_steps / control_frequency_hz
+        if len(successful_steps)
+        else np.asarray([], dtype=np.float64)
+    )
+
+    def mean_or_none(values: np.ndarray) -> float | None:
+        if not len(values):
+            return None
+        return float(np.mean(values))
+
+    def std_or_none(values: np.ndarray) -> float | None:
+        if not len(values):
+            return None
+        return float(np.std(values))
+
+    delta_x = float(condition["dx"])
+    delta_y = float(condition["dy"])
+
+    return {
+        "condition_id": str(condition["id"]),
+        "delta_x": delta_x,
+        "delta_y": delta_y,
+        "offset_distance": float(
+            np.hypot(delta_x, delta_y)
+        ),
+        "initial_state_index": initial_state_index,
+        "expected_episodes": expected_episodes,
+        "completed_episodes": len(ordered_results),
+        "successes": len(successes),
+        "timeouts": len(failures),
+        "success_rate": (
+            len(successes) / len(ordered_results)
+            if ordered_results
+            else None
+        ),
+        "mean_control_steps_all_episodes": mean_or_none(
+            all_steps
+        ),
+        "std_control_steps_all_episodes": std_or_none(
+            all_steps
+        ),
+        "mean_episode_duration_seconds_all": mean_or_none(
+            all_durations
+        ),
+        "std_episode_duration_seconds_all": std_or_none(
+            all_durations
+        ),
+        "mean_successful_completion_steps": mean_or_none(
+            successful_steps
+        ),
+        "std_successful_completion_steps": std_or_none(
+            successful_steps
+        ),
+        "mean_successful_completion_seconds": mean_or_none(
+            successful_durations
+        ),
+        "std_successful_completion_seconds": std_or_none(
+            successful_durations
+        ),
+        "results": [
+            dataclasses.asdict(result)
+            for result in ordered_results
+        ],
+    }
+
+
+def write_progress(
+    *,
+    output_root: Path,
+    args: Args,
+    config: dict[str, Any],
+    conditions: list[dict[str, Any]],
+    results_by_condition: dict[str, list[EpisodeResult]],
+    task_description: str,
+) -> None:
+    condition_summaries = []
+
+    for condition in conditions:
+        condition_id = str(condition["id"])
+
+        summary = summarize_condition(
+            condition=condition,
+            results=results_by_condition[condition_id],
+            initial_state_index=args.initial_state_index,
+            expected_episodes=args.num_trials,
+            control_frequency_hz=args.control_frequency_hz,
+        )
+        condition_summaries.append(summary)
+
+        condition_directory = output_root / condition_id
+        condition_directory.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+        with (
+            condition_directory / "run_summary.json"
+        ).open("w", encoding="utf-8") as file:
+            json.dump(summary, file, indent=2)
+
+    completed_episodes = sum(
+        len(results)
+        for results in results_by_condition.values()
+    )
+    expected_episodes = (
+        len(conditions) * args.num_trials
+    )
+
+    sweep_summary = {
+        "complete": completed_episodes == expected_episodes,
+        "completed_episodes": completed_episodes,
+        "expected_episodes": expected_episodes,
+        "arguments": dataclasses.asdict(args),
+        "config": config,
+        "task_description": task_description,
+        "conditions": condition_summaries,
+    }
+
+    with (output_root / "sweep_summary.json").open(
+        "w",
+        encoding="utf-8",
+    ) as file:
+        json.dump(sweep_summary, file, indent=2)
+
+
+def write_schedule(
+    *,
+    output_root: Path,
+    conditions: list[dict[str, Any]],
+    num_trials: int,
+) -> None:
+    schedule = []
+
+    for trial_index in range(num_trials):
+        ordered_conditions = cyclic_condition_order(
+            conditions,
+            trial_index,
+        )
+
+        schedule.append(
+            {
+                "trial_index": trial_index,
+                "condition_order": [
+                    str(condition["id"])
+                    for condition in ordered_conditions
+                ],
+            }
+        )
+
+    with (output_root / "schedule.json").open(
+        "w",
+        encoding="utf-8",
+    ) as file:
+        json.dump(schedule, file, indent=2)
 
 
 def main(args: Args) -> None:
     if args.num_trials <= 0:
-        raise ValueError("num_trials must be greater than zero.")
+        raise ValueError(
+            "num_trials must be greater than zero."
+        )
 
     if args.control_frequency_hz <= 0:
-        raise ValueError("control_frequency_hz must be greater than zero.")
+        raise ValueError(
+            "control_frequency_hz must be greater than zero."
+        )
 
     config = load_config(Path(args.config_path))
     conditions = select_conditions(
@@ -116,8 +447,22 @@ def main(args: Args) -> None:
     output_root = Path(args.output_dir)
     output_root.mkdir(parents=True, exist_ok=True)
 
+    write_schedule(
+        output_root=output_root,
+        conditions=conditions,
+        num_trials=args.num_trials,
+    )
+
+    results_by_condition: dict[
+        str,
+        list[EpisodeResult],
+    ] = {
+        str(condition["id"]): []
+        for condition in conditions
+    }
+
     env: Any | None = None
-    all_condition_summaries: list[dict[str, Any]] = []
+    policy: OpenPiLiberoPolicy | None = None
 
     try:
         env, task_description, initial_states = create_libero_task(
@@ -129,56 +474,118 @@ def main(args: Args) -> None:
 
         if not 0 <= args.initial_state_index < len(initial_states):
             raise ValueError(
-                f"Initial-state index {args.initial_state_index} is invalid; "
+                f"Initial-state index "
+                f"{args.initial_state_index} is invalid; "
                 f"{len(initial_states)} states are available."
             )
 
         if "cream cheese" not in task_description.lower():
             raise ValueError(
-                "Selected task is not the expected cream-cheese task: "
-                f"{task_description!r}"
+                "Selected task is not the expected "
+                f"cream-cheese task: {task_description!r}"
             )
-
-        policy = OpenPiLiberoPolicy(
-            host=args.host,
-            port=args.port,
-            resize_size=args.resize_size,
-        )
 
         logging.info("Task: %s", task_description)
         logging.info(
-            "Using fixed LIBERO initial state %d for every trial.",
+            "Fixed initial state: %d",
             args.initial_state_index,
         )
         logging.info(
-            "Selected conditions: %s",
-            ", ".join(str(condition["id"]) for condition in conditions),
+            "Conditions: %s",
+            ", ".join(
+                str(condition["id"])
+                for condition in conditions
+            ),
         )
+        logging.info(
+            "Execution schedule: balanced cyclic round-robin"
+        )
+        logging.info("Resume enabled: %s", args.resume)
 
-        for condition_index, condition in enumerate(conditions):
-            condition_id = str(condition["id"])
-            delta_x = float(condition["dx"])
-            delta_y = float(condition["dy"])
-            distance = float(np.hypot(delta_x, delta_y))
-
-            logging.info(
-                "Condition %d/%d: %s, dx=%.3f, dy=%.3f, distance=%.3f",
-                condition_index + 1,
-                len(conditions),
-                condition_id,
-                delta_x,
-                delta_y,
-                distance,
+        for trial_index in range(args.num_trials):
+            ordered_conditions = cyclic_condition_order(
+                conditions,
+                trial_index,
             )
 
-            results: list[EpisodeResult] = []
+            logging.info(
+                "Starting round %d/%d with order: %s",
+                trial_index + 1,
+                args.num_trials,
+                ", ".join(
+                    str(condition["id"])
+                    for condition in ordered_conditions
+                ),
+            )
 
-            for trial_index in range(args.num_trials):
+            for condition in ordered_conditions:
+                condition_id = str(condition["id"])
+                delta_x = float(condition["dx"])
+                delta_y = float(condition["dy"])
+
+                summary_path = episode_summary_path(
+                    output_root=output_root,
+                    condition_id=condition_id,
+                    task_id=int(config["task_id"]),
+                    initial_state_index=(
+                        args.initial_state_index
+                    ),
+                    trial_index=trial_index,
+                )
+
+                completed_result = None
+
+                if args.resume:
+                    completed_result = load_completed_result(
+                        summary_path,
+                        condition_id=condition_id,
+                        trial_index=trial_index,
+                        initial_state_index=(
+                            args.initial_state_index
+                        ),
+                        delta_x=delta_x,
+                        delta_y=delta_y,
+                    )
+
+                if completed_result is not None:
+                    results_by_condition[
+                        condition_id
+                    ].append(completed_result)
+
+                    logging.info(
+                        "Skipping completed episode: "
+                        "condition=%s, trial=%d, success=%s",
+                        condition_id,
+                        trial_index,
+                        completed_result.success,
+                    )
+
+                    write_progress(
+                        output_root=output_root,
+                        args=args,
+                        config=config,
+                        conditions=conditions,
+                        results_by_condition=(
+                            results_by_condition
+                        ),
+                        task_description=task_description,
+                    )
+                    continue
+
+                if policy is None:
+                    policy = OpenPiLiberoPolicy(
+                        host=args.host,
+                        port=args.port,
+                        resize_size=args.resize_size,
+                    )
+
                 logging.info(
-                    "Condition %s: starting trial %d/%d",
+                    "Running condition=%s, trial=%d, "
+                    "dx=%.3f, dy=%.3f",
                     condition_id,
-                    trial_index + 1,
-                    args.num_trials,
+                    trial_index,
+                    delta_x,
+                    delta_y,
                 )
 
                 result = run_episode(
@@ -190,11 +597,17 @@ def main(args: Args) -> None:
                     initial_state=initial_states[
                         args.initial_state_index
                     ],
-                    initial_state_index=args.initial_state_index,
+                    initial_state_index=(
+                        args.initial_state_index
+                    ),
                     trial_index=trial_index,
                     output_root=output_root,
-                    object_joint_name=str(config["joint_name"]),
-                    object_body_name=str(config["body_name"]),
+                    object_joint_name=str(
+                        config["joint_name"]
+                    ),
+                    object_body_name=str(
+                        config["body_name"]
+                    ),
                     delta_x=delta_x,
                     delta_y=delta_y,
                     replan_steps=args.replan_steps,
@@ -202,101 +615,56 @@ def main(args: Args) -> None:
                     max_steps=args.max_steps,
                     video_fps=args.video_fps,
                 )
-                results.append(result)
+
+                results_by_condition[
+                    condition_id
+                ].append(result)
 
                 logging.info(
-                    "Condition %s, trial %d: success=%s, steps=%d",
+                    "Finished condition=%s, trial=%d: "
+                    "success=%s, steps=%d",
                     condition_id,
                     trial_index,
                     result.success,
                     result.control_steps,
                 )
 
-            successes = sum(result.success for result in results)
-            control_steps = [
-                result.control_steps for result in results
-            ]
-
-            # Use simulated control time for experiment comparison.
-            # Wall-clock time depends on GPU and compilation overhead.
-            simulated_times = [
-                steps / args.control_frequency_hz
-                for steps in control_steps
-            ]
-
-            condition_summary = {
-                "condition_id": condition_id,
-                "delta_x": delta_x,
-                "delta_y": delta_y,
-                "offset_distance": distance,
-                "initial_state_index": args.initial_state_index,
-                "episodes": len(results),
-                "successes": successes,
-                "success_rate": successes / len(results),
-                "mean_control_steps": float(np.mean(control_steps)),
-                "std_control_steps": float(np.std(control_steps)),
-                "mean_simulated_completion_seconds": float(
-                    np.mean(simulated_times)
-                ),
-                "std_simulated_completion_seconds": float(
-                    np.std(simulated_times)
-                ),
-                "results": [
-                    dataclasses.asdict(result)
-                    for result in results
-                ],
-            }
-
-            condition_directory = output_root / condition_id
-            condition_directory.mkdir(parents=True, exist_ok=True)
-
-            with (condition_directory / "run_summary.json").open(
-                "w",
-                encoding="utf-8",
-            ) as file:
-                json.dump(condition_summary, file, indent=2)
-
-            all_condition_summaries.append(condition_summary)
-
-            logging.info(
-                "Condition %s complete: %d/%d successful",
-                condition_id,
-                successes,
-                len(results),
-            )
+                write_progress(
+                    output_root=output_root,
+                    args=args,
+                    config=config,
+                    conditions=conditions,
+                    results_by_condition=(
+                        results_by_condition
+                    ),
+                    task_description=task_description,
+                )
 
     finally:
         if env is not None:
             close = getattr(env, "close", None)
+
             if callable(close):
                 close()
 
-    sweep_summary = {
-        "arguments": dataclasses.asdict(args),
-        "config": config,
-        "task_description": (
-            all_condition_summaries[0]["results"][0][
-                "task_description"
-            ]
-            if all_condition_summaries
-            else None
-        ),
-        "conditions": all_condition_summaries,
-    }
+    write_progress(
+        output_root=output_root,
+        args=args,
+        config=config,
+        conditions=conditions,
+        results_by_condition=results_by_condition,
+        task_description=task_description,
+    )
 
-    with (output_root / "sweep_summary.json").open(
-        "w",
-        encoding="utf-8",
-    ) as file:
-        json.dump(sweep_summary, file, indent=2)
+    completed = sum(
+        len(results)
+        for results in results_by_condition.values()
+    )
 
     logging.info(
-        "Sweep completed: %d condition(s), %d episode(s)",
-        len(all_condition_summaries),
-        sum(
-            summary["episodes"]
-            for summary in all_condition_summaries
-        ),
+        "Sweep complete: %d/%d episodes",
+        completed,
+        len(conditions) * args.num_trials,
     )
 
 
