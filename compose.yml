@@ -57,12 +57,23 @@ services:
 
     volumes:
       - ./third_party/openpi:/app
+      - ./:/workspace
       - ${OPENPI_DATA_HOME:-~/.cache/openpi}:/openpi_assets
 
     environment:
-      SERVER_ARGS: ${SERVER_ARGS:-"--env LIBERO"}
+      SAPS_SERVER_ARGS: ${SAPS_SERVER_ARGS:-}
       OPENPI_DATA_HOME: /openpi_assets
+      XLA_FLAGS: "--xla_gpu_deterministic_ops=true"
+      PYTHONPATH: /workspace/src:/app/src:/app/packages/openpi-client/src
       IS_DOCKER: "true"
+
+    command:
+      - /bin/bash
+      - -lc
+      - >-
+        uv run python
+        /workspace/scripts/serve_seeded_policy.py
+        $$SAPS_SERVER_ARGS
 
     deploy:
       resources:
