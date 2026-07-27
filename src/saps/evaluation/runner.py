@@ -12,6 +12,8 @@ from typing import Any
 import imageio.v2 as imageio
 import numpy as np
 
+from saps.arbitration import ActionArbitrator
+from saps.arbitration import ArbitrationMode
 from saps.environments.perturbations import apply_planar_object_offset
 from saps.environments.perturbations import get_object_pose
 from saps.policies.openpi_client import OpenPiLiberoPolicy
@@ -19,6 +21,11 @@ from saps.policies.seeding import SEED_PROTOCOL
 
 
 LIBERO_DUMMY_ACTION = np.asarray(
+    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0],
+    dtype=np.float32,
+)
+
+IDLE_HUMAN_ACTION = np.asarray(
     [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0],
     dtype=np.float32,
 )
@@ -104,6 +111,31 @@ def run_episode(
         raise ValueError(
             "policy_episode_seed must be non-negative."
         )
+
+    try:
+        parsed_arbitration_mode = ArbitrationMode(
+            arbitration_mode
+        )
+    except ValueError as error:
+        supported = ", ".join(
+            mode.value for mode in ArbitrationMode
+        )
+        raise ValueError(
+            f"Unsupported arbitration mode "
+            f"{arbitration_mode!r}. Supported modes: "
+            f"{supported}."
+        ) from error
+
+    if parsed_arbitration_mode is not ArbitrationMode.AUTONOMOUS:
+        raise ValueError(
+            "The autonomous episode runner currently supports "
+            "only arbitration_mode='autonomous'. Takeover "
+            "requires the human-input runner."
+        )
+
+    arbitrator = ActionArbitrator(
+        parsed_arbitration_mode
+    )
 
     episode_directory = (
         output_root
@@ -299,8 +331,16 @@ def run_episode(
         )
         active_chunk_action_index += 1
 
+        arbitration_result = arbitrator.arbitrate(
+            autonomous_action=policy_action,
+            human_action=IDLE_HUMAN_ACTION,
+        )
+        executed_action = (
+            arbitration_result.executed_action
+        )
+
         obs, reward, done, info = env.step(
-            policy_action.tolist()
+            executed_action.tolist()
         )
         simulation_steps += 1
 
@@ -308,7 +348,7 @@ def run_episode(
             {
                 "simulation_step": simulation_steps,
                 "control_step": len(step_records),
-                "arbitration_mode": arbitration_mode,
+                **arbitration_result.as_dict(),
                 "replanned": replanned,
                 "policy_episode_seed": policy_episode_seed,
                 "policy_replan_index": active_replan_index,
@@ -396,7 +436,9 @@ def run_episode(
             settled_body_position.tolist()
         ),
         output_directory=str(episode_directory),
-        arbitration_mode=arbitration_mode,
+        arbitration_mode=(
+            parsed_arbitration_mode.value
+        ),
         policy_episode_seed=policy_episode_seed,
         policy_seed_protocol=(
             SEED_PROTOCOL
