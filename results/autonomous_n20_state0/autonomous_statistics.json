@@ -1,0 +1,24 @@
+{
+  "source_summary": "/workspace/outputs/autonomous_n20_state0/sweep_summary.json",
+  "conditions": 10,
+  "episodes": 200,
+  "pearson_all_conditions": {
+    "r": -0.8589482985848322,
+    "two_sided_p": 0.0014555311207166128
+  },
+  "pearson_perturbed_conditions": {
+    "r": -0.8204030141909405,
+    "two_sided_p": 0.0067485910999548005
+  },
+  "distance_ge_0_15": {
+    "conditions": 7,
+    "successes": 21,
+    "episodes": 140,
+    "success_rate": 0.15
+  },
+  "paper_reported_values": {
+    "pearson_r": -0.8,
+    "two_sided_p": 0.005,
+    "distance_ge_0_15_success_rate": 0.229
+  }
+}

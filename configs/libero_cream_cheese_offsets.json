@@ -1,0 +1,21 @@
+{
+  "task_suite_name": "libero_object",
+  "task_id": 1,
+  "task_description": "pick up the cream cheese and place it in the basket",
+  "joint_name": "cream_cheese_1_joint0",
+  "body_name": "cream_cheese_1_main",
+  "source": "SAPS Appendix Table A1",
+  "note": "Appendix Table A1 contains nine offset pairs, while the main text refers to eight perturbed configurations.",
+  "offsets": [
+    {"id": "nominal", "dx": 0.00, "dy": 0.00},
+    {"id": "p01", "dx": 0.00, "dy": 0.08},
+    {"id": "p02", "dx": 0.10, "dy": 0.08},
+    {"id": "p03", "dx": 0.00, "dy": 0.18},
+    {"id": "p04", "dx": 0.18, "dy": 0.05},
+    {"id": "p05", "dx": 0.13, "dy": 0.15},
+    {"id": "p06", "dx": 0.05, "dy": 0.23},
+    {"id": "p07", "dx": 0.06, "dy": 0.23},
+    {"id": "p08", "dx": 0.20, "dy": 0.16},
+    {"id": "p09", "dx": 0.08, "dy": 0.28}
+  ]
+}
