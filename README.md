@@ -67,7 +67,7 @@ git submodule update --init --recursive
 The pinned LIBERO runtime uses Python 3.8. Some legacy source packages require Python-3.8-compatible build tools.
 
 ```bash
-./scripts/apply_openpi_patch.sh
+./patches/apply_openpi_patch.sh
 ```
 
 Then build the runtime:
@@ -162,3 +162,11 @@ See:
 The next development phase adds keyboard/gamepad teleoperation and the
 shared-autonomy arbitration modes.
 <!-- PHASE1_STATUS_END -->
+
+## Running the Project
+
+Common experiment, test, diagnostic, and analysis commands are
+documented in the
+[project runbook](docs/runbook.md).
+
+Run `make help` for the short command reference.

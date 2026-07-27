@@ -11,7 +11,7 @@ Usage:
         runtime \
         /bin/bash -lc \
         'source /.venv/bin/activate &&
-        python /workspace/scripts/analyze_autonomous_results.py \
+        python /workspace/tools/analysis/analyze_autonomous_results.py \
             /workspace/outputs/autonomous_n20_state0/sweep_summary.json \
             --output-dir /workspace/results/autonomous_n20_state0 &&
         chown -R "$LOCAL_UID:$LOCAL_GID" \

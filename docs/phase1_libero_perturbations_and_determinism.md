@@ -287,8 +287,8 @@ After human input changes the robot or environment state, subsequent observation
 configs/libero_cream_cheese_offsets.json
 src/saps/environments/libero_env.py
 src/saps/environments/perturbations.py
-scripts/inspect_libero_scene.py
-scripts/preview_libero_perturbation.py
+tools/diagnostics/inspect_libero_scene.py
+tools/diagnostics/preview_libero_perturbation.py
 ```
 
 ### Autonomous Execution and Logging
@@ -297,7 +297,7 @@ scripts/preview_libero_perturbation.py
 src/saps/evaluation/runner.py
 scripts/run_libero.py
 scripts/run_autonomous_sweep.py
-scripts/watch_autonomous_progress.py
+tools/monitoring/watch_autonomous_progress.py
 ```
 
 ### Deterministic Policy Sampling
@@ -306,7 +306,7 @@ scripts/watch_autonomous_progress.py
 src/saps/policies/openpi_client.py
 src/saps/policies/seeding.py
 scripts/serve_seeded_policy.py
-scripts/probe_seeded_policy.py
+tools/diagnostics/probe_seeded_policy.py
 compose.yml
 ```
 
