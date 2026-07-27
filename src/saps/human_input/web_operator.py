@@ -18,6 +18,7 @@ import websockets
 from saps.human_input.keyboard import ALLOWED_KEYS
 from saps.human_input.keyboard import HumanInputSample
 from saps.human_input.keyboard import KeyboardActionMapper
+from saps.human_input.keyboard import SPEED_MODES
 
 
 LOGGER = logging.getLogger(__name__)
@@ -73,7 +74,7 @@ def _build_operator_page(
 
     #camera {{
       width: 100%;
-      aspect-ratio: 4 / 3;
+      aspect-ratio: 2 / 1;
       object-fit: contain;
       background: #050607;
       border-radius: 8px;
@@ -189,6 +190,12 @@ def _build_operator_page(
 
         <div class="label">Gripper</div>
         <div id="gripper">Open (-1)</div>
+
+        <div class="label">Speed mode</div>
+        <div id="speed-mode">Fine</div>
+
+        <div class="label">Interface</div>
+        <div>Phase 2.2 controls</div>
       </div>
 
       <h3>Current 7D action</h3>
@@ -207,17 +214,24 @@ def _build_operator_page(
       <button id="open-gripper">Open (Z)</button>
       <button id="close-gripper">Close (X)</button>
 
+      <h2>Speed</h2>
+
+      <button id="speed-fine">Fine (1)</button>
+      <button id="speed-normal">Normal (2)</button>
+      <button id="speed-fast">Fast (3)</button>
+
       <h2>Keyboard mapping</h2>
 
       <table>
         <tr><th>Keys</th><th>Command</th></tr>
-        <tr><td>A / D</td><td>-x / +x</td></tr>
-        <tr><td>S / W</td><td>-y / +y</td></tr>
-        <tr><td>F / R</td><td>-z / +z</td></tr>
-        <tr><td>U / O</td><td>-roll / +roll</td></tr>
-        <tr><td>K / I</td><td>-pitch / +pitch</td></tr>
-        <tr><td>J / L</td><td>-yaw / +yaw</td></tr>
+        <tr><td>W / S</td><td>screen forward / backward</td></tr>
+        <tr><td>A / D</td><td>screen left / right</td></tr>
+        <tr><td>Space / Shift</td><td>up / down</td></tr>
+        <tr><td>Q / E</td><td>yaw left / right</td></tr>
+        <tr><td>Up / Down</td><td>pitch</td></tr>
+        <tr><td>Left / Right</td><td>roll</td></tr>
         <tr><td>Z / X</td><td>open / close gripper</td></tr>
+        <tr><td>1 / 2 / 3</td><td>fine / normal / fast</td></tr>
         <tr><td>Escape</td><td>abort</td></tr>
       </table>
 
@@ -241,8 +255,11 @@ const websocketUrl =
   `ws://${{window.location.hostname}}:${{websocketPort}}`;
 
 const allowedKeys = new Set([
-  "a", "d", "w", "s", "r", "f",
-  "u", "o", "i", "k", "j", "l",
+  "w", "a", "s", "d",
+  "space", "shift",
+  "q", "e",
+  "arrowup", "arrowdown",
+  "arrowleft", "arrowright",
   "z", "x"
 ]);
 
@@ -261,6 +278,8 @@ const motionElement =
   document.getElementById("motion-active");
 const gripperElement =
   document.getElementById("gripper");
+const speedElement =
+  document.getElementById("speed-mode");
 const actionElement =
   document.getElementById("action");
 const runtimeStatusElement =
@@ -343,6 +362,11 @@ function connect() {{
             ? "Closed (+1)"
             : "Open (-1)";
 
+        speedElement.textContent =
+          `${{sample.speed_mode}} ` +
+          `(T=${{sample.translation_gain.toFixed(2)}}, ` +
+          `R=${{sample.rotation_gain.toFixed(2)}})`;
+
         actionElement.textContent =
           JSON.stringify(sample.action, null, 2);
 
@@ -366,12 +390,41 @@ function connect() {{
   }};
 }}
 
-window.addEventListener("keydown", (event) => {{
+function normalizeKey(event) {{
   const key = event.key.toLowerCase();
+
+  if (key === " " || key === "spacebar") {{
+    return "space";
+  }}
+
+  if (key === "shift") {{
+    return "shift";
+  }}
+
+  return key;
+}}
+
+window.addEventListener("keydown", (event) => {{
+  const key = normalizeKey(event);
 
   if (key === "escape") {{
     event.preventDefault();
     send({{type: "abort"}});
+    return;
+  }}
+
+  const speedModes = {{
+    "1": "fine",
+    "2": "normal",
+    "3": "fast"
+  }};
+
+  if (speedModes[key]) {{
+    event.preventDefault();
+    send({{
+      type: "speed",
+      value: speedModes[key]
+    }});
     return;
   }}
 
@@ -388,7 +441,7 @@ window.addEventListener("keydown", (event) => {{
 }});
 
 window.addEventListener("keyup", (event) => {{
-  const key = event.key.toLowerCase();
+  const key = normalizeKey(event);
 
   if (!allowedKeys.has(key)) {{
     return;
@@ -433,6 +486,18 @@ document.getElementById("close-gripper").onclick = () => {{
   send({{type: "gripper", value: 1}});
 }};
 
+document.getElementById("speed-fine").onclick = () => {{
+  send({{type: "speed", value: "fine"}});
+}};
+
+document.getElementById("speed-normal").onclick = () => {{
+  send({{type: "speed", value: "normal"}});
+}};
+
+document.getElementById("speed-fast").onclick = () => {{
+  send({{type: "speed", value: "fast"}});
+}};
+
 connect();
 </script>
 </body>
@@ -449,8 +514,15 @@ class BrowserOperatorServer:
         host: str = "0.0.0.0",
         websocket_port: int = 8765,
         http_port: int = 8766,
-        translation_gain: float = 0.35,
-        rotation_gain: float = 0.35,
+        fine_translation_gain: float = 0.07,
+        normal_translation_gain: float = 0.14,
+        fast_translation_gain: float = 0.25,
+        fine_rotation_gain: float = 0.10,
+        normal_rotation_gain: float = 0.18,
+        fast_rotation_gain: float = 0.30,
+        default_speed_mode: str = "fine",
+        translation_gain: Optional[float] = None,
+        rotation_gain: Optional[float] = None,
         jpeg_quality: int = 85,
     ) -> None:
         if not 1 <= jpeg_quality <= 100:
@@ -463,14 +535,48 @@ class BrowserOperatorServer:
         self.http_port = int(http_port)
         self.jpeg_quality = int(jpeg_quality)
 
+        # Preserve the concise legacy arguments used by the
+        # Phase 2.1 operator test. They configure normal speed.
+        if translation_gain is not None:
+            normal_translation_gain = float(
+                translation_gain
+            )
+
+        if rotation_gain is not None:
+            normal_rotation_gain = float(
+                rotation_gain
+            )
+
         self._mapper = KeyboardActionMapper(
-            translation_gain=translation_gain,
-            rotation_gain=rotation_gain,
+            fine_translation_gain=(
+                fine_translation_gain
+            ),
+            normal_translation_gain=(
+                normal_translation_gain
+            ),
+            fast_translation_gain=(
+                fast_translation_gain
+            ),
+            fine_rotation_gain=(
+                fine_rotation_gain
+            ),
+            normal_rotation_gain=(
+                normal_rotation_gain
+            ),
+            fast_rotation_gain=(
+                fast_rotation_gain
+            ),
+            default_speed_mode=(
+                default_speed_mode
+            ),
         )
 
         self._lock = threading.Lock()
         self._pressed_keys: set[str] = set()
         self._gripper_command = -1.0
+        self._speed_mode = (
+            self._mapper.default_speed_mode
+        )
         self._armed = False
         self._abort_requested = False
         self._connected_clients = 0
@@ -556,6 +662,29 @@ class BrowserOperatorServer:
                 self.end_headers()
                 self.wfile.write(page)
 
+            def do_HEAD(self) -> None:
+                if self.path not in {
+                    "/",
+                    "/index.html",
+                }:
+                    self.send_error(404)
+                    return
+
+                self.send_response(200)
+                self.send_header(
+                    "Content-Type",
+                    "text/html; charset=utf-8",
+                )
+                self.send_header(
+                    "Content-Length",
+                    str(len(page)),
+                )
+                self.send_header(
+                    "Cache-Control",
+                    "no-store",
+                )
+                self.end_headers()
+
             def log_message(
                 self,
                 format: str,
@@ -628,6 +757,19 @@ class BrowserOperatorServer:
         path: Any = None,
     ) -> None:
         del path
+
+        if self._clients:
+            LOGGER.warning(
+                "Rejecting additional operator browser."
+            )
+            await websocket.close(
+                code=4001,
+                reason=(
+                    "Only one operator browser "
+                    "is allowed."
+                ),
+            )
+            return
 
         self._clients.add(websocket)
 
@@ -713,6 +855,14 @@ class BrowserOperatorServer:
                     self._gripper_command = 1.0
                 elif "z" in self._pressed_keys:
                     self._gripper_command = -1.0
+
+            elif message_type == "speed":
+                requested_mode = str(
+                    message.get("value", "")
+                ).lower()
+
+                if requested_mode in SPEED_MODES:
+                    self._speed_mode = requested_mode
 
             elif message_type == "arm":
                 self._armed = bool(
@@ -820,6 +970,7 @@ class BrowserOperatorServer:
         with self._lock:
             pressed_keys = set(self._pressed_keys)
             gripper_command = self._gripper_command
+            speed_mode = self._speed_mode
             connected = self._connected_clients > 0
             armed = self._armed
             abort_requested = self._abort_requested
@@ -830,6 +981,7 @@ class BrowserOperatorServer:
         return self._mapper.sample(
             pressed_keys=pressed_keys,
             gripper_command=gripper_command,
+            speed_mode=speed_mode,
             connected=connected,
             armed=armed,
             abort_requested=abort_requested,

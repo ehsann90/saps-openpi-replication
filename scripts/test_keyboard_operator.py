@@ -22,8 +22,8 @@ class Args:
     websocket_port: int = 8765
     http_port: int = 8766
 
-    translation_gain: float = 0.35
-    rotation_gain: float = 0.35
+    translation_gain: float = 0.14
+    rotation_gain: float = 0.18
 
     duration_seconds: float = 300.0
     frame_frequency_hz: float = 10.0

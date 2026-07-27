@@ -12,27 +12,35 @@ from typing import Tuple
 import numpy as np
 
 
+SPEED_MODES = ("fine", "normal", "fast")
+
 MOTION_KEYS = frozenset(
     {
-        # Cartesian translation.
-        "a",
-        "d",
+        # Camera-relative translation.
         "w",
+        "a",
         "s",
-        "r",
-        "f",
-        # Cartesian orientation.
-        "u",
-        "o",
-        "i",
-        "k",
-        "j",
-        "l",
+        "d",
+        "space",
+        "shift",
+        # Orientation.
+        "q",
+        "e",
+        "arrowup",
+        "arrowdown",
+        "arrowleft",
+        "arrowright",
     }
 )
 
 GRIPPER_KEYS = frozenset({"z", "x"})
 ALLOWED_KEYS = MOTION_KEYS | GRIPPER_KEYS
+
+
+@dataclasses.dataclass(frozen=True)
+class SpeedProfile:
+    translation_gain: float
+    rotation_gain: float
 
 
 @dataclasses.dataclass(frozen=True)
@@ -46,6 +54,11 @@ class HumanInputSample:
     abort_requested: bool
     pressed_keys: Tuple[str, ...]
     gripper_command: float
+
+    speed_mode: str
+    translation_gain: float
+    rotation_gain: float
+
     sample_monotonic_seconds: float
     last_event_monotonic_seconds: Optional[float]
 
@@ -58,6 +71,9 @@ class HumanInputSample:
             "abort_requested": self.abort_requested,
             "pressed_keys": list(self.pressed_keys),
             "gripper_command": self.gripper_command,
+            "speed_mode": self.speed_mode,
+            "translation_gain": self.translation_gain,
+            "rotation_gain": self.rotation_gain,
             "sample_monotonic_seconds": (
                 self.sample_monotonic_seconds
             ),
@@ -68,31 +84,80 @@ class HumanInputSample:
 
 
 class KeyboardActionMapper:
-    """Map held keyboard keys to a normalized LIBERO action.
+    """Map keyboard state to a normalized LIBERO action.
 
     Action convention:
 
         [dx, dy, dz, droll, dpitch, dyaw, gripper]
 
-    The first six dimensions describe Cartesian motion. The final
-    dimension is -1 for open and +1 for close.
+    The displayed agent image is rotated by 180 degrees relative to the
+    raw MuJoCo image. In the displayed view:
+
+        screen up    approximately corresponds to world +x
+        screen right approximately corresponds to world -y
+
+    Therefore the camera-relative planar mapping is:
+
+        W/S -> +x/-x
+        A/D -> -y/+y
     """
 
     def __init__(
         self,
         *,
-        translation_gain: float = 0.35,
-        rotation_gain: float = 0.35,
+        fine_translation_gain: float = 0.07,
+        normal_translation_gain: float = 0.14,
+        fast_translation_gain: float = 0.25,
+        fine_rotation_gain: float = 0.10,
+        normal_rotation_gain: float = 0.18,
+        fast_rotation_gain: float = 0.30,
+        default_speed_mode: str = "fine",
         idle_threshold: float = 1e-3,
     ) -> None:
-        if not 0.0 < translation_gain <= 1.0:
-            raise ValueError(
-                "translation_gain must be within (0, 1]."
-            )
+        self._speed_profiles = {
+            "fine": SpeedProfile(
+                translation_gain=float(
+                    fine_translation_gain
+                ),
+                rotation_gain=float(
+                    fine_rotation_gain
+                ),
+            ),
+            "normal": SpeedProfile(
+                translation_gain=float(
+                    normal_translation_gain
+                ),
+                rotation_gain=float(
+                    normal_rotation_gain
+                ),
+            ),
+            "fast": SpeedProfile(
+                translation_gain=float(
+                    fast_translation_gain
+                ),
+                rotation_gain=float(
+                    fast_rotation_gain
+                ),
+            ),
+        }
 
-        if not 0.0 < rotation_gain <= 1.0:
+        for mode, profile in self._speed_profiles.items():
+            if not 0.0 < profile.translation_gain <= 1.0:
+                raise ValueError(
+                    f"{mode} translation gain must be "
+                    "within (0, 1]."
+                )
+
+            if not 0.0 < profile.rotation_gain <= 1.0:
+                raise ValueError(
+                    f"{mode} rotation gain must be "
+                    "within (0, 1]."
+                )
+
+        if default_speed_mode not in SPEED_MODES:
             raise ValueError(
-                "rotation_gain must be within (0, 1]."
+                f"Unknown default speed mode "
+                f"{default_speed_mode!r}."
             )
 
         if idle_threshold < 0.0:
@@ -100,8 +165,7 @@ class KeyboardActionMapper:
                 "idle_threshold must be non-negative."
             )
 
-        self.translation_gain = float(translation_gain)
-        self.rotation_gain = float(rotation_gain)
+        self.default_speed_mode = default_speed_mode
         self.idle_threshold = float(idle_threshold)
 
     @staticmethod
@@ -121,58 +185,66 @@ class KeyboardActionMapper:
         *,
         pressed_keys: Iterable[str],
         gripper_command: float,
+        speed_mode: str,
         connected: bool,
         armed: bool,
         abort_requested: bool,
         last_event_monotonic_seconds: Optional[float],
     ) -> HumanInputSample:
+        if speed_mode not in self._speed_profiles:
+            raise ValueError(
+                f"Unknown speed mode {speed_mode!r}."
+            )
+
+        profile = self._speed_profiles[speed_mode]
+
         keys = {
             str(key).lower()
             for key in pressed_keys
             if str(key).lower() in ALLOWED_KEYS
         }
 
-        translation = np.zeros(3, dtype=np.float32)
-        rotation = np.zeros(3, dtype=np.float32)
+        translation = np.zeros(
+            3,
+            dtype=np.float32,
+        )
+        rotation = np.zeros(
+            3,
+            dtype=np.float32,
+        )
 
-        # Motion commands are disabled until the operator explicitly
-        # arms the interface.
         if connected and armed and not abort_requested:
-            # Base-frame translation:
-            # D/A: +x/-x
-            # W/S: +y/-y
-            # R/F: +z/-z
-            translation[0] = float("d" in keys) - float(
-                "a" in keys
-            )
-            translation[1] = float("w" in keys) - float(
+            # Camera-relative translation in the displayed agent view.
+            translation[0] = float("w" in keys) - float(
                 "s" in keys
             )
-            translation[2] = float("r" in keys) - float(
-                "f" in keys
+            translation[1] = float("d" in keys) - float(
+                "a" in keys
             )
+            translation[2] = float(
+                "space" in keys
+            ) - float("shift" in keys)
 
-            # Axis-angle rotation:
-            # O/U: +roll/-roll
-            # I/K: +pitch/-pitch
-            # L/J: +yaw/-yaw
-            rotation[0] = float("o" in keys) - float(
-                "u" in keys
-            )
-            rotation[1] = float("i" in keys) - float(
-                "k" in keys
-            )
-            rotation[2] = float("l" in keys) - float(
-                "j" in keys
+            # Orientation commands.
+            rotation[0] = float(
+                "arrowright" in keys
+            ) - float("arrowleft" in keys)
+
+            rotation[1] = float(
+                "arrowup" in keys
+            ) - float("arrowdown" in keys)
+
+            rotation[2] = float("q" in keys) - float(
+                "e" in keys
             )
 
             translation = self._normalize_to_gain(
                 translation,
-                self.translation_gain,
+                profile.translation_gain,
             )
             rotation = self._normalize_to_gain(
                 rotation,
-                self.rotation_gain,
+                profile.rotation_gain,
             )
 
         action = np.concatenate(
@@ -180,7 +252,13 @@ class KeyboardActionMapper:
                 translation,
                 rotation,
                 np.asarray(
-                    [np.clip(gripper_command, -1.0, 1.0)],
+                    [
+                        np.clip(
+                            gripper_command,
+                            -1.0,
+                            1.0,
+                        )
+                    ],
                     dtype=np.float32,
                 ),
             )
@@ -205,6 +283,11 @@ class KeyboardActionMapper:
             abort_requested=bool(abort_requested),
             pressed_keys=tuple(sorted(keys)),
             gripper_command=float(action[6]),
+            speed_mode=speed_mode,
+            translation_gain=(
+                profile.translation_gain
+            ),
+            rotation_gain=profile.rotation_gain,
             sample_monotonic_seconds=time.monotonic(),
             last_event_monotonic_seconds=(
                 last_event_monotonic_seconds
