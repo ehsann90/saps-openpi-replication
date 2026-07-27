@@ -4,9 +4,9 @@ This runbook records the commands used to run the main replication processes, te
 
 Run all commands from the repository root:
 
-~~~bash
+```bash
 cd ~/MyProjects/saps-openpi-replication
-~~~
+```
 
 ## 1. Repository layout
 
@@ -49,9 +49,9 @@ cd ~/MyProjects/saps-openpi-replication
 
 Display the available Makefile commands:
 
-~~~bash
+```bash
 make help
-~~~
+```
 
 Common commands:
 
