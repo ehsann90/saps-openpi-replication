@@ -129,3 +129,36 @@ saps-openpi-replication/
 └── third_party/
     └── openpi/
 ```
+
+<!-- PHASE1_STATUS_START -->
+## Current Project Status
+
+**Phase 1 is complete.**
+
+The repository currently provides:
+
+- pinned OpenPI π0.5 and LIBERO integration;
+- SAPS-style cream-cheese planar perturbations;
+- a resumable cyclic autonomous evaluation scheduler;
+- a completed 200-episode autonomous perturbation baseline;
+- deterministic per-episode and per-replan policy sampling;
+- bitwise reproducibility across policy-server restarts;
+- step-level logging prepared for matched arbitration experiments.
+
+The 200-episode baseline contains 20 trials for each of the nominal
+condition and nine SAPS Appendix A1 perturbations. It demonstrates clear
+autonomous-policy degradation as the target object is moved away from
+its nominal pose.
+
+The deterministic policy protocol assigns one stable seed to each
+`(condition_id, trial_index)` pair. Arbitration mode is excluded from
+seed derivation, allowing future autonomous, takeover, fixed-blending,
+and cosine-blending trials to use matched autonomous randomness.
+
+See:
+
+- [Phase 1: LIBERO Perturbations, Autonomous Baseline, and Deterministic Policy Sampling](docs/phase1_libero_perturbations_and_determinism.md)
+
+The next development phase adds keyboard/gamepad teleoperation and the
+shared-autonomy arbitration modes.
+<!-- PHASE1_STATUS_END -->
