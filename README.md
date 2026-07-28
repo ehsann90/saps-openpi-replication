@@ -1,58 +1,84 @@
-# SAPS OpenPI Replication
+# SAPS–OpenPI Replication
 
-A methodological replication of:
+An independent, research-oriented replication of **SAPS: Shared Autonomy for
+Policy Steering by Blending Teleoperation with a Pretrained VLA** using the
+OpenPI `pi05_libero` policy, LIBERO, Robosuite, and MuJoCo.
 
-**SAPS: Shared Autonomy for Policy Steering by Blending Teleoperation
-with a Pretrained VLA**
+> Crystal Zhou, Jehan Yang, Douglas J. Weber, and Zackory Erickson,
+> “SAPS: Shared Autonomy for Policy Steering by Blending Teleoperation with a
+> Pretrained VLA,” arXiv:2606.15568, 2026.
+>
+> Paper: https://arxiv.org/abs/2606.15568
 
-The first objective is to reproduce the simulation experiments using:
-
-- Physical Intelligence OpenPI
-- the `pi05_libero` checkpoint
-- LIBERO
-- Robosuite
-- MuJoCo
-
-The subsequent objective is to implement the SAPS action-level
-arbitration methods:
-
-- autonomous execution
-- pure teleoperation
-- takeover
-- fixed 50/50 blending
-- cosine-similarity blending
+This repository is not an official implementation from the SAPS or OpenPI
+authors. It focuses on methodological transparency, deterministic policy
+sampling, controlled LIBERO perturbations, operator-visible shared autonomy,
+and reproducible experiment tooling.
 
 ## Current status
 
-The nominal OpenPI-LIBERO pipeline has been validated locally.
+The functional replication stack is complete through action-level arbitration.
+Formal multi-condition, operator-assisted experiments and unified statistical
+analysis are the next phase.
 
-- OpenPI policy server: working
-- `pi05_libero` checkpoint: working
-- LIBERO / Robosuite simulation: working
-- NVIDIA GPU inference: working
-- EGL rendering: working
-- LIBERO-Object smoke test: 10/10 successful episodes
+| Component | Status |
+|---|---|
+| Pinned OpenPI and LIBERO environment | Implemented and validated |
+| `pi05_libero` policy server | Implemented and validated |
+| SAPS cream-cheese perturbations | Implemented and validated |
+| Deterministic per-episode and per-replan sampling | Implemented and validated |
+| Autonomous baseline and resumable sweeps | Implemented |
+| Browser keyboard teleoperation | Implemented and validated |
+| Hard takeover | Implemented and validated |
+| Fixed/equal action blending | Implemented and validated |
+| Cosine-similarity blending | Implemented and validated |
+| Manifest-driven operator experiment sessions | Planned for Phase 3 |
+| Unified multi-mode analysis | Planned for Phase 3 |
 
-The SAPS arbitration methods and paper-specific object perturbations have
-not yet been implemented.
+The completed Phase 1 autonomous degradation study contains 200 episodes:
+20 trials for the nominal condition and each of nine perturbation conditions.
+The human-input and arbitration stack has passed unit, compilation, scheduler,
+and live LIBERO validation, but those pilot runs are not formal statistical
+experiments.
 
-## Tested environment
+## What is reproduced
 
-- Ubuntu 24.04.4 LTS
-- NVIDIA GeForce RTX 5080 Laptop GPU, 16 GB
-- NVIDIA driver 595.71.05
-- Docker 29.1.3
-- Docker Compose 2.40.3
-- OpenPI commit:
-  `15a9616a00943ada6c20a0f158e3adb39df2ccac`
-- LIBERO commit:
-  `f78abd68ee283de9f9be3c8f7e2a9ad60246e95c`
+The repository implements the SAPS action-level comparison conditions:
 
-## Clone
+- autonomous policy execution;
+- pure teleoperation;
+- hard takeover;
+- fixed blending, with `0.5` as the paper coefficient;
+- cosine-similarity blending, with gain `k = 6` as in the paper.
+
+Human activity is detected from the first six action dimensions. Motion is
+arbitrated separately from the gripper, which uses the SAPS closing-biased
+`max()` rule under this project's `-1=open`, `+1=close` convention.
+
+## Reproducibility baseline
+
+| Dependency | Pinned revision |
+|---|---|
+| OpenPI | `15a9616a00943ada6c20a0f158e3adb39df2ccac` |
+| LIBERO | `f78abd68ee283de9f9be3c8f7e2a9ad60246e95c` |
+| Policy config | `pi05_libero` |
+| Task suite | `libero_object` |
+| Task | `pick up the cream cheese and place it in the basket` |
+
+OpenPI is included as the `third_party/openpi` Git submodule. Project-specific
+code remains in the outer repository; the retained OpenPI compatibility change
+is stored as a patch rather than an undocumented modification.
+
+## Quick start
+
+### 1. Clone the complete repository
 
 ```bash
-git clone --recurse-submodules <repository-url>
+git clone --recurse-submodules \
+  https://github.com/ehsann90/saps-openpi-replication.git
 cd saps-openpi-replication
+
+git submodule status
 ```
 
 For an existing clone:
@@ -61,104 +87,87 @@ For an existing clone:
 git submodule update --init --recursive
 ```
 
-
-## Patch
-
-The pinned LIBERO runtime uses Python 3.8. Some legacy source packages require Python-3.8-compatible build tools.
+### 2. Apply the pinned compatibility patch and build images
 
 ```bash
-./scripts/apply_openpi_patch.sh
+make apply-patch
+make build-images
 ```
 
-Then build the runtime:
+The two expected local images are:
+
+```text
+libero
+openpi_server
+```
+
+### 3. Run the automated checks
 
 ```bash
-cd third_party/openpi
-docker compose -f examples/libero/compose.yml build runtime
+make check
 ```
 
-## Checkpoint
-
-The checkpoint is not stored in this repository.
-
-Expected cache location:
+### 4. Start the deterministic policy server
 
 ```bash
-~/.cache/openpi/openpi-assets/checkpoints/pi05_libero
+make policy-server
 ```
 
-It can be synchronized from the public bucket using:
+Keep this terminal running for autonomous or shared-autonomy modes. Pure
+teleoperation and the browser input smoke test do not require the policy server.
+
+### 5. Run one mode in a second terminal
 
 ```bash
-gcloud storage rsync \
-  gs://openpi-assets/checkpoints/pi05_libero \
-  "$HOME/.cache/openpi/openpi-assets/checkpoints/pi05_libero" \
-  --recursive \
-  --checksums-only
+# Autonomous smoke test
+make autonomous-smoke CONDITION=nominal
+
+# Pure teleoperation
+make teleop CONDITION=nominal TRIAL=0 TELEOP_MAX_STEPS=1800
+
+# Hard takeover
+make takeover \
+  CONDITION=nominal \
+  TRIAL=0
+
+# Equal/fixed blending
+make fixed-blend \
+  FIXED_AUTONOMY_WEIGHT=0.5 \
+  CONDITION=nominal \
+  TRIAL=0
+
+# Cosine-similarity blending
+make cosine-blend \
+  COSINE_GAIN=6.0 \
+  CONDITION=nominal \
+  TRIAL=0
 ```
 
-## Baseline evaluation
+For operator-controlled modes, open the displayed browser URL and click
+**Arm controls** before issuing commands.
 
-```bash
-cd third_party/openpi
+## Documentation
 
-SERVER_ARGS="--env LIBERO" \
-CLIENT_ARGS="--args.task-suite-name libero_object \
---args.num-trials-per-task 1 \
---args.replan-steps 5" \
-docker compose -f examples/libero/compose.yml up
-```
+- [Installation and environment setup](docs/setup.md)
+- [Command runbook](docs/runbook.md)
+- [Testing and validation](docs/testing.md)
+- [Shared-autonomy semantics and runtime](docs/shared_autonomy.md)
+- [Phase 1 perturbations and deterministic sampling](docs/phase1_libero_perturbations_and_determinism.md)
+- [Formal experiment protocol](docs/experiment_protocol.md)
+- [Analysis plan and current tools](docs/analysis.md)
+- [Repository structure](docs/repository_structure.md)
 
-## Cleanly Stopping Server
+Run `make help` for the compact command reference.
 
-```bash
-cd ~/MyProjects/saps-openpi-replication/third_party/openpi
+## Output policy
 
-docker compose \
-  -f examples/libero/compose.yml \
-  down
-```
+Generated episodes are written below `outputs/`; analysis products belong below
+`results/`. Both directories are ignored by Git. Preserve experiment manifests,
+software revisions, and output summaries outside the repository when archiving
+formal studies.
 
-## Repository structure
+## Citation
 
-```bash
-saps-openpi-replication/
-├── docs/
-├── patches/
-├── scripts/
-└── third_party/
-    └── openpi/
-```
-
-<!-- PHASE1_STATUS_START -->
-## Current Project Status
-
-**Phase 1 is complete.**
-
-The repository currently provides:
-
-- pinned OpenPI π0.5 and LIBERO integration;
-- SAPS-style cream-cheese planar perturbations;
-- a resumable cyclic autonomous evaluation scheduler;
-- a completed 200-episode autonomous perturbation baseline;
-- deterministic per-episode and per-replan policy sampling;
-- bitwise reproducibility across policy-server restarts;
-- step-level logging prepared for matched arbitration experiments.
-
-The 200-episode baseline contains 20 trials for each of the nominal
-condition and nine SAPS Appendix A1 perturbations. It demonstrates clear
-autonomous-policy degradation as the target object is moved away from
-its nominal pose.
-
-The deterministic policy protocol assigns one stable seed to each
-`(condition_id, trial_index)` pair. Arbitration mode is excluded from
-seed derivation, allowing future autonomous, takeover, fixed-blending,
-and cosine-blending trials to use matched autonomous randomness.
-
-See:
-
-- [Phase 1: LIBERO Perturbations, Autonomous Baseline, and Deterministic Policy Sampling](docs/phase1_libero_perturbations_and_determinism.md)
-
-The next development phase adds keyboard/gamepad teleoperation and the
-shared-autonomy arbitration modes.
-<!-- PHASE1_STATUS_END -->
+When using this replication, cite the original SAPS paper and identify the exact
+repository commit used for the experiment. A machine-readable citation template
+is provided in [`CITATION.cff`](CITATION.cff).

@@ -16,6 +16,7 @@ def create_libero_task(
     task_id: int,
     resolution: int,
     seed: int,
+    horizon: int | None = None,
 ) -> tuple[Any, str, Any]:
     """Create one LIBERO task and return its environment and initial states."""
 
@@ -45,11 +46,21 @@ def create_libero_task(
         / task.bddl_file
     )
 
-    env = OffScreenRenderEnv(
-        bddl_file_name=bddl_path,
-        camera_heights=resolution,
-        camera_widths=resolution,
-    )
+    env_kwargs: dict[str, Any] = {
+        "bddl_file_name": bddl_path,
+        "camera_heights": resolution,
+        "camera_widths": resolution,
+    }
+
+    if horizon is not None:
+        if horizon <= 0:
+            raise ValueError(
+                "horizon must be positive when provided."
+            )
+
+        env_kwargs["horizon"] = int(horizon)
+
+    env = OffScreenRenderEnv(**env_kwargs)
 
     # LIBERO reports that the seed can affect object positions, even when a
     # saved initial state is subsequently restored.

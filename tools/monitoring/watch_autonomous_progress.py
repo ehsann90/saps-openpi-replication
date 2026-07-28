@@ -4,7 +4,7 @@ Watch the progress of autonomous OpenPI on the SAPS LIBERO cream-cheese task.
 
 Usage:
     watch -n 10 \
-        python3 scripts/watch_autonomous_progress.py \
+        python3 tools/monitoring/watch_autonomous_progress.py \
         outputs/autonomous_n20_state0/sweep_summary.json
 """
 

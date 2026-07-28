@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import collections
 import dataclasses
 import json
 from pathlib import Path
@@ -12,13 +11,23 @@ from typing import Any
 import imageio.v2 as imageio
 import numpy as np
 
+from saps.arbitration import ActionArbitrator
+from saps.arbitration import ArbitrationMode
 from saps.environments.perturbations import apply_planar_object_offset
 from saps.environments.perturbations import get_object_pose
+from saps.policies.action_source import (
+    ChunkedPolicyActionSource,
+)
 from saps.policies.openpi_client import OpenPiLiberoPolicy
 from saps.policies.seeding import SEED_PROTOCOL
 
 
 LIBERO_DUMMY_ACTION = np.asarray(
+    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0],
+    dtype=np.float32,
+)
+
+IDLE_HUMAN_ACTION = np.asarray(
     [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0],
     dtype=np.float32,
 )
@@ -105,6 +114,31 @@ def run_episode(
             "policy_episode_seed must be non-negative."
         )
 
+    try:
+        parsed_arbitration_mode = ArbitrationMode(
+            arbitration_mode
+        )
+    except ValueError as error:
+        supported = ", ".join(
+            mode.value for mode in ArbitrationMode
+        )
+        raise ValueError(
+            f"Unsupported arbitration mode "
+            f"{arbitration_mode!r}. Supported modes: "
+            f"{supported}."
+        ) from error
+
+    if parsed_arbitration_mode is not ArbitrationMode.AUTONOMOUS:
+        raise ValueError(
+            "The autonomous episode runner currently supports "
+            "only arbitration_mode='autonomous'. Takeover "
+            "requires the human-input runner."
+        )
+
+    arbitrator = ActionArbitrator(
+        parsed_arbitration_mode
+    )
+
     episode_directory = (
         output_root
         / condition_id
@@ -177,17 +211,14 @@ def run_episode(
     ) as file:
         json.dump(perturbation_report, file, indent=2)
 
-    action_plan: collections.deque[np.ndarray] = (
-        collections.deque()
+    policy_actions = ChunkedPolicyActionSource(
+        policy=policy,
+        replan_steps=replan_steps,
+        policy_episode_seed=policy_episode_seed,
     )
+
     replay_images: list[np.ndarray] = []
     step_records: list[dict[str, Any]] = []
-
-    next_replan_index = 0
-    active_replan_index: int | None = None
-    active_chunk_action_index = 0
-    active_sampling_metadata: dict[str, Any] | None = None
-    sampling_protocol_version: int | None = None
 
     control_start = time.perf_counter()
 
@@ -198,109 +229,21 @@ def run_episode(
         )
         replay_images.append(replay_image)
 
-        replanned = False
-        inference_latency_seconds: float | None = None
-
-        if not action_plan:
-            active_replan_index = next_replan_index
-            active_chunk_action_index = 0
-
-            inference_start = time.perf_counter()
-
-            if policy_episode_seed is None:
-                action_chunk = policy.infer(policy_input)
-            else:
-                action_chunk = policy.infer(
-                    policy_input,
-                    policy_episode_seed=policy_episode_seed,
-                    replan_index=active_replan_index,
-                )
-
-            inference_latency_seconds = (
-                time.perf_counter() - inference_start
-            )
-            replanned = True
-
-            active_sampling_metadata = (
-                dict(policy.last_sampling_metadata)
-                if policy.last_sampling_metadata is not None
-                else None
-            )
-
-            if policy_episode_seed is not None:
-                if active_sampling_metadata is None:
-                    raise RuntimeError(
-                        "The seeded policy server did not return "
-                        "sampling metadata."
-                    )
-
-                returned_seed = int(
-                    active_sampling_metadata[
-                        "policy_episode_seed"
-                    ]
-                )
-                returned_replan = int(
-                    active_sampling_metadata["replan_index"]
-                )
-
-                if returned_seed != policy_episode_seed:
-                    raise RuntimeError(
-                        "The policy server returned a different "
-                        "episode seed."
-                    )
-
-                if returned_replan != active_replan_index:
-                    raise RuntimeError(
-                        "The policy server returned a different "
-                        "replan index."
-                    )
-
-                returned_protocol = int(
-                    active_sampling_metadata[
-                        "protocol_version"
-                    ]
-                )
-
-                if sampling_protocol_version is None:
-                    sampling_protocol_version = (
-                        returned_protocol
-                    )
-                elif (
-                    sampling_protocol_version
-                    != returned_protocol
-                ):
-                    raise RuntimeError(
-                        "Sampling protocol changed during an episode."
-                    )
-
-            if len(action_chunk) < replan_steps:
-                raise ValueError(
-                    f"Policy returned {len(action_chunk)} actions, "
-                    f"but replan_steps={replan_steps}."
-                )
-
-            action_plan.extend(
-                action_chunk[:replan_steps]
-            )
-            next_replan_index += 1
-
-        if active_replan_index is None:
-            raise RuntimeError(
-                "No active policy action chunk is available."
-            )
-
-        policy_action = np.asarray(
-            action_plan.popleft(),
-            dtype=np.float32,
+        policy_sample = policy_actions.next_action(
+            policy_input
         )
+        policy_action = policy_sample.action
 
-        policy_chunk_action_index = (
-            active_chunk_action_index
+        arbitration_result = arbitrator.arbitrate(
+            autonomous_action=policy_action,
+            human_action=IDLE_HUMAN_ACTION,
         )
-        active_chunk_action_index += 1
+        executed_action = (
+            arbitration_result.executed_action
+        )
 
         obs, reward, done, info = env.step(
-            policy_action.tolist()
+            executed_action.tolist()
         )
         simulation_steps += 1
 
@@ -308,31 +251,9 @@ def run_episode(
             {
                 "simulation_step": simulation_steps,
                 "control_step": len(step_records),
-                "arbitration_mode": arbitration_mode,
-                "replanned": replanned,
+                **arbitration_result.as_dict(),
+                **policy_sample.as_log_dict(),
                 "policy_episode_seed": policy_episode_seed,
-                "policy_replan_index": active_replan_index,
-                "policy_chunk_action_index": (
-                    policy_chunk_action_index
-                ),
-                "sampling_protocol_version": (
-                    active_sampling_metadata.get(
-                        "protocol_version"
-                    )
-                    if active_sampling_metadata
-                    else None
-                ),
-                "policy_noise_sha256": (
-                    active_sampling_metadata.get(
-                        "noise_sha256"
-                    )
-                    if active_sampling_metadata
-                    else None
-                ),
-                "inference_latency_seconds": (
-                    inference_latency_seconds
-                ),
-                "policy_action": policy_action.tolist(),
                 "reward": float(reward),
                 "done": bool(done),
                 "eef_position": np.asarray(
@@ -378,7 +299,9 @@ def run_episode(
         task_description=task_description,
         trial_index=trial_index,
         initial_state_index=initial_state_index,
-        policy_replan_count=next_replan_index,
+        policy_replan_count=(
+            policy_actions.replan_count
+        ),
         delta_x=float(delta_x),
         delta_y=float(delta_y),
         offset_distance=float(
@@ -396,16 +319,20 @@ def run_episode(
             settled_body_position.tolist()
         ),
         output_directory=str(episode_directory),
-        arbitration_mode=arbitration_mode,
+        arbitration_mode=(
+            parsed_arbitration_mode.value
+        ),
         policy_episode_seed=policy_episode_seed,
         policy_seed_protocol=(
             SEED_PROTOCOL
             if policy_episode_seed is not None
             else None
         ),
-        policy_replans=next_replan_index,
+        policy_replans=(
+            policy_actions.replan_count
+        ),
         sampling_protocol_version=(
-            sampling_protocol_version
+            policy_actions.sampling_protocol_version
         ),
     )
 
