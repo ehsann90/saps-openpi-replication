@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run one deterministic autonomous or hard-takeover LIBERO episode."""
+"""Run one deterministic SAPS shared-autonomy LIBERO episode."""
 
 from __future__ import annotations
 
@@ -69,6 +69,7 @@ class Args:
     trial_index: int = 0
     initial_state_index: int = 0
     arbitration_mode: str = "takeover"
+    fixed_autonomy_weight: float = 0.5
 
     # Reproducibility
     environment_seed: int = 7
@@ -113,6 +114,7 @@ class Args:
 class SharedAutonomyEpisodeResult:
     condition_id: str
     arbitration_mode: str
+    fixed_autonomy_weight: float | None
     task_id: int
     task_description: str
     trial_index: int
@@ -144,6 +146,19 @@ class SharedAutonomyEpisodeResult:
     object_position_final: list[float]
 
     output_directory: str
+
+
+
+def _fixed_weight_directory_name(
+    fixed_autonomy_weight: float,
+) -> str:
+    """Return a stable path component for one blend weight."""
+
+    value = f"{fixed_autonomy_weight:.3f}".replace(
+        ".",
+        "p",
+    )
+    return f"alpha_{value}"
 
 
 def validate_args(args: Args) -> ArbitrationMode:
@@ -197,6 +212,15 @@ def validate_args(args: Args) -> ArbitrationMode:
             "arm_timeout_seconds must be positive."
         )
 
+    if (
+        not np.isfinite(args.fixed_autonomy_weight)
+        or not 0.0 <= args.fixed_autonomy_weight <= 1.0
+    ):
+        raise ValueError(
+            "fixed_autonomy_weight must be finite and "
+            "within [0, 1]."
+        )
+
     try:
         return ArbitrationMode(
             args.arbitration_mode
@@ -237,9 +261,18 @@ def main(args: Args) -> None:
     )
 
     output_root = Path(args.output_dir)
+    mode_output_root = output_root / mode.value
+
+    if mode is ArbitrationMode.FIXED_BLEND:
+        mode_output_root = (
+            mode_output_root
+            / _fixed_weight_directory_name(
+                args.fixed_autonomy_weight
+            )
+        )
+
     episode_directory = (
-        output_root
-        / mode.value
+        mode_output_root
         / args.condition_id
         / f"task_{task_id:02d}"
         / f"init_{args.initial_state_index:03d}"
@@ -444,6 +477,12 @@ def main(args: Args) -> None:
             runtime_status={
                 "phase": "waiting_for_browser",
                 "arbitration_mode": mode.value,
+                "configured_autonomy_weight": (
+                    args.fixed_autonomy_weight
+                    if mode
+                    is ArbitrationMode.FIXED_BLEND
+                    else None
+                ),
                 "condition_id": args.condition_id,
                 "trial_index": args.trial_index,
                 "task": task_description,
@@ -457,6 +496,11 @@ def main(args: Args) -> None:
         print("SAPS shared-autonomy episode")
         print()
         print(f"Mode: {mode.value}")
+        if mode is ArbitrationMode.FIXED_BLEND:
+            print(
+                "Configured autonomy weight: "
+                f"{args.fixed_autonomy_weight:.3f}"
+            )
         print(f"Task: {task_description}")
         print(
             f"Condition: {args.condition_id} "
@@ -510,6 +554,9 @@ def main(args: Args) -> None:
                 config["body_name"]
             ),
             arbitration_mode=mode.value,
+            fixed_autonomy_weight=(
+                args.fixed_autonomy_weight
+            ),
             replan_steps=args.replan_steps,
             policy_episode_seed=(
                 policy_episode_seed
@@ -566,6 +613,12 @@ def main(args: Args) -> None:
         result = SharedAutonomyEpisodeResult(
             condition_id=args.condition_id,
             arbitration_mode=mode.value,
+            fixed_autonomy_weight=(
+                args.fixed_autonomy_weight
+                if mode
+                is ArbitrationMode.FIXED_BLEND
+                else None
+            ),
             task_id=task_id,
             task_description=task_description,
             trial_index=args.trial_index,

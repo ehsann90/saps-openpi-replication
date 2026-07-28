@@ -54,6 +54,58 @@ class SharedEpisodeLoopResult:
     replay_images: tuple[np.ndarray, ...]
 
 
+
+def _policy_execution_state(
+    mode: ArbitrationMode,
+) -> str:
+    """Return the state used while consuming policy actions."""
+
+    if mode is ArbitrationMode.FIXED_BLEND:
+        return "fixed_blend"
+
+    return "autonomous"
+
+
+def _policy_wait_state(
+    mode: ArbitrationMode,
+) -> str:
+    """Return the normal policy-wait state for one mode."""
+
+    if mode is ArbitrationMode.FIXED_BLEND:
+        return "fixed_blend_policy_wait"
+
+    return "policy_wait"
+
+
+def _configured_weight(
+    mode: ArbitrationMode,
+    fixed_autonomy_weight: float,
+) -> float | None:
+    """Return the configured blend weight when applicable."""
+
+    if mode is ArbitrationMode.FIXED_BLEND:
+        return fixed_autonomy_weight
+
+    return None
+
+
+def _effective_weight_without_step(
+    *,
+    mode: ArbitrationMode,
+    human_active: bool,
+    fixed_autonomy_weight: float,
+) -> float:
+    """Report the weight that would apply once policy data exists."""
+
+    if mode is ArbitrationMode.FIXED_BLEND and human_active:
+        return fixed_autonomy_weight
+
+    if mode is ArbitrationMode.TAKEOVER and human_active:
+        return 0.0
+
+    return 1.0
+
+
 def run_shared_episode_loop(
     *,
     env: Any,
@@ -63,6 +115,7 @@ def run_shared_episode_loop(
     task_description: str,
     object_body_name: str,
     arbitration_mode: str,
+    fixed_autonomy_weight: float = 0.5,
     replan_steps: int,
     policy_episode_seed: int,
     environment_seed: int,
@@ -89,7 +142,10 @@ def run_shared_episode_loop(
         )
 
     mode = ArbitrationMode(arbitration_mode)
-    arbitrator = ActionArbitrator(mode=mode)
+    arbitrator = ActionArbitrator(
+        mode=mode,
+        fixed_autonomy_weight=fixed_autonomy_weight,
+    )
 
     steps_path.parent.mkdir(
         parents=True,
@@ -110,7 +166,9 @@ def run_shared_episode_loop(
     termination_reason = "timeout"
 
     generation = int(initial_generation)
-    shared_control_state = "policy_wait"
+    shared_control_state = _policy_wait_state(
+        mode
+    )
 
     active_chunk: AsyncPolicyChunk | None = None
     active_chunk_index = 0
@@ -178,7 +236,9 @@ def run_shared_episode_loop(
                 else:
                     active_chunk = completed_chunk
                     active_chunk_index = 0
-                    shared_control_state = "autonomous"
+                    shared_control_state = (
+                        _policy_execution_state(mode)
+                    )
 
                     result_disposition = "applied"
                     result_applied = True
@@ -279,9 +339,13 @@ def run_shared_episode_loop(
                 shared_control_state
                 in {
                     "policy_wait",
+                    "fixed_blend_policy_wait",
                     "takeover_resync",
                 }
-                and not human_active
+                and not (
+                    mode is ArbitrationMode.TAKEOVER
+                    and human_active
+                )
                 and not policy_worker.pending
             ):
                 submitted_request = (
@@ -343,7 +407,8 @@ def run_shared_episode_loop(
                 can_step_environment = True
 
             elif (
-                shared_control_state == "autonomous"
+                shared_control_state
+                == _policy_execution_state(mode)
                 and active_chunk is not None
                 and active_chunk_index
                 < min(
@@ -414,10 +479,11 @@ def run_shared_episode_loop(
 
                 if shared_control_state not in {
                     "policy_wait",
+                    "fixed_blend_policy_wait",
                     "takeover_resync",
                 }:
                     shared_control_state = (
-                        "policy_wait"
+                        _policy_wait_state(mode)
                     )
 
             if not can_step_environment:
@@ -433,6 +499,22 @@ def run_shared_episode_loop(
                         transition
                     ),
                     "control_generation": generation,
+                    "arbitration_mode": mode.value,
+                    "configured_autonomy_weight": (
+                        _configured_weight(
+                            mode,
+                            fixed_autonomy_weight,
+                        )
+                    ),
+                    "effective_autonomy_weight": (
+                        _effective_weight_without_step(
+                            mode=mode,
+                            human_active=human_active,
+                            fixed_autonomy_weight=(
+                                fixed_autonomy_weight
+                            ),
+                        )
+                    ),
                     "policy_worker_pending": (
                         policy_worker.pending
                     ),
@@ -473,6 +555,21 @@ def run_shared_episode_loop(
                         "control_step": control_steps,
                         "max_steps": max_steps,
                         "human_active": human_active,
+                        "configured_autonomy_weight": (
+                            _configured_weight(
+                                mode,
+                                fixed_autonomy_weight,
+                            )
+                        ),
+                        "effective_autonomy_weight": (
+                            _effective_weight_without_step(
+                                mode=mode,
+                                human_active=human_active,
+                                fixed_autonomy_weight=(
+                                    fixed_autonomy_weight
+                                ),
+                            )
+                        ),
                         "policy_worker_pending": (
                             policy_worker.pending
                         ),
@@ -535,7 +632,10 @@ def run_shared_episode_loop(
             )
             autonomy_wait_ticks = 0
 
-            if state_used_for_step == "autonomous":
+            if state_used_for_step in {
+                "autonomous",
+                "fixed_blend",
+            }:
                 active_chunk_index += 1
 
                 last_autonomous_action = (
@@ -565,7 +665,7 @@ def run_shared_episode_loop(
                     active_chunk = None
                     active_chunk_index = 0
                     shared_control_state = (
-                        "policy_wait"
+                        _policy_wait_state(mode)
                     )
 
                     if not policy_worker.pending:
@@ -768,6 +868,14 @@ def run_shared_episode_loop(
                     "reward": float(reward),
                     "human_active": (
                         arbitration_result.human_active
+                    ),
+                    "configured_autonomy_weight": (
+                        arbitration_result
+                        .configured_autonomy_weight
+                    ),
+                    "effective_autonomy_weight": (
+                        arbitration_result
+                        .autonomy_weight
                     ),
                     "autonomy_weight": (
                         arbitration_result

@@ -257,6 +257,41 @@ class SharedAutonomyControllerTest(
             0,
         )
 
+    def test_fixed_blend_combines_policy_and_human_motion(
+        self,
+    ) -> None:
+        policy = FakeSharedPolicy()
+        controller = SharedAutonomyController(
+            policy=policy,
+            arbitration_mode="fixed_blend",
+            replan_steps=2,
+            policy_episode_seed=88,
+            fixed_autonomy_weight=0.5,
+        )
+        active_human = np.asarray(
+            [-0.20, 0.10, 0.00, -0.10, 0.20, 0.30, 1.0],
+            dtype=np.float32,
+        )
+        decision = controller.decide(
+            observation={"id": 4},
+            task_description="test task",
+            human_action=active_human,
+        )
+        expected_motion = (
+            0.5 * policy.first_action[:6]
+            + 0.5 * active_human[:6]
+        )
+        np.testing.assert_allclose(
+            decision.executed_action[:6],
+            expected_motion,
+        )
+        self.assertEqual(float(decision.executed_action[6]), 1.0)
+        record = decision.as_log_dict()
+        self.assertEqual(record["configured_autonomy_weight"], 0.5)
+        self.assertEqual(record["effective_autonomy_weight"], 0.5)
+        self.assertEqual(record["autonomy_weight"], 0.5)
+
+
 
 if __name__ == "__main__":
     unittest.main()

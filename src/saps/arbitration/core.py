@@ -19,6 +19,7 @@ class ArbitrationMode(str, enum.Enum):
 
     AUTONOMOUS = "autonomous"
     TAKEOVER = "takeover"
+    FIXED_BLEND = "fixed_blend"
 
 
 class ActivityState(str, enum.Enum):
@@ -35,6 +36,7 @@ class ArbitrationResult:
     arbitration_mode: ArbitrationMode
     activity_state: ActivityState
     human_motion_norm: float
+    configured_autonomy_weight: float | None
     autonomy_weight: float
 
     human_action: np.ndarray
@@ -55,6 +57,12 @@ class ArbitrationResult:
             "activity_state": self.activity_state.value,
             "human_active": self.human_active,
             "human_motion_norm": self.human_motion_norm,
+            "configured_autonomy_weight": (
+                self.configured_autonomy_weight
+            ),
+            "effective_autonomy_weight": (
+                self.autonomy_weight
+            ),
             "autonomy_weight": self.autonomy_weight,
             "human_action": self.human_action.tolist(),
             "autonomous_action": self.autonomous_action.tolist(),
@@ -68,6 +76,7 @@ class ActionArbitrator:
 
     mode: ArbitrationMode | str
     activity_threshold: float = SAPS_ACTIVITY_THRESHOLD
+    fixed_autonomy_weight: float = 0.5
 
     def __post_init__(self) -> None:
         try:
@@ -86,14 +95,29 @@ class ActionArbitrator:
             ) from error
 
         threshold = float(self.activity_threshold)
+        fixed_weight = float(self.fixed_autonomy_weight)
 
         if not np.isfinite(threshold) or threshold < 0.0:
             raise ValueError(
                 "activity_threshold must be finite and non-negative."
             )
 
+        if (
+            not np.isfinite(fixed_weight)
+            or not 0.0 <= fixed_weight <= 1.0
+        ):
+            raise ValueError(
+                "fixed_autonomy_weight must be finite and "
+                "within [0, 1]."
+            )
+
         object.__setattr__(self, "mode", parsed_mode)
         object.__setattr__(self, "activity_threshold", threshold)
+        object.__setattr__(
+            self,
+            "fixed_autonomy_weight",
+            fixed_weight,
+        )
 
     def arbitrate(
         self,
@@ -101,7 +125,7 @@ class ActionArbitrator:
         autonomous_action: np.ndarray,
         human_action: np.ndarray,
     ) -> ArbitrationResult:
-        """Produce one autonomous or hard-takeover action."""
+        """Produce one action-level shared-autonomy decision."""
 
         autonomous = _validated_action(
             "autonomous_action",
@@ -125,9 +149,11 @@ class ActionArbitrator:
         )
 
         if self.mode is ArbitrationMode.AUTONOMOUS:
+            configured_autonomy_weight = None
             autonomy_weight = 1.0
             executed = autonomous.copy()
         elif self.mode is ArbitrationMode.TAKEOVER:
+            configured_autonomy_weight = None
             autonomy_weight = 0.0 if human_active else 1.0
 
             executed = np.empty(
@@ -148,6 +174,41 @@ class ActionArbitrator:
                 float(autonomous[6]),
                 float(human[6]),
             )
+        elif self.mode is ArbitrationMode.FIXED_BLEND:
+            configured_autonomy_weight = (
+                self.fixed_autonomy_weight
+            )
+            autonomy_weight = (
+                self.fixed_autonomy_weight
+                if human_active
+                else 1.0
+            )
+
+            executed = np.empty(
+                ACTION_DIMENSION,
+                dtype=np.float32,
+            )
+            executed[:MOTION_DIMENSION] = (
+                autonomy_weight
+                * autonomous[:MOTION_DIMENSION]
+                + (1.0 - autonomy_weight)
+                * human[:MOTION_DIMENSION]
+            )
+            executed[6] = max(
+                float(autonomous[6]),
+                float(human[6]),
+            )
+
+            # Keep source actions unchanged in logs, but constrain the
+            # final command sent to LIBERO.
+            executed = np.clip(
+                executed,
+                -1.0,
+                1.0,
+            ).astype(
+                np.float32,
+                copy=False,
+            )
         else:
             raise RuntimeError(
                 f"Unhandled arbitration mode {self.mode!r}."
@@ -159,6 +220,9 @@ class ActionArbitrator:
             arbitration_mode=self.mode,
             activity_state=activity_state,
             human_motion_norm=human_motion_norm,
+            configured_autonomy_weight=(
+                configured_autonomy_weight
+            ),
             autonomy_weight=autonomy_weight,
             human_action=human,
             autonomous_action=autonomous,

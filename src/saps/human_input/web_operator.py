@@ -195,7 +195,7 @@ def _build_operator_page(
         <div id="speed-mode">Fine</div>
 
         <div class="label">Interface</div>
-        <div>Phase 2.2 controls</div>
+        <div>Phase 2 shared-autonomy controls</div>
       </div>
 
       <h3>Current 7D action</h3>

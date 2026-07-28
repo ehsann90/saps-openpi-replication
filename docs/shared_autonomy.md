@@ -1,87 +1,107 @@
 # Shared-Autonomy Runtime
 
-This document describes the Phase 2.3 autonomous and hard-takeover
-runtime for the SAPS–OpenPI replication.
+This document describes the Phase 2 autonomous, hard-takeover, and
+fixed-weight blending runtime for the SAPS-OpenPI replication.
+
+## Paper-defined arbitration semantics
+
+SAPS uses seven-dimensional expert and VLA actions. The first six
+dimensions are translational and rotational end-effector motion. The
+seventh dimension controls the gripper.
+
+Motion is blended as:
+
+```text
+executed_motion =
+    alpha * autonomous_motion
+    + (1 - alpha) * human_motion
+```
+
+`alpha` is the autonomy weight. Human motion is active when the L2 norm
+of the first six human-action dimensions exceeds `0.001`.
+
+The paper's equal-blending condition uses `alpha = 0.5` while human
+motion is active and `alpha = 1.0` while human motion is idle. This
+replication generalizes the active-human coefficient through
+`--fixed-autonomy-weight`, retaining `0.5` as the default.
+
+The gripper is not blended. It follows the SAPS closing-biased rule:
+
+```text
+executed_gripper = max(autonomous_gripper, human_gripper)
+```
+
+with this project's `-1=open`, `+1=close` convention.
 
 ## Supported arbitration modes
 
-The current implementation supports:
+### `autonomous`
 
-- `autonomous`
-- `takeover`
+The OpenPI action is executed. Human input is logged but does not alter
+the robot command.
 
-Fixed-weight and cosine-similarity blending are intentionally not
-enabled yet.
+### `takeover`
 
-### Autonomous
+When operator motion is idle, the OpenPI action is executed. When
+operator motion is active, human motion is executed. Policy requests are
+paused during active takeover, stale pre-takeover inference is rejected,
+and fresh inference is required after release.
 
-The OpenPI action is executed. Human input may still be logged, but it
-does not affect the robot.
+### `fixed_blend`
 
-### Takeover
+When operator motion is idle, effective autonomy is `1.0`. When operator
+motion is active, the configured fixed autonomy weight is used.
 
-When operator motion is idle, the OpenPI action is executed.
+The policy worker continues replanning while human motion is active.
+LIBERO advances only when a valid buffered policy action exists. No
+fabricated zero policy action is blended or executed.
 
-When operator translational or rotational motion is active, the human
-motion command is executed. Gripper arbitration follows the SAPS rule
-implemented by `ActionArbitrator`.
-
-## Runtime architecture
-
-The runtime has two execution contexts.
-
-### Main thread
-
-The main thread owns:
-
-- LIBERO and MuJoCo
-- browser input sampling
-- arbitration
-- environment stepping
-- browser image publication
-- step logging
-
-### Policy worker
-
-A persistent worker thread owns OpenPI inference.
-
-Only one inference request may be active at a time.
-
-In hard-takeover mode, new inference requests are paused while human
-motion is active. An inference result based on a pre-takeover
-observation is discarded if it becomes stale.
-
-After the operator releases control, a fresh inference request is made
-from the post-intervention observation.
+Cosine-similarity blending remains intentionally disabled.
 
 ## Shared-control states
 
-The logged `shared_control_state` has four possible values.
+The runtime logs:
 
-- `autonomous`: executing genuine buffered policy actions
-- `human_takeover`: executing operator motion
-- `policy_wait`: waiting for normal initial or periodic policy inference
-- `takeover_resync`: waiting for fresh inference after human release
+- `autonomous`: executing buffered policy actions in autonomous or
+  takeover-idle operation;
+- `human_takeover`: executing active operator motion in takeover mode;
+- `policy_wait`: waiting for normal policy inference outside fixed
+  blending;
+- `takeover_resync`: waiting for fresh post-takeover inference;
+- `fixed_blend`: executing a fixed human-policy blend;
+- `fixed_blend_policy_wait`: retaining browser responsiveness while
+  waiting for policy data required by fixed blending.
 
-LIBERO advances only in `autonomous` and `human_takeover`.
+LIBERO advances only in `autonomous`, `human_takeover`, and
+`fixed_blend`.
 
-During `policy_wait` and `takeover_resync`, the browser scheduler
-continues running, but the simulation does not receive artificial hold
-actions.
+## Replanning and latency semantics
 
-## Replanning semantics
+The OpenPI `pi05_libero` model predicts an action horizon of 10. The
+official evaluator executes the first five actions before replanning, so
+this project retains `replan_steps=5`.
 
-The OpenPI `pi05_libero` model predicts an action horizon of 10.
+At 20 Hz, five actions cover 0.25 seconds. If inference takes longer,
+the conservative runtime pauses LIBERO between chunks while keeping the
+browser scheduler responsive. It does not reuse an invalidated chunk or
+insert artificial hold actions.
 
-The official OpenPI LIBERO evaluator uses `replan_steps=5`: it executes
-the first five actions from the predicted chunk and then requests a new
-chunk from the latest observation.
+Deterministic episode seeds and monotonically increasing replan indices
+are preserved across arbitration modes.
 
-This project retains that default for baseline compatibility.
+## Logging
 
-At a 20 Hz control rate, five actions represent 0.25 seconds of
-simulated control. If inference takes longer than 0.25 seconds, the
-current conservative runtime pauses simulation between policy chunks.
+Every LIBERO step records human, autonomous, and executed actions;
+activity state and motion norm; configured and effective autonomy
+weights; policy action freshness; replan and chunk indices; inference
+timing; worker state; generation; and result disposition.
+
+For compatibility, `autonomy_weight` remains an alias of
+`effective_autonomy_weight`.
+
+`scheduler_waits.jsonl` records non-stepping browser ticks, including the
+wait state, human activity, worker state, and the weight that would apply
+once fresh policy data is available.
 
 ## Launch
 
@@ -91,68 +111,31 @@ Start the deterministic policy server:
 make policy-server
 ```
 
-In another terminal, run hard takeover:
+Run fixed blending with the paper coefficient:
 
 ```bash
-make shared-control \
-  ARBITRATION_MODE=takeover \
-  CONDITION=nominal \
-  TRIAL=0 \
-  INITIAL_STATE=0 \
-  SHARED_MAX_STEPS=280 \
-  SPEED_MODE=fine \
-  SHARED_OUTPUT=outputs/shared_autonomy
+make fixed-blend   FIXED_AUTONOMY_WEIGHT=0.5   CONDITION=nominal   TRIAL=0   INITIAL_STATE=0   SHARED_MAX_STEPS=280   SPEED_MODE=fine   SHARED_OUTPUT=outputs/fixed_blend_validation
 ```
 
-Open the displayed operator URL and click **Arm controls**.
+Equivalent explicit mode selection:
 
-## Outputs
+```bash
+make shared-control   ARBITRATION_MODE=fixed_blend   FIXED_AUTONOMY_WEIGHT=0.5
+```
 
-Each episode directory contains:
+Fixed-blend output paths include an `alpha_...` component so different
+weights do not overwrite one another.
 
-- summary.json: episode-level result and timing
-- steps.jsonl: records for actual LIBERO environment steps
-- scheduler_waits.jsonl: browser-scheduler ticks where LIBERO did not
-  advance while waiting for policy inference
-- perturbation.json: requested and measured perturbation
-- rollout video and diagnostic images
+## Boundary validation
 
-## Timing interpretation
+For active human motion, weight `1.0` reproduces autonomous motion,
+weight `0.0` reproduces human motion, and weight `0.5` produces the
+six-dimensional element-wise midpoint. Human-idle fixed blending always
+uses effective autonomy weight `1.0`. The gripper remains independent.
 
-Two rates must be distinguished.
+## Existing behavior preserved
 
-- **Operator scheduler frequency**
-
-    The browser and keyboard scheduler targets 20 Hz, including during
-    policy inference.
-
-- **LIBERO step frequency**
-
-    LIBERO advances only when a genuine policy action or active human
-    action is available. Its wall-clock step frequency may therefore be
-    lower than 20 Hz.
-
-This behavior preserves the validated five-action OpenPI trajectory and
-avoids inserting artificial zero-motion actions.
-
-## Validated behavior
-
-The current implementation has been validated with:
-
-- a matched nominal autonomous regression that completed successfully;
-- repeated hard takeover and release transitions;
-- a 20 Hz operator scheduler;
-- no policy requests during active takeover;
-- stale pre-takeover result rejection;
-- no arbitration violations;
-- no artificial non-policy autonomous LIBERO steps.
-
-## Known limitations
-
-- Autonomous simulation pauses when inference exceeds the five-action 
-  execution window.
-- Hard takeover switches abruptly between full autonomy and full human 
-  motion.
-- Fixed and cosine blending are not yet implemented.
-- Faster inference hardware can shorten policy waits but does not 
-  remove the discontinuity inherent in hard takeover.
+Autonomous and takeover retain matched deterministic policy seeds,
+policy replan indices, stale-generation rejection, takeover-specific
+inference pausing and resynchronization, genuine-policy-only environment
+steps, and separate action and scheduler-wait logs.
