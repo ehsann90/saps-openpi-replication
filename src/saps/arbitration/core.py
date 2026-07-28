@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import dataclasses
 import enum
+import math
 from typing import Any
 
 import numpy as np
@@ -20,6 +21,7 @@ class ArbitrationMode(str, enum.Enum):
     AUTONOMOUS = "autonomous"
     TAKEOVER = "takeover"
     FIXED_BLEND = "fixed_blend"
+    COSINE_BLEND = "cosine_blend"
 
 
 class ActivityState(str, enum.Enum):
@@ -36,8 +38,12 @@ class ArbitrationResult:
     arbitration_mode: ArbitrationMode
     activity_state: ActivityState
     human_motion_norm: float
+    autonomous_motion_norm: float
     configured_autonomy_weight: float | None
     autonomy_weight: float
+    cosine_gain: float | None
+    cosine_similarity: float | None
+    cosine_similarity_status: str
 
     human_action: np.ndarray
     autonomous_action: np.ndarray
@@ -57,6 +63,9 @@ class ArbitrationResult:
             "activity_state": self.activity_state.value,
             "human_active": self.human_active,
             "human_motion_norm": self.human_motion_norm,
+            "autonomous_motion_norm": (
+                self.autonomous_motion_norm
+            ),
             "configured_autonomy_weight": (
                 self.configured_autonomy_weight
             ),
@@ -64,6 +73,11 @@ class ArbitrationResult:
                 self.autonomy_weight
             ),
             "autonomy_weight": self.autonomy_weight,
+            "cosine_gain": self.cosine_gain,
+            "cosine_similarity": self.cosine_similarity,
+            "cosine_similarity_status": (
+                self.cosine_similarity_status
+            ),
             "human_action": self.human_action.tolist(),
             "autonomous_action": self.autonomous_action.tolist(),
             "executed_action": self.executed_action.tolist(),
@@ -77,6 +91,7 @@ class ActionArbitrator:
     mode: ArbitrationMode | str
     activity_threshold: float = SAPS_ACTIVITY_THRESHOLD
     fixed_autonomy_weight: float = 0.5
+    cosine_gain: float = 6.0
 
     def __post_init__(self) -> None:
         try:
@@ -96,6 +111,7 @@ class ActionArbitrator:
 
         threshold = float(self.activity_threshold)
         fixed_weight = float(self.fixed_autonomy_weight)
+        cosine_gain = float(self.cosine_gain)
 
         if not np.isfinite(threshold) or threshold < 0.0:
             raise ValueError(
@@ -111,6 +127,11 @@ class ActionArbitrator:
                 "within [0, 1]."
             )
 
+        if not np.isfinite(cosine_gain) or cosine_gain <= 0.0:
+            raise ValueError(
+                "cosine_gain must be finite and positive."
+            )
+
         object.__setattr__(self, "mode", parsed_mode)
         object.__setattr__(self, "activity_threshold", threshold)
         object.__setattr__(
@@ -118,6 +139,7 @@ class ActionArbitrator:
             "fixed_autonomy_weight",
             fixed_weight,
         )
+        object.__setattr__(self, "cosine_gain", cosine_gain)
 
     def arbitrate(
         self,
@@ -139,6 +161,9 @@ class ActionArbitrator:
         human_motion_norm = float(
             np.linalg.norm(human[:MOTION_DIMENSION])
         )
+        autonomous_motion_norm = float(
+            np.linalg.norm(autonomous[:MOTION_DIMENSION])
+        )
         human_active = (
             human_motion_norm > self.activity_threshold
         )
@@ -147,6 +172,10 @@ class ActionArbitrator:
             if human_active
             else ActivityState.IDLE
         )
+
+        cosine_similarity: float | None = None
+        cosine_similarity_status = "not_applicable"
+        reported_cosine_gain: float | None = None
 
         if self.mode is ArbitrationMode.AUTONOMOUS:
             configured_autonomy_weight = None
@@ -209,6 +238,72 @@ class ActionArbitrator:
                 np.float32,
                 copy=False,
             )
+        elif self.mode is ArbitrationMode.COSINE_BLEND:
+            configured_autonomy_weight = None
+            reported_cosine_gain = self.cosine_gain
+
+            if not human_active:
+                autonomy_weight = 1.0
+                cosine_similarity_status = "human_idle"
+            else:
+                if (
+                    autonomous_motion_norm
+                    > self.activity_threshold
+                ):
+                    cosine_similarity = float(
+                        np.dot(
+                            human[:MOTION_DIMENSION],
+                            autonomous[:MOTION_DIMENSION],
+                        )
+                        / (
+                            human_motion_norm
+                            * autonomous_motion_norm
+                        )
+                    )
+                    cosine_similarity = float(
+                        np.clip(
+                            cosine_similarity,
+                            -1.0,
+                            1.0,
+                        )
+                    )
+                    cosine_similarity_status = "computed"
+                else:
+                    # The paper does not define cosine similarity
+                    # for a zero policy-motion vector. Treat the
+                    # missing direction as neutral agreement and
+                    # expose the fallback explicitly in logs.
+                    cosine_similarity = 0.0
+                    cosine_similarity_status = (
+                        "autonomous_motion_below_threshold"
+                    )
+
+                autonomy_weight = _stable_sigmoid(
+                    self.cosine_gain * cosine_similarity
+                )
+
+            executed = np.empty(
+                ACTION_DIMENSION,
+                dtype=np.float32,
+            )
+            executed[:MOTION_DIMENSION] = (
+                autonomy_weight
+                * autonomous[:MOTION_DIMENSION]
+                + (1.0 - autonomy_weight)
+                * human[:MOTION_DIMENSION]
+            )
+            executed[6] = max(
+                float(autonomous[6]),
+                float(human[6]),
+            )
+            executed = np.clip(
+                executed,
+                -1.0,
+                1.0,
+            ).astype(
+                np.float32,
+                copy=False,
+            )
         else:
             raise RuntimeError(
                 f"Unhandled arbitration mode {self.mode!r}."
@@ -220,14 +315,30 @@ class ActionArbitrator:
             arbitration_mode=self.mode,
             activity_state=activity_state,
             human_motion_norm=human_motion_norm,
+            autonomous_motion_norm=autonomous_motion_norm,
             configured_autonomy_weight=(
                 configured_autonomy_weight
             ),
             autonomy_weight=autonomy_weight,
+            cosine_gain=reported_cosine_gain,
+            cosine_similarity=cosine_similarity,
+            cosine_similarity_status=(
+                cosine_similarity_status
+            ),
             human_action=human,
             autonomous_action=autonomous,
             executed_action=executed,
         )
+
+
+def _stable_sigmoid(value: float) -> float:
+    """Return a numerically stable scalar logistic sigmoid."""
+
+    if value >= 0.0:
+        return 1.0 / (1.0 + math.exp(-value))
+
+    exponential = math.exp(value)
+    return exponential / (1.0 + exponential)
 
 
 def _validated_action(

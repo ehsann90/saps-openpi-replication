@@ -1,7 +1,8 @@
 # Shared-Autonomy Runtime
 
-This document describes the Phase 2 autonomous, hard-takeover, and
-fixed-weight blending runtime for the SAPS-OpenPI replication.
+This document describes the Phase 2 autonomous, hard-takeover,
+fixed-weight, and cosine-similarity blending runtime for the
+SAPS-OpenPI replication.
 
 ## Paper-defined arbitration semantics
 
@@ -33,6 +34,26 @@ executed_gripper = max(autonomous_gripper, human_gripper)
 
 with this project's `-1=open`, `+1=close` convention.
 
+For cosine-similarity arbitration during active human motion, SAPS uses:
+
+```text
+cosine_similarity =
+    dot(human_motion, autonomous_motion)
+    / (norm(human_motion) * norm(autonomous_motion))
+
+effective_autonomy_weight =
+    sigmoid(cosine_gain * cosine_similarity)
+```
+
+The paper uses `cosine_gain = 6`. Aligned commands therefore give nearly
+full autonomy, opposing commands give nearly full human control, and
+orthogonal commands give equal blending. Human-idle behavior remains full
+autonomy.
+
+The paper does not define the zero autonomous-motion norm case. This
+replication uses neutral cosine similarity `0.0`, giving weight `0.5`, and
+logs `cosine_similarity_status=autonomous_motion_below_threshold`.
+
 ## Supported arbitration modes
 
 ### `autonomous`
@@ -56,7 +77,16 @@ The policy worker continues replanning while human motion is active.
 LIBERO advances only when a valid buffered policy action exists. No
 fabricated zero policy action is blended or executed.
 
-Cosine-similarity blending remains intentionally disabled.
+### `cosine_blend`
+
+When human motion is active, the first six human and autonomous action
+dimensions are compared geometrically. Their cosine similarity is mapped
+through a logistic sigmoid with configurable gain, defaulting to the paper
+value `6.0`. When the human is idle, effective autonomy is `1.0`.
+
+Like fixed blending, policy inference continues during active operator
+motion and LIBERO waits when no valid policy action is available.
+
 
 ## Shared-control states
 
@@ -70,10 +100,13 @@ The runtime logs:
 - `takeover_resync`: waiting for fresh post-takeover inference;
 - `fixed_blend`: executing a fixed human-policy blend;
 - `fixed_blend_policy_wait`: retaining browser responsiveness while
-  waiting for policy data required by fixed blending.
+  waiting for policy data required by fixed blending;
+- `cosine_blend`: executing a cosine-weighted human-policy blend;
+- `cosine_blend_policy_wait`: retaining browser responsiveness while
+  waiting for policy data required by cosine blending.
 
-LIBERO advances only in `autonomous`, `human_takeover`, and
-`fixed_blend`.
+LIBERO advances only in `autonomous`, `human_takeover`, `fixed_blend`,
+and `cosine_blend`.
 
 ## Replanning and latency semantics
 
@@ -92,9 +125,10 @@ are preserved across arbitration modes.
 ## Logging
 
 Every LIBERO step records human, autonomous, and executed actions;
-activity state and motion norm; configured and effective autonomy
-weights; policy action freshness; replan and chunk indices; inference
-timing; worker state; generation; and result disposition.
+activity state and motion norms; configured and effective autonomy
+weights; cosine gain, similarity, and status; policy action freshness;
+replan and chunk indices; inference timing; worker state; generation; and
+result disposition.
 
 For compatibility, `autonomy_weight` remains an alias of
 `effective_autonomy_weight`.
@@ -134,6 +168,22 @@ make shared-control \
 
 Fixed-blend output paths include an `alpha_...` component so different
 weights do not overwrite one another.
+
+Run cosine-similarity arbitration with the paper gain:
+
+```bash
+make cosine-blend \
+  COSINE_GAIN=6.0 \
+  CONDITION=nominal \
+  TRIAL=0 \
+  INITIAL_STATE=0 \
+  SHARED_MAX_STEPS=280 \
+  SPEED_MODE=fine \
+  SHARED_OUTPUT=outputs/cosine_blend_validation
+```
+
+Cosine output paths include a `k_...` component so alternative gain
+values do not overwrite one another.
 
 ## Boundary validation
 

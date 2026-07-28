@@ -292,6 +292,30 @@ class SharedAutonomyControllerTest(
         self.assertEqual(record["autonomy_weight"], 0.5)
 
 
+    def test_cosine_blend_logs_dynamic_weight(
+        self,
+    ) -> None:
+        policy = FakeSharedPolicy()
+        controller = SharedAutonomyController(
+            policy=policy,
+            arbitration_mode="cosine_blend",
+            replan_steps=2,
+            policy_episode_seed=99,
+            cosine_gain=6.0,
+        )
+        human = policy.first_action.copy()
+        human[6] = 1.0
+        decision = controller.decide(
+            observation={"id": 5},
+            task_description="test task",
+            human_action=human,
+        )
+        record = decision.as_log_dict()
+        self.assertEqual(record["cosine_gain"], 6.0)
+        self.assertAlmostEqual(record["cosine_similarity"], 1.0)
+        self.assertEqual(record["cosine_similarity_status"], "computed")
+        self.assertGreater(record["effective_autonomy_weight"], 0.99)
+
 
 if __name__ == "__main__":
     unittest.main()

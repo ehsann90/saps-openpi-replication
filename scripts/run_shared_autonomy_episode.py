@@ -70,6 +70,7 @@ class Args:
     initial_state_index: int = 0
     arbitration_mode: str = "takeover"
     fixed_autonomy_weight: float = 0.5
+    cosine_gain: float = 6.0
 
     # Reproducibility
     environment_seed: int = 7
@@ -115,6 +116,7 @@ class SharedAutonomyEpisodeResult:
     condition_id: str
     arbitration_mode: str
     fixed_autonomy_weight: float | None
+    cosine_gain: float | None
     task_id: int
     task_description: str
     trial_index: int
@@ -159,6 +161,18 @@ def _fixed_weight_directory_name(
         "p",
     )
     return f"alpha_{value}"
+
+
+def _cosine_gain_directory_name(
+    cosine_gain: float,
+) -> str:
+    """Return a stable path component for one cosine gain."""
+
+    value = f"{cosine_gain:.3f}".replace(
+        ".",
+        "p",
+    )
+    return f"k_{value}"
 
 
 def validate_args(args: Args) -> ArbitrationMode:
@@ -221,6 +235,11 @@ def validate_args(args: Args) -> ArbitrationMode:
             "within [0, 1]."
         )
 
+    if not np.isfinite(args.cosine_gain) or args.cosine_gain <= 0.0:
+        raise ValueError(
+            "cosine_gain must be finite and positive."
+        )
+
     try:
         return ArbitrationMode(
             args.arbitration_mode
@@ -268,6 +287,13 @@ def main(args: Args) -> None:
             mode_output_root
             / _fixed_weight_directory_name(
                 args.fixed_autonomy_weight
+            )
+        )
+    elif mode is ArbitrationMode.COSINE_BLEND:
+        mode_output_root = (
+            mode_output_root
+            / _cosine_gain_directory_name(
+                args.cosine_gain
             )
         )
 
@@ -483,6 +509,12 @@ def main(args: Args) -> None:
                     is ArbitrationMode.FIXED_BLEND
                     else None
                 ),
+                "cosine_gain": (
+                    args.cosine_gain
+                    if mode
+                    is ArbitrationMode.COSINE_BLEND
+                    else None
+                ),
                 "condition_id": args.condition_id,
                 "trial_index": args.trial_index,
                 "task": task_description,
@@ -501,6 +533,8 @@ def main(args: Args) -> None:
                 "Configured autonomy weight: "
                 f"{args.fixed_autonomy_weight:.3f}"
             )
+        elif mode is ArbitrationMode.COSINE_BLEND:
+            print(f"Cosine gain: {args.cosine_gain:.3f}")
         print(f"Task: {task_description}")
         print(
             f"Condition: {args.condition_id} "
@@ -557,6 +591,7 @@ def main(args: Args) -> None:
             fixed_autonomy_weight=(
                 args.fixed_autonomy_weight
             ),
+            cosine_gain=args.cosine_gain,
             replan_steps=args.replan_steps,
             policy_episode_seed=(
                 policy_episode_seed
@@ -617,6 +652,12 @@ def main(args: Args) -> None:
                 args.fixed_autonomy_weight
                 if mode
                 is ArbitrationMode.FIXED_BLEND
+                else None
+            ),
+            cosine_gain=(
+                args.cosine_gain
+                if mode
+                is ArbitrationMode.COSINE_BLEND
                 else None
             ),
             task_id=task_id,

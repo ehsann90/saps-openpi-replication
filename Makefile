@@ -42,6 +42,7 @@ help:
 	@echo "  make teleop CONDITION=nominal TRIAL=4"
 	@echo "  make shared-control ARBITRATION_MODE=takeover"
 	@echo "  make fixed-blend FIXED_AUTONOMY_WEIGHT=0.5"
+	@echo "  make cosine-blend COSINE_GAIN=6.0"
 	@echo
 	@echo "Tests:"
 	@echo "  make unit-test"
@@ -58,7 +59,7 @@ help:
 	@echo "  CONDITION, CONDITION_IDS, TRIAL, INITIAL_STATE"
 	@echo "  NUM_TRIALS, TELEOP_MAX_STEPS, AUTONOMOUS_MAX_STEPS, SPEED_MODE"
 	@echo "  TELEOP_OUTPUT, AUTONOMOUS_OUTPUT, SHARED_OUTPUT"
-	@echo "  ARBITRATION_MODE, FIXED_AUTONOMY_WEIGHT"
+	@echo "  ARBITRATION_MODE, FIXED_AUTONOMY_WEIGHT, COSINE_GAIN"
 
 .PHONY: apply-patch
 apply-patch:
@@ -170,17 +171,23 @@ SHARED_MAX_STEPS ?= 1200
 SHARED_OUTPUT ?= outputs/shared_autonomy_smoke
 ARBITRATION_MODE ?= takeover
 FIXED_AUTONOMY_WEIGHT ?= 0.5
+COSINE_GAIN ?= 6.0
 
 .PHONY: shared-control
 shared-control:
 	$(COMPOSE) run --rm --no-deps \
 		-e SAPS_SCRIPT=/workspace/scripts/run_shared_autonomy_episode.py \
-		-e SAPS_RUNTIME_ARGS="--arbitration-mode $(ARBITRATION_MODE) --fixed-autonomy-weight $(FIXED_AUTONOMY_WEIGHT) --condition-id $(CONDITION) --trial-index $(TRIAL) --initial-state-index $(INITIAL_STATE) --environment-seed $(ENVIRONMENT_SEED) --policy-base-seed $(POLICY_BASE_SEED) --max-steps $(SHARED_MAX_STEPS) --default-speed-mode $(SPEED_MODE) --output-dir $(SHARED_OUTPUT)" \
+		-e SAPS_RUNTIME_ARGS="--arbitration-mode $(ARBITRATION_MODE) --fixed-autonomy-weight $(FIXED_AUTONOMY_WEIGHT) --cosine-gain $(COSINE_GAIN) --condition-id $(CONDITION) --trial-index $(TRIAL) --initial-state-index $(INITIAL_STATE) --environment-seed $(ENVIRONMENT_SEED) --policy-base-seed $(POLICY_BASE_SEED) --max-steps $(SHARED_MAX_STEPS) --default-speed-mode $(SPEED_MODE) --output-dir $(SHARED_OUTPUT)" \
 		runtime
 
 .PHONY: fixed-blend
 fixed-blend:
 	$(MAKE) shared-control ARBITRATION_MODE=fixed_blend
+
+
+.PHONY: cosine-blend
+cosine-blend:
+	$(MAKE) shared-control ARBITRATION_MODE=cosine_blend
 
 .PHONY: help-shared-control
 help-shared-control:

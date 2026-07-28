@@ -139,6 +139,71 @@ class SharedEpisodeLoopSchedulerTest(unittest.TestCase):
         self.assertEqual(waits[0]["configured_autonomy_weight"], 0.5)
         self.assertEqual(waits[0]["effective_autonomy_weight"], 0.5)
 
+    def test_cosine_blend_requests_policy_during_human_motion(
+        self,
+    ) -> None:
+        operator = FakeOperator()
+        worker = FakePolicyWorker()
+        observation = {
+            "agentview_image": np.zeros(
+                (8, 8, 3),
+                dtype=np.uint8,
+            ),
+            "robot0_eye_in_hand_image": np.zeros(
+                (8, 8, 3),
+                dtype=np.uint8,
+            ),
+        }
+
+        with tempfile.TemporaryDirectory() as directory:
+            steps_path = Path(directory) / "steps.jsonl"
+            with mock.patch(
+                "saps.evaluation.shared_episode_loop._sleep_to_deadline",
+                return_value=0.0,
+            ):
+                result = run_shared_episode_loop(
+                    env=object(),
+                    operator=operator,
+                    policy_worker=worker,
+                    initial_observation=observation,
+                    task_description="test task",
+                    object_body_name="unused",
+                    arbitration_mode="cosine_blend",
+                    cosine_gain=6.0,
+                    replan_steps=5,
+                    policy_episode_seed=123,
+                    environment_seed=7,
+                    max_steps=1,
+                    control_frequency_hz=20.0,
+                    steps_path=steps_path,
+                )
+            waits = [
+                json.loads(line)
+                for line in steps_path.with_name(
+                    "scheduler_waits.jsonl"
+                ).read_text(encoding="utf-8").splitlines()
+            ]
+
+        self.assertEqual(result.termination_reason, "operator_abort")
+        self.assertEqual(result.control_steps, 0)
+        self.assertEqual(len(worker.requests), 1)
+        self.assertEqual(worker.requests[0]["reason"], "periodic")
+        self.assertEqual(len(waits), 1)
+        self.assertEqual(
+            waits[0]["shared_control_state"],
+            "cosine_blend_policy_wait",
+        )
+        self.assertTrue(waits[0]["human_active"])
+        self.assertIsNone(
+            waits[0]["effective_autonomy_weight"]
+        )
+        self.assertEqual(waits[0]["cosine_gain"], 6.0)
+        self.assertIsNone(waits[0]["cosine_similarity"])
+        self.assertEqual(
+            waits[0]["cosine_similarity_status"],
+            "waiting_for_policy",
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

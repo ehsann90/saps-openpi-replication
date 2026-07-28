@@ -63,6 +63,9 @@ def _policy_execution_state(
     if mode is ArbitrationMode.FIXED_BLEND:
         return "fixed_blend"
 
+    if mode is ArbitrationMode.COSINE_BLEND:
+        return "cosine_blend"
+
     return "autonomous"
 
 
@@ -73,6 +76,9 @@ def _policy_wait_state(
 
     if mode is ArbitrationMode.FIXED_BLEND:
         return "fixed_blend_policy_wait"
+
+    if mode is ArbitrationMode.COSINE_BLEND:
+        return "cosine_blend_policy_wait"
 
     return "policy_wait"
 
@@ -94,16 +100,47 @@ def _effective_weight_without_step(
     mode: ArbitrationMode,
     human_active: bool,
     fixed_autonomy_weight: float,
-) -> float:
+) -> float | None:
     """Report the weight that would apply once policy data exists."""
 
     if mode is ArbitrationMode.FIXED_BLEND and human_active:
         return fixed_autonomy_weight
 
+    if mode is ArbitrationMode.COSINE_BLEND and human_active:
+        return None
+
     if mode is ArbitrationMode.TAKEOVER and human_active:
         return 0.0
 
     return 1.0
+
+
+def _reported_cosine_gain(
+    mode: ArbitrationMode,
+    cosine_gain: float,
+) -> float | None:
+    """Return the configured cosine gain when applicable."""
+
+    if mode is ArbitrationMode.COSINE_BLEND:
+        return cosine_gain
+
+    return None
+
+
+def _cosine_wait_status(
+    *,
+    mode: ArbitrationMode,
+    human_active: bool,
+) -> str:
+    """Describe cosine metadata while no policy action exists."""
+
+    if mode is not ArbitrationMode.COSINE_BLEND:
+        return "not_applicable"
+
+    if not human_active:
+        return "human_idle"
+
+    return "waiting_for_policy"
 
 
 def run_shared_episode_loop(
@@ -116,6 +153,7 @@ def run_shared_episode_loop(
     object_body_name: str,
     arbitration_mode: str,
     fixed_autonomy_weight: float = 0.5,
+    cosine_gain: float = 6.0,
     replan_steps: int,
     policy_episode_seed: int,
     environment_seed: int,
@@ -124,10 +162,10 @@ def run_shared_episode_loop(
     steps_path: Path,
     initial_generation: int = 0,
 ) -> SharedEpisodeLoopResult:
-    """Run responsive autonomous or hard-takeover control.
+    """Run responsive shared autonomy with asynchronous inference.
 
     The operator scheduler runs continuously at the requested rate.
-    LIBERO advances only when a human or fresh policy action exists.
+    LIBERO advances only when a valid arbitration decision exists.
     """
 
     if replan_steps <= 0:
@@ -145,6 +183,7 @@ def run_shared_episode_loop(
     arbitrator = ActionArbitrator(
         mode=mode,
         fixed_autonomy_weight=fixed_autonomy_weight,
+        cosine_gain=cosine_gain,
     )
 
     steps_path.parent.mkdir(
@@ -340,6 +379,7 @@ def run_shared_episode_loop(
                 in {
                     "policy_wait",
                     "fixed_blend_policy_wait",
+                    "cosine_blend_policy_wait",
                     "takeover_resync",
                 }
                 and not (
@@ -480,6 +520,7 @@ def run_shared_episode_loop(
                 if shared_control_state not in {
                     "policy_wait",
                     "fixed_blend_policy_wait",
+                    "cosine_blend_policy_wait",
                     "takeover_resync",
                 }:
                     shared_control_state = (
@@ -513,6 +554,19 @@ def run_shared_episode_loop(
                             fixed_autonomy_weight=(
                                 fixed_autonomy_weight
                             ),
+                        )
+                    ),
+                    "cosine_gain": (
+                        _reported_cosine_gain(
+                            mode,
+                            cosine_gain,
+                        )
+                    ),
+                    "cosine_similarity": None,
+                    "cosine_similarity_status": (
+                        _cosine_wait_status(
+                            mode=mode,
+                            human_active=human_active,
                         )
                     ),
                     "policy_worker_pending": (
@@ -568,6 +622,19 @@ def run_shared_episode_loop(
                                 fixed_autonomy_weight=(
                                     fixed_autonomy_weight
                                 ),
+                            )
+                        ),
+                        "cosine_gain": (
+                            _reported_cosine_gain(
+                                mode,
+                                cosine_gain,
+                            )
+                        ),
+                        "cosine_similarity": None,
+                        "cosine_similarity_status": (
+                            _cosine_wait_status(
+                                mode=mode,
+                                human_active=human_active,
                             )
                         ),
                         "policy_worker_pending": (
@@ -635,6 +702,7 @@ def run_shared_episode_loop(
             if state_used_for_step in {
                 "autonomous",
                 "fixed_blend",
+                "cosine_blend",
             }:
                 active_chunk_index += 1
 
@@ -880,6 +948,16 @@ def run_shared_episode_loop(
                     "autonomy_weight": (
                         arbitration_result
                         .autonomy_weight
+                    ),
+                    "cosine_gain": (
+                        arbitration_result.cosine_gain
+                    ),
+                    "cosine_similarity": (
+                        arbitration_result.cosine_similarity
+                    ),
+                    "cosine_similarity_status": (
+                        arbitration_result
+                        .cosine_similarity_status
                     ),
                     "policy_worker_pending": (
                         policy_worker.pending

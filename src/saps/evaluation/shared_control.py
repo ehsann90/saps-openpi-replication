@@ -52,6 +52,7 @@ class SharedAutonomyController:
         policy_episode_seed: int | None,
         activity_threshold: float = SAPS_ACTIVITY_THRESHOLD,
         fixed_autonomy_weight: float = 0.5,
+        cosine_gain: float = 6.0,
     ) -> None:
         self._policy = policy
 
@@ -65,6 +66,7 @@ class SharedAutonomyController:
             mode=arbitration_mode,
             activity_threshold=activity_threshold,
             fixed_autonomy_weight=fixed_autonomy_weight,
+            cosine_gain=cosine_gain,
         )
 
     @property

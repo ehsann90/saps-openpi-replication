@@ -1,4 +1,4 @@
-"""Tests for autonomous and takeover arbitration."""
+"""Tests for SAPS action-level arbitration modes."""
 
 from __future__ import annotations
 
@@ -323,6 +323,128 @@ class ActionArbitratorTest(unittest.TestCase):
                         fixed_autonomy_weight=weight,
                     )
 
+
+    def test_cosine_blend_aligned_actions_favor_autonomy(
+        self,
+    ) -> None:
+        human_action = np.asarray(
+            [0.2, -0.4, 0.6, -0.8, 1.0, -1.2, -1.0],
+            dtype=np.float32,
+        )
+        result = ActionArbitrator(
+            "cosine_blend",
+            cosine_gain=6.0,
+        ).arbitrate(
+            autonomous_action=self.autonomous_action,
+            human_action=human_action,
+        )
+        expected_weight = 1.0 / (1.0 + np.exp(-6.0))
+        self.assertAlmostEqual(result.cosine_similarity, 1.0)
+        self.assertEqual(result.cosine_similarity_status, "computed")
+        self.assertAlmostEqual(result.autonomy_weight, expected_weight)
+
+    def test_cosine_blend_opposing_actions_favor_human(
+        self,
+    ) -> None:
+        human_action = self.autonomous_action.copy()
+        human_action[:6] *= -1.0
+        result = ActionArbitrator(
+            ArbitrationMode.COSINE_BLEND,
+            cosine_gain=6.0,
+        ).arbitrate(
+            autonomous_action=self.autonomous_action,
+            human_action=human_action,
+        )
+        expected_weight = 1.0 / (1.0 + np.exp(6.0))
+        self.assertAlmostEqual(result.cosine_similarity, -1.0)
+        self.assertAlmostEqual(result.autonomy_weight, expected_weight)
+
+    def test_cosine_blend_orthogonal_actions_are_equal(
+        self,
+    ) -> None:
+        autonomous = np.asarray(
+            [0.5, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0],
+            dtype=np.float32,
+        )
+        human = np.asarray(
+            [0.0, 0.5, 0.0, 0.0, 0.0, 0.0, 1.0],
+            dtype=np.float32,
+        )
+        result = ActionArbitrator(
+            "cosine_blend",
+        ).arbitrate(
+            autonomous_action=autonomous,
+            human_action=human,
+        )
+        np.testing.assert_allclose(
+            result.executed_action[:6],
+            0.5 * autonomous[:6] + 0.5 * human[:6],
+        )
+        self.assertEqual(result.cosine_similarity, 0.0)
+        self.assertEqual(result.autonomy_weight, 0.5)
+        self.assertEqual(float(result.executed_action[6]), 1.0)
+
+    def test_cosine_blend_idle_uses_full_autonomy(
+        self,
+    ) -> None:
+        idle_human = np.asarray(
+            [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0],
+            dtype=np.float32,
+        )
+        result = ActionArbitrator(
+            "cosine_blend",
+        ).arbitrate(
+            autonomous_action=self.autonomous_action,
+            human_action=idle_human,
+        )
+        np.testing.assert_array_equal(
+            result.executed_action[:6],
+            self.autonomous_action[:6],
+        )
+        self.assertEqual(result.autonomy_weight, 1.0)
+        self.assertIsNone(result.cosine_similarity)
+        self.assertEqual(
+            result.cosine_similarity_status,
+            "human_idle",
+        )
+
+    def test_cosine_blend_zero_policy_motion_uses_logged_fallback(
+        self,
+    ) -> None:
+        autonomous = np.asarray(
+            [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0],
+            dtype=np.float32,
+        )
+        human = np.asarray(
+            [0.2, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0],
+            dtype=np.float32,
+        )
+        result = ActionArbitrator(
+            "cosine_blend",
+        ).arbitrate(
+            autonomous_action=autonomous,
+            human_action=human,
+        )
+        self.assertEqual(result.cosine_similarity, 0.0)
+        self.assertEqual(result.autonomy_weight, 0.5)
+        self.assertEqual(
+            result.cosine_similarity_status,
+            "autonomous_motion_below_threshold",
+        )
+
+    def test_invalid_cosine_gains_are_rejected(
+        self,
+    ) -> None:
+        for gain in (0.0, -1.0, float("nan")):
+            with self.subTest(gain=gain):
+                with self.assertRaisesRegex(
+                    ValueError,
+                    "cosine_gain",
+                ):
+                    ActionArbitrator(
+                        "cosine_blend",
+                        cosine_gain=gain,
+                    )
 
 
 if __name__ == "__main__":

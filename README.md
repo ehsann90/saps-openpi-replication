@@ -173,6 +173,6 @@ Run `make help` for the short command reference.
 
 ## Shared-autonomy runtime
 
-The autonomous, hard-takeover, and fixed-blending runtime,
-timing semantics, launch commands, and output logs are documented in
+The autonomous, hard-takeover, fixed-blending, and cosine-blending
+runtime, timing semantics, launch commands, and output logs are documented in
 [`docs/shared_autonomy.md`](docs/shared_autonomy.md).
