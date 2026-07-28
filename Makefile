@@ -161,3 +161,20 @@ clean-python:
 	find . \
 		-path ./third_party -prune -o \
 		-type f \( -name "*.pyc" -o -name "*.pyo" \) -delete
+
+# Shared-autonomy live runner
+SHARED_MAX_STEPS ?= 1200
+SHARED_OUTPUT ?= outputs/shared_autonomy_smoke
+ARBITRATION_MODE ?= takeover
+
+.PHONY: shared-control
+shared-control:
+	$(COMPOSE) run --rm --no-deps \
+		-e SAPS_SCRIPT=/workspace/scripts/run_shared_autonomy_episode.py \
+		-e SAPS_RUNTIME_ARGS="--arbitration-mode $(ARBITRATION_MODE) --condition-id $(CONDITION) --trial-index $(TRIAL) --initial-state-index $(INITIAL_STATE) --environment-seed $(ENVIRONMENT_SEED) --policy-base-seed $(POLICY_BASE_SEED) --max-steps $(SHARED_MAX_STEPS) --default-speed-mode $(SPEED_MODE) --output-dir $(SHARED_OUTPUT)" \
+		runtime
+
+.PHONY: help-shared-control
+help-shared-control:
+	$(COMPOSE) run --rm --no-deps runtime /bin/bash -lc \
+		'source /.venv/bin/activate && python /workspace/scripts/run_shared_autonomy_episode.py --help'
