@@ -57,7 +57,7 @@ make help-operator
 make help-probe
 make help-teleop
 make help-autonomous
-make help-shared-control
+make help-shared-autonomy
 ```
 
 ## 4. Automated checks
@@ -130,8 +130,7 @@ make teleop \
 Hard takeover:
 
 ```bash
-make shared-control \
-  ARBITRATION_MODE=takeover \
+make takeover \
   CONDITION=nominal \
   TRIAL=0 \
   SHARED_MAX_STEPS=1200 \
@@ -163,16 +162,9 @@ make cosine-blend \
   SHARED_OUTPUT=outputs/cosine_blend_smoke
 ```
 
-Autonomous execution through the common arbitration runner:
-
-```bash
-make shared-control \
-  ARBITRATION_MODE=autonomous \
-  CONDITION=nominal \
-  TRIAL=0 \
-  SHARED_MAX_STEPS=280 \
-  SHARED_OUTPUT=outputs/shared_autonomous_smoke
-```
+The underlying shared-autonomy Python runner still accepts
+`--arbitration-mode autonomous` for programmatic experiment orchestration. For
+manual autonomous runs, use `make autonomous-smoke` or `make autonomous-sweep`.
 
 ## 9. Browser controls
 

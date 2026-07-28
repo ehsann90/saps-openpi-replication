@@ -41,7 +41,7 @@ help:
 	@echo "  make autonomous-smoke"
 	@echo "  make autonomous-sweep NUM_TRIALS=20"
 	@echo "  make teleop CONDITION=nominal TRIAL=4"
-	@echo "  make shared-control ARBITRATION_MODE=takeover"
+	@echo "  make takeover CONDITION=nominal TRIAL=0"
 	@echo "  make fixed-blend FIXED_AUTONOMY_WEIGHT=0.5"
 	@echo "  make cosine-blend COSINE_GAIN=6.0"
 	@echo
@@ -61,7 +61,7 @@ help:
 	@echo "  CONDITION, CONDITION_IDS, TRIAL, INITIAL_STATE"
 	@echo "  NUM_TRIALS, TELEOP_MAX_STEPS, AUTONOMOUS_MAX_STEPS, SPEED_MODE"
 	@echo "  TELEOP_OUTPUT, AUTONOMOUS_OUTPUT, SHARED_OUTPUT"
-	@echo "  ARBITRATION_MODE, FIXED_AUTONOMY_WEIGHT, COSINE_GAIN"
+	@echo "  FIXED_AUTONOMY_WEIGHT, COSINE_GAIN"
 
 .PHONY: apply-patch
 apply-patch:
@@ -181,27 +181,29 @@ clean-python:
 # Shared-autonomy live runner
 SHARED_MAX_STEPS ?= 1200
 SHARED_OUTPUT ?= outputs/shared_autonomy_smoke
-ARBITRATION_MODE ?= takeover
 FIXED_AUTONOMY_WEIGHT ?= 0.5
 COSINE_GAIN ?= 6.0
 
-.PHONY: shared-control
-shared-control:
+define RUN_SHARED_AUTONOMY
 	$(COMPOSE) run --rm --no-deps \
 		-e SAPS_SCRIPT=/workspace/scripts/run_shared_autonomy_episode.py \
-		-e SAPS_RUNTIME_ARGS="--arbitration-mode $(ARBITRATION_MODE) --fixed-autonomy-weight $(FIXED_AUTONOMY_WEIGHT) --cosine-gain $(COSINE_GAIN) --condition-id $(CONDITION) --trial-index $(TRIAL) --initial-state-index $(INITIAL_STATE) --environment-seed $(ENVIRONMENT_SEED) --policy-base-seed $(POLICY_BASE_SEED) --max-steps $(SHARED_MAX_STEPS) --default-speed-mode $(SPEED_MODE) --output-dir $(SHARED_OUTPUT)" \
+		-e SAPS_RUNTIME_ARGS="--arbitration-mode $(1) --fixed-autonomy-weight $(FIXED_AUTONOMY_WEIGHT) --cosine-gain $(COSINE_GAIN) --condition-id $(CONDITION) --trial-index $(TRIAL) --initial-state-index $(INITIAL_STATE) --environment-seed $(ENVIRONMENT_SEED) --policy-base-seed $(POLICY_BASE_SEED) --max-steps $(SHARED_MAX_STEPS) --default-speed-mode $(SPEED_MODE) --output-dir $(SHARED_OUTPUT)" \
 		runtime
+endef
+
+.PHONY: takeover
+takeover:
+	$(call RUN_SHARED_AUTONOMY,takeover)
 
 .PHONY: fixed-blend
 fixed-blend:
-	$(MAKE) shared-control ARBITRATION_MODE=fixed_blend
-
+	$(call RUN_SHARED_AUTONOMY,fixed_blend)
 
 .PHONY: cosine-blend
 cosine-blend:
-	$(MAKE) shared-control ARBITRATION_MODE=cosine_blend
+	$(call RUN_SHARED_AUTONOMY,cosine_blend)
 
-.PHONY: help-shared-control
-help-shared-control:
+.PHONY: help-shared-autonomy
+help-shared-autonomy:
 	$(COMPOSE) run --rm --no-deps runtime /bin/bash -lc \
 		'source /.venv/bin/activate && python /workspace/scripts/run_shared_autonomy_episode.py --help'

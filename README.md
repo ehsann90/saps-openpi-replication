@@ -126,8 +126,7 @@ make autonomous-smoke CONDITION=nominal
 make teleop CONDITION=nominal TRIAL=0 TELEOP_MAX_STEPS=1800
 
 # Hard takeover
-make shared-control \
-  ARBITRATION_MODE=takeover \
+make takeover \
   CONDITION=nominal \
   TRIAL=0
 

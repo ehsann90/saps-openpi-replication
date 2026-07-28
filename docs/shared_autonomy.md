@@ -195,8 +195,7 @@ make policy-server
 Hard takeover:
 
 ```bash
-make shared-control \
-  ARBITRATION_MODE=takeover \
+make takeover \
   CONDITION=nominal \
   TRIAL=0 \
   SHARED_OUTPUT=outputs/takeover_smoke
