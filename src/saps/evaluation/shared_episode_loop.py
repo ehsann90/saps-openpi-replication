@@ -110,7 +110,7 @@ def run_shared_episode_loop(
     termination_reason = "timeout"
 
     generation = int(initial_generation)
-    shared_control_state = "autonomy_resync"
+    shared_control_state = "policy_wait"
 
     active_chunk: AsyncPolicyChunk | None = None
     active_chunk_index = 0
@@ -271,13 +271,16 @@ def run_shared_episode_loop(
                     active_chunk = None
                     active_chunk_index = 0
                     shared_control_state = (
-                        "autonomy_resync"
+                        "takeover_resync"
                     )
                     autonomy_wait_ticks = 0
 
             if (
                 shared_control_state
-                == "autonomy_resync"
+                in {
+                    "policy_wait",
+                    "takeover_resync",
+                }
                 and not human_active
                 and not policy_worker.pending
             ):
@@ -293,8 +296,8 @@ def run_shared_episode_loop(
                         generation=generation,
                         reason=(
                             "takeover_resync"
-                            if transition
-                            == "takeover_released"
+                            if shared_control_state
+                            == "takeover_resync"
                             else "periodic"
                         ),
                     )
@@ -409,9 +412,13 @@ def run_shared_episode_loop(
                 noise_sha256 = None
                 chunk_remaining = 0
 
-                shared_control_state = (
-                    "autonomy_resync"
-                )
+                if shared_control_state not in {
+                    "policy_wait",
+                    "takeover_resync",
+                }:
+                    shared_control_state = (
+                        "policy_wait"
+                    )
 
             if not can_step_environment:
                 autonomy_wait_ticks += 1
@@ -558,7 +565,7 @@ def run_shared_episode_loop(
                     active_chunk = None
                     active_chunk_index = 0
                     shared_control_state = (
-                        "autonomy_resync"
+                        "policy_wait"
                     )
 
                     if not policy_worker.pending:

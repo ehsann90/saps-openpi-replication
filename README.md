@@ -170,3 +170,9 @@ documented in the
 [project runbook](docs/runbook.md).
 
 Run `make help` for the short command reference.
+
+## Shared-autonomy runtime
+
+The autonomous and hard-takeover runtime, timing semantics, launch
+commands, and output logs are documented in
+[`docs/shared_autonomy.md`](docs/shared_autonomy.md).
