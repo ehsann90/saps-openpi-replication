@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+message: >-
+  If you use this replication software, cite the original SAPS paper and
+  identify the exact repository commit used in your experiment.
+title: SAPS OpenPI Replication
+type: software
+authors:
+  - family-names: Khorrambakht
+    given-names: Ehsan
+repository-code: https://github.com/ehsann90/saps-openpi-replication
+url: https://github.com/ehsann90/saps-openpi-replication
+preferred-citation:
+  type: article
+  title: >-
+    SAPS: Shared Autonomy for Policy Steering by Blending Teleoperation with a
+    Pretrained VLA
+  authors:
+    - family-names: Zhou
+      given-names: Crystal
+    - family-names: Yang
+      given-names: Jehan
+    - family-names: Weber
+      given-names: Douglas J.
+    - family-names: Erickson
+      given-names: Zackory
+  year: 2026
+  url: https://arxiv.org/abs/2606.15568

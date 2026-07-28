@@ -17,7 +17,7 @@ The phase had three objectives:
 2. measure the degradation of the autonomous π0.5 policy across those perturbations;
 3. make π0.5 action sampling deterministic so that autonomous, teleoperation, takeover, fixed-blending, and cosine-blending trials can later be compared using matched policy randomness.
 
-Human input and arbitration are intentionally deferred to Phase 2.
+Human input and arbitration were intentionally deferred to Phase 2.
 
 ---
 
@@ -360,34 +360,32 @@ Phase 1 established that:
 
 ---
 
-## 10. Next Phase
+## 10. Subsequent Phases
 
-Phase 2 will add the human-input and arbitration stack:
+Phase 2 completed the human-input and action-arbitration stack that Phase 1 had
+prepared for:
 
-1. keyboard input;
-2. keyboard-to-7D LIBERO action mapping;
-3. pure teleoperation;
-4. a common arbitration interface;
-5. autonomous mode through that common interface;
-6. takeover;
-7. fixed 50/50 blending;
-8. gamepad support;
-9. cosine-similarity blending;
-10. matched and counterbalanced evaluation across arbitration modes.
+1. browser keyboard input and seven-dimensional LIBERO action mapping;
+2. pure teleoperation;
+3. a common structured arbitration interface;
+4. autonomous execution through that interface;
+5. hard takeover with stale-policy rejection and post-release resynchronization;
+6. fixed/equal blending;
+7. cosine-similarity blending;
+8. asynchronous policy inference with explicit non-stepping scheduler waits;
+9. step-level human, policy, executed-action, weight, and latency logging.
 
-The Phase 2 implementation must preserve the seed protocol and log, at minimum:
+Phase 3 now focuses on formal reproducibility:
 
-```text
-condition_id
-trial_index
-initial_state_index
-environment_seed
-policy_episode_seed
-policy_replan_index
-arbitration_mode
-autonomous_action
-human_action
-blending_weight
-executed_action
-operator_input_timestamps
-```
+1. an immutable experiment manifest;
+2. deterministic and counterbalanced episode schedules;
+3. a resumable operator-session runner for all non-autonomous modes;
+4. artifact validation and duplicate protection;
+5. unified paired analysis across modes and perturbations;
+6. execution on lower-latency hardware suitable for operator experiments.
+
+See:
+
+- [`shared_autonomy.md`](shared_autonomy.md)
+- [`experiment_protocol.md`](experiment_protocol.md)
+- [`analysis.md`](analysis.md)

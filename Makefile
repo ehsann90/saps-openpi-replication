@@ -36,6 +36,7 @@ SUMMARY ?= outputs/autonomous_sweep/sweep_summary.json
 .PHONY: help
 help:
 	@echo "Main processes:"
+	@echo "  make build-images"
 	@echo "  make policy-server"
 	@echo "  make autonomous-smoke"
 	@echo "  make autonomous-sweep NUM_TRIALS=20"
@@ -45,6 +46,7 @@ help:
 	@echo "  make cosine-blend COSINE_GAIN=6.0"
 	@echo
 	@echo "Tests:"
+	@echo "  make check"
 	@echo "  make unit-test"
 	@echo "  make operator-smoke"
 	@echo "  make compile"
@@ -64,6 +66,12 @@ help:
 .PHONY: apply-patch
 apply-patch:
 	./patches/apply_openpi_patch.sh
+
+.PHONY: build-images
+build-images:
+	cd third_party/openpi && \
+		docker compose -f examples/libero/compose.yml \
+		build runtime openpi_server
 
 .PHONY: policy-server
 policy-server:
@@ -136,6 +144,10 @@ unit-test:
 compile:
 	$(RUNTIME) /bin/bash -lc \
 		'source /.venv/bin/activate && python -m compileall -q /workspace/src /workspace/scripts /workspace/tests /workspace/tools && echo "Compilation passed"'
+
+
+.PHONY: check
+check: unit-test compile
 
 .PHONY: help-teleop
 help-teleop:
