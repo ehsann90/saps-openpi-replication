@@ -114,13 +114,22 @@ make policy-server
 Run fixed blending with the paper coefficient:
 
 ```bash
-make fixed-blend   FIXED_AUTONOMY_WEIGHT=0.5   CONDITION=nominal   TRIAL=0   INITIAL_STATE=0   SHARED_MAX_STEPS=280   SPEED_MODE=fine   SHARED_OUTPUT=outputs/fixed_blend_validation
+make fixed-blend \
+  FIXED_AUTONOMY_WEIGHT=0.5 \
+  CONDITION=nominal \
+  TRIAL=0 \
+  INITIAL_STATE=0 \
+  SHARED_MAX_STEPS=280 \
+  SPEED_MODE=fine \
+  SHARED_OUTPUT=outputs/fixed_blend_validation
 ```
 
 Equivalent explicit mode selection:
 
 ```bash
-make shared-control   ARBITRATION_MODE=fixed_blend   FIXED_AUTONOMY_WEIGHT=0.5
+make shared-control \
+  ARBITRATION_MODE=fixed_blend \
+  FIXED_AUTONOMY_WEIGHT=0.5
 ```
 
 Fixed-blend output paths include an `alpha_...` component so different
