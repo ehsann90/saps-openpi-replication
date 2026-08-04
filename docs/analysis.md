@@ -21,30 +21,33 @@ used as the final cross-mode analyzer because shared-autonomy experiments add
 operator activity, dynamic arbitration weights, scheduler waits, and mode
 pairing requirements.
 
-## 2. Planned unified analyzer
+## 2. Unified comparison analyzer
 
-The Phase 3 analyzer will consume the immutable experiment manifest and episode
-outputs:
+Generate the current paper-style autonomous/operator comparison with:
 
 ```bash
-python tools/analysis/analyze_arbitration_experiment.py \
-  --experiment-root outputs/saps_libero_operator_v1 \
-  --manifest outputs/saps_libero_operator_v1/manifest.json \
-  --output-dir results/saps_libero_operator_v1
+make analyze-comparison
 ```
 
-Planned outputs:
+Override `AUTONOMOUS_RESULTS`, `TELEOP_RESULTS`, `SHARED_RESULTS`, or
+`COMPARISON_OUTPUT` when analyzing another collection. Outputs include:
 
 ```text
 episode_metrics.csv
-condition_summary.csv
 mode_summary.csv
-paired_mode_comparisons.csv
-operator_intervention_summary.csv
-policy_latency_summary.csv
+condition_mode_summary.csv
+paired_autonomous_comparisons.csv
+paired_mode_summary.csv
 validation_report.json
+REPORT.md
 plots/
 ```
+
+The analyzer uses simulated control time, end-effector arc length, official task
+success, and the paper's intervention convention: 0% for autonomy, 100% for
+teleoperation, and motion-active step fraction for shared autonomy. It validates
+policy-seed pairing and reports incomplete scheduled coverage rather than
+silently treating collected subsets as complete experiments.
 
 ## 3. Pairing key
 

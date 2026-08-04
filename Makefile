@@ -27,6 +27,10 @@ PROBE_OUTPUT ?= outputs/seeded_policy_probe
 SCENE_OUTPUT ?= outputs/scene_inspection
 PREVIEW_OUTPUT ?= outputs/perturbation_preview
 ANALYSIS_OUTPUT ?= results/analysis
+COMPARISON_OUTPUT ?= results/saps_libero_current
+AUTONOMOUS_RESULTS ?= outputs/autonomous_deterministic_n20_state0_v1
+TELEOP_RESULTS ?= outputs/saps_libero_teleoperation_v1
+SHARED_RESULTS ?= outputs/saps_libero_shared_autonomy_v1
 MANIFEST ?= configs/operator_shared_autonomy_manifest.json
 SESSION_OUTPUT ?= outputs/operator_experiment
 REPOSITORY_COMMIT := $(shell git rev-parse HEAD)
@@ -62,6 +66,7 @@ help:
 	@echo "  make scene-inspect"
 	@echo "  make perturbation-preview DX=0.10 DY=0.08 LABEL=p02"
 	@echo "  make analyze SUMMARY=<sweep_summary.json>"
+	@echo "  make analyze-comparison"
 	@echo
 	@echo "Common overrides:"
 	@echo "  CONDITION, CONDITION_IDS, TRIAL, INITIAL_STATE"
@@ -162,6 +167,11 @@ analyze:
 	$(RUNTIME) /bin/bash -lc \
 		'source /.venv/bin/activate && python /workspace/tools/analysis/analyze_autonomous_results.py --output-dir "$(ANALYSIS_OUTPUT)" "$(SUMMARY)"'
 
+.PHONY: analyze-comparison
+analyze-comparison:
+	$(COMPOSE) run --rm --no-deps runtime /bin/bash -lc \
+		'source /.venv/bin/activate && python /workspace/tools/analysis/analyze_operator_comparison.py --autonomous-root $(AUTONOMOUS_RESULTS) --teleoperation-root $(TELEOP_RESULTS) --shared-autonomy-root $(SHARED_RESULTS) --output-dir $(COMPARISON_OUTPUT)'
+
 .PHONY: unit-test
 unit-test:
 	$(RUNTIME) /bin/bash -lc \
@@ -216,6 +226,7 @@ define RUN_SHARED_AUTONOMY
 		-e SAPS_SCRIPT=/workspace/scripts/run_shared_autonomy_episode.py \
 		-e SAPS_RUNTIME_ARGS="--arbitration-mode $(1) --fixed-autonomy-weight $(FIXED_AUTONOMY_WEIGHT) --cosine-gain $(COSINE_GAIN) --condition-id $(CONDITION) --trial-index $(TRIAL) --initial-state-index $(INITIAL_STATE) --environment-seed $(ENVIRONMENT_SEED) --policy-base-seed $(POLICY_BASE_SEED) --max-steps $(SHARED_MAX_STEPS) --default-speed-mode $(SPEED_MODE) --output-dir $(SHARED_OUTPUT)" \
 		runtime
+
 endef
 
 .PHONY: takeover
