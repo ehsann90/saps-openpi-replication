@@ -13,11 +13,11 @@
   "control_frequency_hz": 20.0,
   "operator_max_steps": 280,
   "fine_translation_gain": 0.25,
-  "fine_rotation_gain": 0.25,
+  "fine_rotation_gain": 0.1,
   "normal_translation_gain": 0.5,
-  "normal_rotation_gain": 0.5,
+  "normal_rotation_gain": 0.2,
   "fast_translation_gain": 1.0,
-  "fast_rotation_gain": 1.0,
+  "fast_rotation_gain": 0.4,
   "default_speed_mode": "normal",
   "ordering_seed": 20260801
 }
