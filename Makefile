@@ -27,7 +27,7 @@ PROBE_OUTPUT ?= outputs/seeded_policy_probe
 SCENE_OUTPUT ?= outputs/scene_inspection
 PREVIEW_OUTPUT ?= outputs/perturbation_preview
 ANALYSIS_OUTPUT ?= results/analysis
-MANIFEST ?= configs/operator_experiment_manifest.json
+MANIFEST ?= configs/operator_shared_autonomy_manifest.json
 SESSION_OUTPUT ?= outputs/operator_experiment
 REPOSITORY_COMMIT := $(shell git rev-parse HEAD)
 
@@ -48,6 +48,8 @@ help:
 	@echo "  make fixed-blend FIXED_AUTONOMY_WEIGHT=0.5"
 	@echo "  make cosine-blend COSINE_GAIN=6.0"
 	@echo "  make operator-session MANIFEST=<manifest.json>"
+	@echo "  make teleoperation-session"
+	@echo "  make shared-autonomy-session"
 	@echo
 	@echo "Tests:"
 	@echo "  make check"
@@ -100,6 +102,18 @@ operator-session:
 		-e SAPS_SCRIPT=/workspace/scripts/run_operator_experiment.py \
 		-e SAPS_RUNTIME_ARGS="--manifest-path $(MANIFEST) --repository-commit $(REPOSITORY_COMMIT) --output-dir $(SESSION_OUTPUT)" \
 		runtime
+
+.PHONY: teleoperation-session
+teleoperation-session:
+	$(MAKE) operator-session \
+		MANIFEST=configs/operator_teleoperation_manifest.json \
+		SESSION_OUTPUT=outputs/saps_libero_teleoperation_v1
+
+.PHONY: shared-autonomy-session
+shared-autonomy-session:
+	$(MAKE) operator-session \
+		MANIFEST=configs/operator_shared_autonomy_manifest.json \
+		SESSION_OUTPUT=outputs/saps_libero_shared_autonomy_v1
 
 .PHONY: teleop
 teleop:

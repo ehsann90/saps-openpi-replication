@@ -13,7 +13,7 @@ from saps.policies.seeding import make_policy_episode_seed
 from saps.policies.seeding import SEED_PROTOCOL
 
 
-MANIFEST_SCHEMA_VERSION = 2
+MANIFEST_SCHEMA_VERSION = 3
 SCHEDULE_SCHEMA_VERSION = 1
 OPERATOR_MODES = (
     "teleoperation",
@@ -40,6 +40,13 @@ class ExperimentManifest:
     cosine_gain: float
     control_frequency_hz: float
     operator_max_steps: int
+    fine_translation_gain: float
+    fine_rotation_gain: float
+    normal_translation_gain: float
+    normal_rotation_gain: float
+    fast_translation_gain: float
+    fast_rotation_gain: float
+    default_speed_mode: str
     ordering_seed: int
 
     @classmethod
@@ -86,6 +93,13 @@ class ExperimentManifest:
                 data["control_frequency_hz"]
             ),
             operator_max_steps=int(data["operator_max_steps"]),
+            fine_translation_gain=float(data["fine_translation_gain"]),
+            fine_rotation_gain=float(data["fine_rotation_gain"]),
+            normal_translation_gain=float(data["normal_translation_gain"]),
+            normal_rotation_gain=float(data["normal_rotation_gain"]),
+            fast_translation_gain=float(data["fast_translation_gain"]),
+            fast_rotation_gain=float(data["fast_rotation_gain"]),
+            default_speed_mode=str(data["default_speed_mode"]),
             ordering_seed=int(data["ordering_seed"]),
         )
         manifest.validate()
@@ -150,6 +164,35 @@ class ExperimentManifest:
 
         if self.operator_max_steps <= 0:
             raise ValueError("operator_max_steps must be positive.")
+
+        gains = (
+            self.fine_translation_gain,
+            self.fine_rotation_gain,
+            self.normal_translation_gain,
+            self.normal_rotation_gain,
+            self.fast_translation_gain,
+            self.fast_rotation_gain,
+        )
+
+        if any(not 0.0 < gain <= 1.0 for gain in gains):
+            raise ValueError("Operator gains must be within (0, 1].")
+
+        if not (
+            self.fine_translation_gain
+            <= self.normal_translation_gain
+            <= self.fast_translation_gain
+        ):
+            raise ValueError("Translation gains must be non-decreasing.")
+
+        if not (
+            self.fine_rotation_gain
+            <= self.normal_rotation_gain
+            <= self.fast_rotation_gain
+        ):
+            raise ValueError("Rotation gains must be non-decreasing.")
+
+        if self.default_speed_mode not in {"fine", "normal", "fast"}:
+            raise ValueError("default_speed_mode is invalid.")
 
     def as_dict(self) -> dict[str, Any]:
         """Return a canonical JSON-compatible representation."""

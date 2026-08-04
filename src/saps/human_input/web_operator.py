@@ -213,6 +213,11 @@ def _build_operator_page(
 
       <button id="open-gripper">Open (Z)</button>
       <button id="close-gripper">Close (X)</button>
+      <p>
+        In shared-autonomy modes, SAPS gives conflicting gripper
+        commands a closing bias. Open takes effect only when the policy
+        is not commanding close.
+      </p>
 
       <h2>Speed</h2>
 

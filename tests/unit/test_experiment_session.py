@@ -19,7 +19,7 @@ def make_manifest() -> ExperimentManifest:
     """Return one compact valid test manifest."""
 
     return ExperimentManifest(
-        schema_version=2,
+        schema_version=3,
         experiment_id="test_operator_v1",
         config_path="configs/test.json",
         conditions=("nominal", "p01"),
@@ -32,6 +32,13 @@ def make_manifest() -> ExperimentManifest:
         cosine_gain=6.0,
         control_frequency_hz=20.0,
         operator_max_steps=1200,
+        fine_translation_gain=0.25,
+        fine_rotation_gain=0.25,
+        normal_translation_gain=0.5,
+        normal_rotation_gain=0.5,
+        fast_translation_gain=1.0,
+        fast_rotation_gain=1.0,
+        default_speed_mode="normal",
         ordering_seed=42,
     )
 
@@ -185,6 +192,21 @@ class ExperimentSessionTest(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "Operator session modes"):
             invalid.validate()
+
+    def test_invalid_or_unsorted_operator_gains_are_rejected(self) -> None:
+        manifest = make_manifest()
+        too_large = ExperimentManifest(
+            **{**manifest.__dict__, "fast_translation_gain": 1.1}
+        )
+        unsorted = ExperimentManifest(
+            **{**manifest.__dict__, "normal_rotation_gain": 0.1}
+        )
+
+        with self.assertRaisesRegex(ValueError, "within"):
+            too_large.validate()
+
+        with self.assertRaisesRegex(ValueError, "non-decreasing"):
+            unsorted.validate()
 
 
 if __name__ == "__main__":

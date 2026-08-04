@@ -79,12 +79,11 @@ The session runner will consume an immutable JSON manifest similar to:
 
 ```json
 {
-  "schema_version": 2,
-  "experiment_id": "saps_libero_operator_v1",
+  "schema_version": 3,
+  "experiment_id": "saps_libero_shared_autonomy_v1",
   "config_path": "configs/libero_cream_cheese_offsets.json",
   "conditions": ["nominal", "p01", "p02"],
   "modes": [
-    "teleoperation",
     "takeover",
     "fixed_blend",
     "cosine_blend"
@@ -97,6 +96,13 @@ The session runner will consume an immutable JSON manifest similar to:
   "cosine_gain": 6.0,
   "control_frequency_hz": 20.0,
   "operator_max_steps": 1200,
+  "fine_translation_gain": 0.25,
+  "fine_rotation_gain": 0.25,
+  "normal_translation_gain": 0.5,
+  "normal_rotation_gain": 0.5,
+  "fast_translation_gain": 1.0,
+  "fast_rotation_gain": 1.0,
+  "default_speed_mode": "normal",
   "ordering_seed": 20260801
 }
 ```
@@ -104,12 +110,14 @@ The session runner will consume an immutable JSON manifest similar to:
 The finalized manifest is copied into the output root and must not be edited
 after data collection begins. Changes require a new experiment ID.
 
-The version-controlled protocol is
-`configs/operator_experiment_manifest.json`. Commit any protocol changes before
-collection. The Make target rejects a dirty worktree, obtains the exact Git
-commit on the host, and records it alongside the frozen manifest in
-`repository_provenance.json`. Git is therefore not required in the runtime
-container, and the manifest does not contain a self-referential commit hash.
+The version-controlled protocols are
+`configs/operator_teleoperation_manifest.json` and
+`configs/operator_shared_autonomy_manifest.json`. They are separate because
+pure teleoperation and corrective shared autonomy impose different operator
+attention requirements. Commit any protocol changes before collection. The
+Make target rejects a dirty worktree, obtains the exact Git commit on the host,
+and records it alongside the frozen manifest in `repository_provenance.json`.
+Git is therefore not required in the runtime container.
 
 ## 7. Episode schedule
 
@@ -146,12 +154,16 @@ Requirements:
 The session runner must launch one browser-mediated episode at a time. It should
 not attempt unattended loops for operator-controlled conditions.
 
-Generate or resume the session with the policy server already running:
+Generate or resume the teleoperation session without a policy server:
 
 ```bash
-make operator-session \
-  MANIFEST=configs/operator_experiment_manifest.json \
-  SESSION_OUTPUT=outputs/saps_libero_operator_v1
+make teleoperation-session
+```
+
+Run shared autonomy separately with the policy server already running:
+
+```bash
+make shared-autonomy-session
 ```
 
 The first invocation freezes `manifest.json`, creates `schedule.json`, and asks
@@ -173,6 +185,12 @@ initial_state_index
 Arbitration mode is deliberately excluded. Consequently, a condition/trial
 unit has one seed shared by autonomous, teleoperation, takeover, fixed blending,
 and cosine blending.
+
+The SAPS paper also excludes the gripper from motion arbitration and applies
+`max(policy_gripper, operator_gripper)`. Under the LIBERO convention
+`-1 = open` and `+1 = close`, either source can initiate closing, while a
+conflict is intentionally biased toward closing. An operator Open command
+therefore cannot override a simultaneous policy Close command.
 
 ## 8. Operator procedure
 
