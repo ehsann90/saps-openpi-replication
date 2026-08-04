@@ -126,6 +126,10 @@ while still retaining the logged latency and wait metrics.
 
 ### 4.1 Latency-aware experimental scheduler
 
+The implementation history, preliminary local measurements, known comparison
+confounds, and next experiments are recorded in
+[`latency_aware_experiments.md`](latency_aware_experiments.md).
+
 The strict scheduler remains the default reproduction baseline. An opt-in
 latency-aware scheduler can request the next plan while buffered actions remain:
 

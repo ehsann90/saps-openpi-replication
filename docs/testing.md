@@ -173,6 +173,10 @@ dynamic weights, continuous policy requests during human activity, and explicit
 
 ### Latency-aware scheduler
 
+See [`latency_aware_experiments.md`](latency_aware_experiments.md) before
+comparing frequencies; equal step counts do not provide equal simulated
+horizons when control frequencies differ.
+
 After validating the strict mode, run an opt-in smoke test:
 
 ```bash
