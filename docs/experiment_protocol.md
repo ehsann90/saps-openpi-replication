@@ -107,10 +107,12 @@ The finalized manifest is copied into the output root and must not be edited
 after data collection begins. Changes require a new experiment ID.
 
 Start from
-`configs/operator_experiment_manifest.example.json`, copy it to a new file, and
-replace `repository_commit` with the exact clean commit returned by
-`git rev-parse HEAD`. The operator runner rejects commit mismatches and dirty
-repositories for formal collection.
+`configs/operator_experiment_manifest.example.json`, copy it to
+`outputs/operator_experiment_manifest.json`, and replace `repository_commit`
+with the exact clean commit returned by `git rev-parse HEAD`. Keeping the
+study-specific manifest under the ignored `outputs/` directory avoids changing
+the repository it identifies. The operator runner rejects commit mismatches and
+dirty tracked repositories for formal collection.
 
 ## 7. Episode schedule
 
@@ -151,7 +153,7 @@ Generate or resume the session with the policy server already running:
 
 ```bash
 make operator-session \
-  MANIFEST=configs/operator_experiment_manifest.json \
+  MANIFEST=outputs/operator_experiment_manifest.json \
   SESSION_OUTPUT=outputs/saps_libero_operator_v1
 ```
 
