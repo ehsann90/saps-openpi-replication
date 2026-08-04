@@ -53,6 +53,7 @@ class Args:
     )
     output_dir: str = "results/saps_libero_current"
     control_frequency_hz: float = 20.0
+    comparison_max_steps: int = 280
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -250,7 +251,9 @@ def _load_operator_session(
         valid_attempts = [
             attempt
             for attempt in episode["attempts"]
-            if attempt.get("valid") and attempt.get("summary_path")
+            if attempt.get("valid")
+            and attempt.get("summary_path")
+            and attempt.get("selected_for_analysis", True)
         ]
 
         if len(valid_attempts) != 1:
@@ -514,6 +517,7 @@ def _write_report(
     mode_summary: list[dict[str, Any]],
     paired: list[dict[str, Any]],
     paired_summary: list[dict[str, Any]],
+    over_horizon: list[dict[str, Any]],
 ) -> None:
     by_mode = {row["mode"]: row for row in mode_summary}
     lines = [
@@ -581,6 +585,8 @@ def _write_report(
             "",
             f"There are {len(paired)} operator episodes with a seed-matched autonomous baseline. Operator collection is incomplete and unbalanced across methods and perturbations. All currently collected operator episodes succeeded, so these data are suitable for pipeline validation and descriptive pilot reporting, but not for significance testing or final comparative claims.",
             "",
+            f"{len(over_horizon)} collected operator episodes exceed the formal 280-step horizon and must be redone or treated as 14-second timeouts for the final comparison.",
+            "",
             "Error bars and inferential tests should be added only after the planned matched repetitions are complete. Failed episodes must remain in the denominator and contribute their full timeout to completion-time summaries, as in the paper.",
             "",
             "## Generated artifacts",
@@ -621,6 +627,19 @@ def main(args: Args) -> None:
     )
     paired = _pair_rows(rows)
     paired_summary = _paired_summary(paired)
+    over_horizon = [
+        {
+            "mode": row["mode"],
+            "condition_id": row["condition_id"],
+            "trial_index": row["trial_index"],
+            "control_steps": row["control_steps"],
+            "completion_time_s": row["completion_time_s"],
+            "summary_path": row["summary_path"],
+        }
+        for row in rows
+        if row["mode"] != "autonomous"
+        and row["control_steps"] > args.comparison_max_steps
+    ]
     scheduled = {
         "autonomous": autonomous_scheduled,
         **teleop_scheduled,
@@ -650,6 +669,8 @@ def main(args: Args) -> None:
                     for mode, count in scheduled.items()
                     if mode != "autonomous"
                 ),
+                "comparison_max_steps": args.comparison_max_steps,
+                "operator_episodes_exceeding_horizon": over_horizon,
                 "warnings": [
                     "Operator collection is incomplete; do not run final inferential tests.",
                     "Operator modes have unequal sample sizes and perturbation coverage.",
@@ -689,6 +710,7 @@ def main(args: Args) -> None:
         mode_summary,
         paired,
         paired_summary,
+        over_horizon,
     )
     print(f"Wrote comparison analysis to {output}")
 

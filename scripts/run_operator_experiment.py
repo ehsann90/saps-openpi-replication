@@ -28,6 +28,7 @@ class Args:
     output_dir: str = "outputs/operator_experiment"
     dry_run: bool = False
     continue_on_invalid_attempt: bool = False
+    redo_episode_ids: str = ""
 
 
 def _utc_now() -> str:
@@ -261,9 +262,27 @@ def main(args: Args) -> None:
 
     schedule_path = output_root / "schedule.json"
     events_path = output_root / "session_events.jsonl"
+    redo_ids = {
+        value.strip()
+        for value in args.redo_episode_ids.split(",")
+        if value.strip()
+    }
+    known_ids = {
+        str(episode["episode_id"])
+        for episode in schedule["episodes"]
+    }
+    unknown_redo_ids = redo_ids.difference(known_ids)
+
+    if unknown_redo_ids:
+        raise ValueError(
+            "Unknown redo episode IDs: "
+            f"{sorted(unknown_redo_ids)}."
+        )
 
     for episode in schedule["episodes"]:
-        if episode["status"] == "completed":
+        redo_requested = str(episode["episode_id"]) in redo_ids
+
+        if episode["status"] == "completed" and not redo_requested:
             continue
 
         print()
@@ -288,6 +307,11 @@ def main(args: Args) -> None:
                 break
 
         attempt_number = int(episode["attempt_count"]) + 1
+        previous_selected_valid = any(
+            previous_attempt.get("valid")
+            and previous_attempt.get("selected_for_analysis", True)
+            for previous_attempt in episode["attempts"]
+        )
         attempt_root = (
             Path(episode["output_directory"])
             / f"attempt_{attempt_number:03d}"
@@ -316,6 +340,8 @@ def main(args: Args) -> None:
             "output_root": str(attempt_root),
             "summary_path": None,
             "valid": False,
+            "selected_for_analysis": False,
+            "redo_requested": redo_requested,
             "error": None,
         }
         episode["status"] = "running"
@@ -349,6 +375,12 @@ def main(args: Args) -> None:
             )
             attempt["summary_path"] = str(summary_path)
             attempt["valid"] = True
+            attempt["selected_for_analysis"] = True
+
+            for previous_attempt in episode["attempts"][:-1]:
+                if previous_attempt.get("valid"):
+                    previous_attempt["selected_for_analysis"] = False
+
             episode["status"] = "completed"
             episode["termination_reason"] = summary[
                 "termination_reason"
@@ -356,7 +388,11 @@ def main(args: Args) -> None:
             episode["success"] = bool(summary["success"])
         except (OSError, ValueError, RuntimeError) as error:
             attempt["error"] = str(error)
-            episode["status"] = "invalid"
+            episode["status"] = (
+                "completed"
+                if redo_requested and previous_selected_valid
+                else "invalid"
+            )
             logging.error(
                 "Invalid attempt for %s: %s",
                 episode["episode_id"],
@@ -382,10 +418,7 @@ def main(args: Args) -> None:
             },
         )
 
-        if (
-            episode["status"] == "invalid"
-            and not args.continue_on_invalid_attempt
-        ):
+        if not attempt["valid"] and not args.continue_on_invalid_attempt:
             raise RuntimeError(
                 "Session stopped after an invalid attempt. "
                 "Inspect schedule.json and session_events.jsonl."

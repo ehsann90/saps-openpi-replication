@@ -115,6 +115,14 @@ make autonomous-sweep \
 
 ## 7. Pure teleoperation
 
+Formal 20-trial operator schedule (280 steps, 14 simulated seconds):
+
+```bash
+make teleoperation-session
+```
+
+Single-episode development run:
+
 ```bash
 make teleop \
   CONDITION=nominal \
@@ -126,6 +134,22 @@ make teleop \
 ```
 
 ## 8. Shared autonomy
+
+Formal shared-autonomy schedule (280 steps, 14 simulated seconds):
+
+```bash
+make shared-autonomy-session
+```
+
+Redo a completed attempt while preserving its history:
+
+```bash
+make shared-autonomy-session \
+  REDO_EPISODES=trial_000__condition_p08__mode_cosine_blend
+```
+
+The commands below are single-episode development runs and may use a longer
+horizon.
 
 Hard takeover:
 
@@ -210,8 +234,13 @@ make analyze \
   ANALYSIS_OUTPUT=results/autonomous_n20_state0
 ```
 
-The unified cross-mode analyzer is specified in [`analysis.md`](analysis.md) and
-will be implemented with the Phase 3 experiment session runner.
+Analyze autonomous, teleoperation, and shared-autonomy results together:
+
+```bash
+make analyze-comparison
+```
+
+See [`analysis.md`](analysis.md) for outputs and interpretation constraints.
 
 ## 12. Output conventions
 

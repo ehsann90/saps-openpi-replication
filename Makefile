@@ -31,6 +31,8 @@ COMPARISON_OUTPUT ?= results/saps_libero_current
 AUTONOMOUS_RESULTS ?= outputs/autonomous_deterministic_n20_state0_v1
 TELEOP_RESULTS ?= outputs/saps_libero_teleoperation_v1
 SHARED_RESULTS ?= outputs/saps_libero_shared_autonomy_v1
+REDO_EPISODES ?=
+REDO_EPISODES_ARG = $(if $(strip $(REDO_EPISODES)),--redo-episode-ids $(REDO_EPISODES),)
 MANIFEST ?= configs/operator_shared_autonomy_manifest.json
 SESSION_OUTPUT ?= outputs/operator_experiment
 REPOSITORY_COMMIT := $(shell git rev-parse HEAD)
@@ -105,20 +107,20 @@ operator-session:
 		{ echo "Formal collection requires a clean repository."; exit 1; }
 	$(COMPOSE) run --rm --no-deps \
 		-e SAPS_SCRIPT=/workspace/scripts/run_operator_experiment.py \
-		-e SAPS_RUNTIME_ARGS="--manifest-path $(MANIFEST) --repository-commit $(REPOSITORY_COMMIT) --output-dir $(SESSION_OUTPUT)" \
+		-e SAPS_RUNTIME_ARGS="--manifest-path $(MANIFEST) --repository-commit $(REPOSITORY_COMMIT) --output-dir $(SESSION_OUTPUT) $(REDO_EPISODES_ARG)" \
 		runtime
 
 .PHONY: teleoperation-session
 teleoperation-session:
 	$(MAKE) operator-session \
 		MANIFEST=configs/operator_teleoperation_manifest.json \
-		SESSION_OUTPUT=outputs/saps_libero_teleoperation_v1
+		SESSION_OUTPUT=outputs/saps_libero_teleoperation_v2
 
 .PHONY: shared-autonomy-session
 shared-autonomy-session:
 	$(MAKE) operator-session \
 		MANIFEST=configs/operator_shared_autonomy_manifest.json \
-		SESSION_OUTPUT=outputs/saps_libero_shared_autonomy_v1
+		SESSION_OUTPUT=outputs/saps_libero_shared_autonomy_v2
 
 .PHONY: teleop
 teleop:

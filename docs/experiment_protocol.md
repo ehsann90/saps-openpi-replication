@@ -80,7 +80,7 @@ The session runner will consume an immutable JSON manifest similar to:
 ```json
 {
   "schema_version": 3,
-  "experiment_id": "saps_libero_shared_autonomy_v1",
+  "experiment_id": "saps_libero_shared_autonomy_v2",
   "config_path": "configs/libero_cream_cheese_offsets.json",
   "conditions": ["nominal", "p01", "p02"],
   "modes": [
@@ -95,7 +95,7 @@ The session runner will consume an immutable JSON manifest similar to:
   "fixed_autonomy_weight": 0.5,
   "cosine_gain": 6.0,
   "control_frequency_hz": 20.0,
-  "operator_max_steps": 1200,
+  "operator_max_steps": 280,
   "fine_translation_gain": 0.25,
   "fine_rotation_gain": 0.25,
   "normal_translation_gain": 0.5,
@@ -170,6 +170,24 @@ The first invocation freezes `manifest.json`, creates `schedule.json`, and asks
 for acknowledgement before every episode. Completed valid episodes are skipped
 on resume. Every attempt receives a unique directory; invalid attempts are
 retained and never overwritten.
+
+Formal autonomous and operator experiments share a 280-step horizon at 20 Hz,
+equal to 14 simulated seconds. The earlier `v1` operator pilot used a 1200-step
+horizon. Pilot episodes that completed by step 280 are dynamically unaffected
+by that larger ceiling, but later completions are not directly comparable.
+
+Redo a completed scheduled episode without overwriting its earlier attempt by
+passing its exact ID from `schedule.json`:
+
+```bash
+make shared-autonomy-session \
+  REDO_EPISODES=trial_000__condition_p08__mode_cosine_blend
+```
+
+Multiple comma-separated IDs are accepted. A successful redo becomes the
+attempt selected for analysis; every previous attempt remains recorded with
+`selected_for_analysis: false`. An invalid redo does not silently replace the
+last valid selected attempt.
 
 Each schedule row derives `policy_episode_seed` with the same
 `make_policy_episode_seed` inputs used by `run_autonomous_sweep.py`:
