@@ -124,6 +124,31 @@ include visible waits even though simulated time is paused. Formal
 operator-assisted experiments should use hardware where this latency is small,
 while still retaining the logged latency and wait metrics.
 
+### 4.1 Latency-aware experimental scheduler
+
+The strict scheduler remains the default reproduction baseline. An opt-in
+latency-aware scheduler can request the next plan while buffered actions remain:
+
+```bash
+make fixed-blend \
+  SCHEDULER_MODE=latency_aware \
+  REPLAN_STEPS=20 \
+  PREFETCH_REMAINING_ACTIONS=12
+```
+
+The active chunk continues during inference. A returned plan is accepted only
+when its generation, age, end-effector translation and rotation, and gripper
+divergence pass configured limits. Accepted plans use a short motion-action
+handoff; rejected plans are logged and replanned. `EXHAUSTION_FALLBACK=pause`
+retains the conservative freeze if inference outlasts the buffer. The
+experimental `hold` fallback advances with zero autonomous motion and should
+not be used as a formal SAPS condition without separate validation.
+
+Relevant overrides are `MAX_PLAN_AGE_SECONDS`, `MAX_PLAN_TRANSLATION_M`,
+`MAX_PLAN_ROTATION_RADIANS`, `MAX_PLAN_GRIPPER_DELTA`, and `HANDOFF_STEPS`.
+Latency-aware results are not directly comparable with strict runs unless the
+scheduler mode and all thresholds are included in the experiment manifest.
+
 ## 5. Shared-control states
 
 | State | Meaning |

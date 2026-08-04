@@ -82,6 +82,16 @@ class Args:
     resize_size: int = 224
     replan_steps: int = 5
 
+    # Policy scheduling
+    scheduler_mode: str = "strict_pause"
+    prefetch_remaining_actions: int = 12
+    max_plan_age_seconds: float = 1.5
+    max_plan_translation_m: float = 0.15
+    max_plan_rotation_radians: float = 0.75
+    max_plan_gripper_delta: float = 0.5
+    handoff_steps: int = 3
+    exhaustion_fallback: str = "pause"
+
     # LIBERO
     resolution: int = 256
     num_steps_wait: int = 10
@@ -127,6 +137,18 @@ class SharedAutonomyEpisodeResult:
     policy_seed_protocol: str
     policy_replan_count: int
     sampling_protocol_version: int | None
+    scheduler_mode: str
+    replan_steps: int
+    prefetch_remaining_actions: int
+    max_plan_age_seconds: float
+    max_plan_translation_m: float
+    max_plan_rotation_radians: float
+    max_plan_gripper_delta: float
+    handoff_steps: int
+    exhaustion_fallback: str
+    accepted_policy_results: int
+    rejected_policy_results: int
+    fallback_control_steps: int
 
     delta_x: float
     delta_y: float
@@ -199,6 +221,43 @@ def validate_args(args: Args) -> ArbitrationMode:
     if args.replan_steps <= 0:
         raise ValueError(
             "replan_steps must be positive."
+        )
+
+    if args.scheduler_mode not in {
+        "strict_pause",
+        "latency_aware",
+    }:
+        raise ValueError(
+            "scheduler_mode must be 'strict_pause' or "
+            "'latency_aware'."
+        )
+
+    if args.prefetch_remaining_actions < 0:
+        raise ValueError(
+            "prefetch_remaining_actions must be non-negative."
+        )
+
+    for name in (
+        "max_plan_age_seconds",
+        "max_plan_translation_m",
+        "max_plan_rotation_radians",
+        "max_plan_gripper_delta",
+    ):
+        value = float(getattr(args, name))
+
+        if not np.isfinite(value) or value < 0.0:
+            raise ValueError(
+                f"{name} must be finite and non-negative."
+            )
+
+    if args.handoff_steps < 0:
+        raise ValueError(
+            "handoff_steps must be non-negative."
+        )
+
+    if args.exhaustion_fallback not in {"pause", "hold"}:
+        raise ValueError(
+            "exhaustion_fallback must be 'pause' or 'hold'."
         )
 
     if args.num_steps_wait < 0:
@@ -545,6 +604,7 @@ def main(args: Args) -> None:
             f"{policy_episode_seed}"
         )
         print(f"Replan steps: {args.replan_steps}")
+        print(f"Scheduler mode: {args.scheduler_mode}")
         print()
         print(f"Open: {operator.operator_url}")
         print()
@@ -605,6 +665,26 @@ def main(args: Args) -> None:
             ),
             steps_path=(
                 episode_directory / "steps.jsonl"
+            ),
+            scheduler_mode=args.scheduler_mode,
+            prefetch_remaining_actions=(
+                args.prefetch_remaining_actions
+            ),
+            max_plan_age_seconds=(
+                args.max_plan_age_seconds
+            ),
+            max_plan_translation_m=(
+                args.max_plan_translation_m
+            ),
+            max_plan_rotation_radians=(
+                args.max_plan_rotation_radians
+            ),
+            max_plan_gripper_delta=(
+                args.max_plan_gripper_delta
+            ),
+            handoff_steps=args.handoff_steps,
+            exhaustion_fallback=(
+                args.exhaustion_fallback
             ),
         )
 
@@ -678,6 +758,36 @@ def main(args: Args) -> None:
             ),
             sampling_protocol_version=(
                 loop_result.sampling_protocol_version
+            ),
+            scheduler_mode=args.scheduler_mode,
+            replan_steps=args.replan_steps,
+            prefetch_remaining_actions=(
+                args.prefetch_remaining_actions
+            ),
+            max_plan_age_seconds=(
+                args.max_plan_age_seconds
+            ),
+            max_plan_translation_m=(
+                args.max_plan_translation_m
+            ),
+            max_plan_rotation_radians=(
+                args.max_plan_rotation_radians
+            ),
+            max_plan_gripper_delta=(
+                args.max_plan_gripper_delta
+            ),
+            handoff_steps=args.handoff_steps,
+            exhaustion_fallback=(
+                args.exhaustion_fallback
+            ),
+            accepted_policy_results=(
+                loop_result.accepted_policy_results
+            ),
+            rejected_policy_results=(
+                loop_result.rejected_policy_results
+            ),
+            fallback_control_steps=(
+                loop_result.fallback_control_steps
             ),
             delta_x=delta_x,
             delta_y=delta_y,

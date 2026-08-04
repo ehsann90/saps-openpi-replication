@@ -16,6 +16,7 @@ NUM_TRIALS ?= 1
 TELEOP_MAX_STEPS ?= 1800
 AUTONOMOUS_MAX_STEPS ?= 280
 DURATION ?= 180
+OPERATOR_SMOKE_OUTPUT ?= outputs/operator_smoke/input_events.jsonl
 SPEED_MODE ?= fine
 
 ENVIRONMENT_SEED ?= 7
@@ -62,6 +63,8 @@ help:
 	@echo "  NUM_TRIALS, TELEOP_MAX_STEPS, AUTONOMOUS_MAX_STEPS, SPEED_MODE"
 	@echo "  TELEOP_OUTPUT, AUTONOMOUS_OUTPUT, SHARED_OUTPUT"
 	@echo "  FIXED_AUTONOMY_WEIGHT, COSINE_GAIN"
+	@echo "  CONTROL_FREQUENCY_HZ, SCHEDULER_MODE, REPLAN_STEPS"
+	@echo "  PREFETCH_REMAINING_ACTIONS"
 
 .PHONY: apply-patch
 apply-patch:
@@ -85,7 +88,7 @@ policy-stop:
 operator-smoke:
 	$(COMPOSE) run --rm --no-deps \
 		-e SAPS_SCRIPT=/workspace/tests/manual/keyboard_operator_smoke.py \
-		-e SAPS_RUNTIME_ARGS="--duration-seconds $(DURATION)" \
+		-e SAPS_RUNTIME_ARGS="--duration-seconds $(DURATION) --output-path $(OPERATOR_SMOKE_OUTPUT)" \
 		runtime
 
 .PHONY: teleop
@@ -183,11 +186,21 @@ SHARED_MAX_STEPS ?= 1200
 SHARED_OUTPUT ?= outputs/shared_autonomy_smoke
 FIXED_AUTONOMY_WEIGHT ?= 0.5
 COSINE_GAIN ?= 6.0
+SCHEDULER_MODE ?= strict_pause
+REPLAN_STEPS ?= 5
+PREFETCH_REMAINING_ACTIONS ?= 12
+MAX_PLAN_AGE_SECONDS ?= 1.5
+MAX_PLAN_TRANSLATION_M ?= 0.15
+MAX_PLAN_ROTATION_RADIANS ?= 0.75
+MAX_PLAN_GRIPPER_DELTA ?= 0.5
+HANDOFF_STEPS ?= 3
+EXHAUSTION_FALLBACK ?= pause
+CONTROL_FREQUENCY_HZ ?= 20.0
 
 define RUN_SHARED_AUTONOMY
 	$(COMPOSE) run --rm --no-deps \
 		-e SAPS_SCRIPT=/workspace/scripts/run_shared_autonomy_episode.py \
-		-e SAPS_RUNTIME_ARGS="--arbitration-mode $(1) --fixed-autonomy-weight $(FIXED_AUTONOMY_WEIGHT) --cosine-gain $(COSINE_GAIN) --condition-id $(CONDITION) --trial-index $(TRIAL) --initial-state-index $(INITIAL_STATE) --environment-seed $(ENVIRONMENT_SEED) --policy-base-seed $(POLICY_BASE_SEED) --max-steps $(SHARED_MAX_STEPS) --default-speed-mode $(SPEED_MODE) --output-dir $(SHARED_OUTPUT)" \
+		-e SAPS_RUNTIME_ARGS="--arbitration-mode $(1) --fixed-autonomy-weight $(FIXED_AUTONOMY_WEIGHT) --cosine-gain $(COSINE_GAIN) --scheduler-mode $(SCHEDULER_MODE) --replan-steps $(REPLAN_STEPS) --prefetch-remaining-actions $(PREFETCH_REMAINING_ACTIONS) --max-plan-age-seconds $(MAX_PLAN_AGE_SECONDS) --max-plan-translation-m $(MAX_PLAN_TRANSLATION_M) --max-plan-rotation-radians $(MAX_PLAN_ROTATION_RADIANS) --max-plan-gripper-delta $(MAX_PLAN_GRIPPER_DELTA) --handoff-steps $(HANDOFF_STEPS) --exhaustion-fallback $(EXHAUSTION_FALLBACK) --control-frequency-hz $(CONTROL_FREQUENCY_HZ) --condition-id $(CONDITION) --trial-index $(TRIAL) --initial-state-index $(INITIAL_STATE) --environment-seed $(ENVIRONMENT_SEED) --policy-base-seed $(POLICY_BASE_SEED) --max-steps $(SHARED_MAX_STEPS) --default-speed-mode $(SPEED_MODE) --output-dir $(SHARED_OUTPUT)" \
 		runtime
 endef
 

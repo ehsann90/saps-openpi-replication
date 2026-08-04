@@ -19,6 +19,9 @@ class AsyncPolicyRequest:
     generation: int
     reason: str
     submitted_monotonic_seconds: float
+    observation_eef_position: tuple[float, ...] | None
+    observation_eef_quaternion: tuple[float, ...] | None
+    observation_gripper_qpos: tuple[float, ...] | None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -145,6 +148,18 @@ class AsyncPolicyWorker:
             reason=str(reason),
             submitted_monotonic_seconds=(
                 time.monotonic()
+            ),
+            observation_eef_position=_observation_tuple(
+                observation,
+                "robot0_eef_pos",
+            ),
+            observation_eef_quaternion=_observation_tuple(
+                observation,
+                "robot0_eef_quat",
+            ),
+            observation_gripper_qpos=_observation_tuple(
+                observation,
+                "robot0_gripper_qpos",
             ),
         )
 
@@ -293,3 +308,24 @@ class AsyncPolicyWorker:
             ),
             noise_sha256=noise_sha256,
         )
+
+
+def _observation_tuple(
+    observation: dict[str, Any],
+    key: str,
+) -> tuple[float, ...] | None:
+    """Copy one finite observation vector into request metadata."""
+
+    value = observation.get(key)
+
+    if value is None:
+        return None
+
+    array = np.asarray(value, dtype=np.float64).reshape(-1)
+
+    if not np.all(np.isfinite(array)):
+        raise ValueError(
+            f"Observation field {key!r} contains non-finite values."
+        )
+
+    return tuple(float(item) for item in array)

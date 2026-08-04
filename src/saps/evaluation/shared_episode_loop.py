@@ -49,6 +49,9 @@ class SharedEpisodeLoopResult:
 
     policy_replan_count: int
     sampling_protocol_version: int | None
+    accepted_policy_results: int
+    rejected_policy_results: int
+    fallback_control_steps: int
 
     final_observation: dict[str, Any]
     replay_images: tuple[np.ndarray, ...]
@@ -161,6 +164,14 @@ def run_shared_episode_loop(
     control_frequency_hz: float,
     steps_path: Path,
     initial_generation: int = 0,
+    scheduler_mode: str = "strict_pause",
+    prefetch_remaining_actions: int = 12,
+    max_plan_age_seconds: float = 1.5,
+    max_plan_translation_m: float = 0.15,
+    max_plan_rotation_radians: float = 0.75,
+    max_plan_gripper_delta: float = 0.5,
+    handoff_steps: int = 3,
+    exhaustion_fallback: str = "pause",
 ) -> SharedEpisodeLoopResult:
     """Run responsive shared autonomy with asynchronous inference.
 
@@ -177,6 +188,39 @@ def run_shared_episode_loop(
     if control_frequency_hz <= 0.0:
         raise ValueError(
             "control_frequency_hz must be positive."
+        )
+
+    if scheduler_mode not in {
+        "strict_pause",
+        "latency_aware",
+    }:
+        raise ValueError(
+            "scheduler_mode must be 'strict_pause' or "
+            "'latency_aware'."
+        )
+
+    if prefetch_remaining_actions < 0:
+        raise ValueError(
+            "prefetch_remaining_actions must be non-negative."
+        )
+
+    for name, value in {
+        "max_plan_age_seconds": max_plan_age_seconds,
+        "max_plan_translation_m": max_plan_translation_m,
+        "max_plan_rotation_radians": max_plan_rotation_radians,
+        "max_plan_gripper_delta": max_plan_gripper_delta,
+    }.items():
+        if not np.isfinite(value) or value < 0.0:
+            raise ValueError(
+                f"{name} must be finite and non-negative."
+            )
+
+    if handoff_steps < 0:
+        raise ValueError("handoff_steps must be non-negative.")
+
+    if exhaustion_fallback not in {"pause", "hold"}:
+        raise ValueError(
+            "exhaustion_fallback must be 'pause' or 'hold'."
         )
 
     mode = ArbitrationMode(arbitration_mode)
@@ -230,6 +274,11 @@ def run_shared_episode_loop(
 
     autonomy_wait_ticks = 0
     last_executed_gripper = -1.0
+    accepted_policy_results = 0
+    rejected_policy_results = 0
+    fallback_control_steps = 0
+    handoff_from_action: np.ndarray | None = None
+    handoff_index = 0
 
     control_period = 1.0 / control_frequency_hz
     next_deadline = time.monotonic()
@@ -255,6 +304,11 @@ def run_shared_episode_loop(
             completed_chunk = policy_worker.poll()
             result_disposition: str | None = None
             result_applied = False
+            plan_age_seconds: float | None = None
+            plan_translation_m: float | None = None
+            plan_rotation_radians: float | None = None
+            plan_gripper_delta: float | None = None
+            plan_validation_status: str | None = None
 
             if completed_chunk is not None:
                 if (
@@ -264,6 +318,7 @@ def run_shared_episode_loop(
                     result_disposition = (
                         "discarded_stale_generation"
                     )
+                    rejected_policy_results += 1
                 elif (
                     mode is ArbitrationMode.TAKEOVER
                     and shared_control_state
@@ -272,15 +327,63 @@ def run_shared_episode_loop(
                     result_disposition = (
                         "discarded_human_takeover"
                     )
+                    rejected_policy_results += 1
                 else:
-                    active_chunk = completed_chunk
-                    active_chunk_index = 0
-                    shared_control_state = (
-                        _policy_execution_state(mode)
+                    (
+                        plan_validation_status,
+                        plan_age_seconds,
+                        plan_translation_m,
+                        plan_rotation_radians,
+                        plan_gripper_delta,
+                    ) = _validate_completed_plan(
+                        chunk=completed_chunk,
+                        observation=observation,
+                        enabled=(
+                            scheduler_mode
+                            == "latency_aware"
+                        ),
+                        max_age_seconds=(
+                            max_plan_age_seconds
+                        ),
+                        max_translation_m=(
+                            max_plan_translation_m
+                        ),
+                        max_rotation_radians=(
+                            max_plan_rotation_radians
+                        ),
+                        max_gripper_delta=(
+                            max_plan_gripper_delta
+                        ),
                     )
 
-                    result_disposition = "applied"
-                    result_applied = True
+                    if plan_validation_status.startswith(
+                        "rejected_"
+                    ):
+                        result_disposition = (
+                            plan_validation_status
+                        )
+                        rejected_policy_results += 1
+                    else:
+                        if (
+                            scheduler_mode
+                            == "latency_aware"
+                            and active_chunk is not None
+                            and handoff_steps > 0
+                        ):
+                            handoff_from_action = (
+                                last_autonomous_action.copy()
+                            )
+                            handoff_index = 0
+
+                        active_chunk = completed_chunk
+                        active_chunk_index = 0
+                        shared_control_state = (
+                            _policy_execution_state(mode)
+                        )
+
+                        result_disposition = "applied"
+                        result_applied = True
+                        accepted_policy_results += 1
 
             sample = operator.sample()
 
@@ -417,6 +520,7 @@ def run_shared_episode_loop(
             protocol_version: int | None
             noise_sha256: str | None
             chunk_remaining: int | None
+            handoff_weight: float | None = None
 
             if (
                 shared_control_state
@@ -464,6 +568,27 @@ def run_shared_episode_loop(
                 autonomous_action_status = (
                     "buffered_policy"
                 )
+
+                if (
+                    handoff_from_action is not None
+                    and handoff_index < handoff_steps
+                ):
+                    handoff_weight = float(
+                        handoff_index + 1
+                    ) / float(handoff_steps + 1)
+                    autonomous_action[:6] = (
+                        (1.0 - handoff_weight)
+                        * handoff_from_action[:6]
+                        + handoff_weight
+                        * autonomous_action[:6]
+                    )
+                    autonomous_action_status = (
+                        "policy_handoff"
+                    )
+                    handoff_index += 1
+
+                    if handoff_index >= handoff_steps:
+                        handoff_from_action = None
                 autonomous_action_fresh = True
 
                 policy_replan_index = (
@@ -527,6 +652,16 @@ def run_shared_episode_loop(
                         _policy_wait_state(mode)
                     )
 
+                if (
+                    scheduler_mode == "latency_aware"
+                    and exhaustion_fallback == "hold"
+                ):
+                    autonomous_action_status = (
+                        "policy_exhaustion_hold"
+                    )
+                    can_step_environment = True
+                    fallback_control_steps += 1
+
             if not can_step_environment:
                 autonomy_wait_ticks += 1
 
@@ -575,6 +710,22 @@ def run_shared_episode_loop(
                     "policy_result_disposition": (
                         result_disposition
                     ),
+                    "scheduler_mode": scheduler_mode,
+                    "plan_validation_status": (
+                        plan_validation_status
+                    ),
+                    "policy_plan_age_seconds": (
+                        plan_age_seconds
+                    ),
+                    "policy_plan_translation_m": (
+                        plan_translation_m
+                    ),
+                    "policy_plan_rotation_radians": (
+                        plan_rotation_radians
+                    ),
+                    "policy_plan_gripper_delta": (
+                        plan_gripper_delta
+                    ),
                     "inference_latency_seconds": (
                         completed_chunk
                         .inference_latency_seconds
@@ -585,6 +736,23 @@ def run_shared_episode_loop(
                         autonomy_wait_ticks
                     ),
                     "human_active": human_active,
+                    "human_action": human_action.tolist(),
+                    "operator_motion_active": (
+                        sample.motion_active
+                    ),
+                    "operator_speed_mode": sample.speed_mode,
+                    "operator_translation_gain": (
+                        sample.translation_gain
+                    ),
+                    "operator_rotation_gain": (
+                        sample.rotation_gain
+                    ),
+                    "operator_sample_monotonic_seconds": (
+                        sample.sample_monotonic_seconds
+                    ),
+                    "operator_last_event_monotonic_seconds": (
+                        sample.last_event_monotonic_seconds
+                    ),
                     "operator_pressed_keys": list(
                         sample.pressed_keys
                     ),
@@ -750,6 +918,27 @@ def run_shared_episode_loop(
                                 reason="periodic",
                             )
                         )
+                elif (
+                    scheduler_mode == "latency_aware"
+                    and (
+                        action_limit - active_chunk_index
+                        <= prefetch_remaining_actions
+                    )
+                    and not policy_worker.pending
+                ):
+                    submitted_request = (
+                        policy_worker.submit(
+                            observation=observation,
+                            task_description=(
+                                task_description
+                            ),
+                            request_control_step=(
+                                control_steps
+                            ),
+                            generation=generation,
+                            reason="early_prefetch",
+                        )
+                    )
 
             frame = operator_view_rgb(observation)
             replay_images.append(frame)
@@ -856,6 +1045,29 @@ def run_shared_episode_loop(
                 ),
                 "policy_result_disposition": (
                     result_disposition
+                ),
+                "scheduler_mode": scheduler_mode,
+                "prefetch_remaining_actions": (
+                    prefetch_remaining_actions
+                ),
+                "plan_validation_status": (
+                    plan_validation_status
+                ),
+                "policy_plan_age_seconds": (
+                    plan_age_seconds
+                ),
+                "policy_plan_translation_m": (
+                    plan_translation_m
+                ),
+                "policy_plan_rotation_radians": (
+                    plan_rotation_radians
+                ),
+                "policy_plan_gripper_delta": (
+                    plan_gripper_delta
+                ),
+                "policy_handoff_weight": handoff_weight,
+                "policy_exhaustion_fallback": (
+                    exhaustion_fallback
                 ),
                 "autonomy_wait_ticks_before_step": (
                     wait_ticks_before_step
@@ -1002,9 +1214,161 @@ def run_shared_episode_loop(
         sampling_protocol_version=(
             policy_worker.sampling_protocol_version
         ),
+        accepted_policy_results=accepted_policy_results,
+        rejected_policy_results=rejected_policy_results,
+        fallback_control_steps=fallback_control_steps,
         final_observation=observation,
         replay_images=tuple(replay_images),
     )
+
+
+def _validate_completed_plan(
+    *,
+    chunk: AsyncPolicyChunk,
+    observation: dict[str, Any],
+    enabled: bool,
+    max_age_seconds: float,
+    max_translation_m: float,
+    max_rotation_radians: float,
+    max_gripper_delta: float,
+) -> tuple[
+    str,
+    float,
+    float | None,
+    float | None,
+    float | None,
+]:
+    """Validate a returned plan against its observation snapshot."""
+
+    request = chunk.request
+    submitted_monotonic_seconds = getattr(
+        request,
+        "submitted_monotonic_seconds",
+        chunk.completed_monotonic_seconds,
+    )
+    age_seconds = max(
+        0.0,
+        time.monotonic()
+        - float(submitted_monotonic_seconds),
+    )
+
+    request_position = getattr(
+        request,
+        "observation_eef_position",
+        None,
+    )
+    request_quaternion = getattr(
+        request,
+        "observation_eef_quaternion",
+        None,
+    )
+    request_gripper = getattr(
+        request,
+        "observation_gripper_qpos",
+        None,
+    )
+
+    translation_m = _vector_delta(
+        request_position,
+        observation.get("robot0_eef_pos"),
+    )
+    rotation_radians = _quaternion_delta(
+        request_quaternion,
+        observation.get("robot0_eef_quat"),
+    )
+    gripper_delta = _vector_delta(
+        request_gripper,
+        observation.get("robot0_gripper_qpos"),
+    )
+
+    if not enabled:
+        status = "accepted_validation_disabled"
+    elif age_seconds > max_age_seconds:
+        status = "rejected_plan_age"
+    elif (
+        translation_m is not None
+        and translation_m > max_translation_m
+    ):
+        status = "rejected_translation_divergence"
+    elif (
+        rotation_radians is not None
+        and rotation_radians > max_rotation_radians
+    ):
+        status = "rejected_rotation_divergence"
+    elif (
+        gripper_delta is not None
+        and gripper_delta > max_gripper_delta
+    ):
+        status = "rejected_gripper_divergence"
+    elif all(
+        value is None
+        for value in (
+            translation_m,
+            rotation_radians,
+            gripper_delta,
+        )
+    ):
+        status = "accepted_state_metadata_unavailable"
+    else:
+        status = "accepted"
+
+    return (
+        status,
+        age_seconds,
+        translation_m,
+        rotation_radians,
+        gripper_delta,
+    )
+
+
+def _vector_delta(
+    reference: tuple[float, ...] | None,
+    current: Any,
+) -> float | None:
+    """Return Euclidean divergence for two observation vectors."""
+
+    if reference is None or current is None:
+        return None
+
+    reference_array = np.asarray(reference, dtype=np.float64)
+    current_array = np.asarray(current, dtype=np.float64).reshape(-1)
+
+    if reference_array.shape != current_array.shape:
+        return None
+
+    return float(np.linalg.norm(current_array - reference_array))
+
+
+def _quaternion_delta(
+    reference: tuple[float, ...] | None,
+    current: Any,
+) -> float | None:
+    """Return the shortest angular distance between quaternions."""
+
+    if reference is None or current is None:
+        return None
+
+    reference_array = np.asarray(reference, dtype=np.float64)
+    current_array = np.asarray(current, dtype=np.float64).reshape(-1)
+
+    if reference_array.shape != (4,) or current_array.shape != (4,):
+        return None
+
+    reference_norm = float(np.linalg.norm(reference_array))
+    current_norm = float(np.linalg.norm(current_array))
+
+    if reference_norm == 0.0 or current_norm == 0.0:
+        return None
+
+    dot = abs(
+        float(
+            np.dot(
+                reference_array / reference_norm,
+                current_array / current_norm,
+            )
+        )
+    )
+    return float(2.0 * np.arccos(np.clip(dot, 0.0, 1.0)))
 
 
 def _capture_counterfactual(

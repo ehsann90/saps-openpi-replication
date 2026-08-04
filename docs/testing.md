@@ -171,6 +171,23 @@ Apply varied human commands. Confirm that logs contain computed similarities,
 dynamic weights, continuous policy requests during human activity, and explicit
 `cosine_blend_policy_wait` records when inference is pending.
 
+### Latency-aware scheduler
+
+After validating the strict mode, run an opt-in smoke test:
+
+```bash
+make cosine-blend \
+  SCHEDULER_MODE=latency_aware \
+  REPLAN_STEPS=20 \
+  PREFETCH_REMAINING_ACTIONS=12 \
+  SHARED_OUTPUT=outputs/cosine_latency_aware_smoke
+```
+
+Verify `early_prefetch` requests occur before chunk exhaustion, camera and
+simulation steps continue while the worker is pending, and every returned plan
+has an explicit acceptance or rejection status. Inspect state-divergence and
+plan-age fields rather than assuming every asynchronous result is valid.
+
 ## 8. Output-integrity checks
 
 Every completed episode should contain:
