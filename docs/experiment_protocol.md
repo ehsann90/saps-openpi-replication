@@ -1,7 +1,7 @@
 # Formal Arbitration Experiment Protocol
 
-**Status:** protocol specification. The manifest-driven session runner described
-here is the next Phase 3 implementation milestone.
+**Status:** implemented for teleoperation and shared-autonomy operator sessions.
+The autonomous condition continues to use the unattended autonomous sweep.
 
 ## 1. Purpose
 
@@ -106,6 +106,12 @@ The session runner will consume an immutable JSON manifest similar to:
 The finalized manifest is copied into the output root and must not be edited
 after data collection begins. Changes require a new experiment ID.
 
+Start from
+`configs/operator_experiment_manifest.example.json`, copy it to a new file, and
+replace `repository_commit` with the exact clean commit returned by
+`git rev-parse HEAD`. The operator runner rejects commit mismatches and dirty
+repositories for formal collection.
+
 ## 7. Episode schedule
 
 The generated schedule should store one row per episode:
@@ -140,6 +146,34 @@ Requirements:
 
 The session runner must launch one browser-mediated episode at a time. It should
 not attempt unattended loops for operator-controlled conditions.
+
+Generate or resume the session with the policy server already running:
+
+```bash
+make operator-session \
+  MANIFEST=configs/operator_experiment_manifest.json \
+  SESSION_OUTPUT=outputs/saps_libero_operator_v1
+```
+
+The first invocation freezes `manifest.json`, creates `schedule.json`, and asks
+for acknowledgement before every episode. Completed valid episodes are skipped
+on resume. Every attempt receives a unique directory; invalid attempts are
+retained and never overwritten.
+
+Each schedule row derives `policy_episode_seed` with the same
+`make_policy_episode_seed` inputs used by `run_autonomous_sweep.py`:
+
+```text
+policy_base_seed
+condition_id
+trial_index
+task_id
+initial_state_index
+```
+
+Arbitration mode is deliberately excluded. Consequently, a condition/trial
+unit has one seed shared by autonomous, teleoperation, takeover, fixed blending,
+and cosine blending.
 
 ## 8. Operator procedure
 

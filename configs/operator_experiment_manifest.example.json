@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "experiment_id": "saps_libero_operator_v1",
+  "repository_commit": "REPLACE_WITH_GIT_COMMIT",
+  "config_path": "configs/libero_cream_cheese_offsets.json",
+  "conditions": [
+    "nominal",
+    "p01",
+    "p02",
+    "p03",
+    "p04",
+    "p05",
+    "p06",
+    "p07",
+    "p08",
+    "p09"
+  ],
+  "modes": [
+    "teleoperation",
+    "takeover",
+    "fixed_blend",
+    "cosine_blend"
+  ],
+  "trials_per_condition": 20,
+  "initial_state_index": 0,
+  "environment_seed": 7,
+  "policy_base_seed": 20260724,
+  "fixed_autonomy_weight": 0.5,
+  "cosine_gain": 6.0,
+  "control_frequency_hz": 20.0,
+  "operator_max_steps": 1200,
+  "ordering_seed": 20260801
+}

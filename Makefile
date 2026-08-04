@@ -27,6 +27,8 @@ PROBE_OUTPUT ?= outputs/seeded_policy_probe
 SCENE_OUTPUT ?= outputs/scene_inspection
 PREVIEW_OUTPUT ?= outputs/perturbation_preview
 ANALYSIS_OUTPUT ?= results/analysis
+MANIFEST ?= configs/operator_experiment_manifest.json
+SESSION_OUTPUT ?= outputs/operator_experiment
 
 DX ?= 0.0
 DY ?= 0.0
@@ -44,6 +46,7 @@ help:
 	@echo "  make takeover CONDITION=nominal TRIAL=0"
 	@echo "  make fixed-blend FIXED_AUTONOMY_WEIGHT=0.5"
 	@echo "  make cosine-blend COSINE_GAIN=6.0"
+	@echo "  make operator-session MANIFEST=<manifest.json>"
 	@echo
 	@echo "Tests:"
 	@echo "  make check"
@@ -86,6 +89,13 @@ operator-smoke:
 	$(COMPOSE) run --rm --no-deps \
 		-e SAPS_SCRIPT=/workspace/tests/manual/keyboard_operator_smoke.py \
 		-e SAPS_RUNTIME_ARGS="--duration-seconds $(DURATION)" \
+		runtime
+
+.PHONY: operator-session
+operator-session:
+	$(COMPOSE) run --rm --no-deps \
+		-e SAPS_SCRIPT=/workspace/scripts/run_operator_experiment.py \
+		-e SAPS_RUNTIME_ARGS="--manifest-path $(MANIFEST) --output-dir $(SESSION_OUTPUT)" \
 		runtime
 
 .PHONY: teleop
