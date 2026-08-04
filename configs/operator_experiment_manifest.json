@@ -1,7 +1,6 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "experiment_id": "saps_libero_operator_v1",
-  "repository_commit": "REPLACE_WITH_GIT_COMMIT",
   "config_path": "configs/libero_cream_cheese_offsets.json",
   "conditions": [
     "nominal",

@@ -19,9 +19,8 @@ def make_manifest() -> ExperimentManifest:
     """Return one compact valid test manifest."""
 
     return ExperimentManifest(
-        schema_version=1,
+        schema_version=2,
         experiment_id="test_operator_v1",
-        repository_commit="abc123",
         config_path="configs/test.json",
         conditions=("nominal", "p01"),
         modes=("teleoperation", "takeover", "cosine_blend"),

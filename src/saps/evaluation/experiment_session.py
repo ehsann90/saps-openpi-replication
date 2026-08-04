@@ -13,7 +13,7 @@ from saps.policies.seeding import make_policy_episode_seed
 from saps.policies.seeding import SEED_PROTOCOL
 
 
-MANIFEST_SCHEMA_VERSION = 1
+MANIFEST_SCHEMA_VERSION = 2
 SCHEDULE_SCHEMA_VERSION = 1
 OPERATOR_MODES = (
     "teleoperation",
@@ -29,7 +29,6 @@ class ExperimentManifest:
 
     schema_version: int
     experiment_id: str
-    repository_commit: str
     config_path: str
     conditions: tuple[str, ...]
     modes: tuple[str, ...]
@@ -64,7 +63,6 @@ class ExperimentManifest:
         manifest = cls(
             schema_version=int(data["schema_version"]),
             experiment_id=str(data["experiment_id"]),
-            repository_commit=str(data["repository_commit"]),
             config_path=str(data["config_path"]),
             conditions=tuple(
                 str(value) for value in data["conditions"]
@@ -104,9 +102,6 @@ class ExperimentManifest:
 
         if not self.experiment_id.strip():
             raise ValueError("experiment_id must not be empty.")
-
-        if not self.repository_commit.strip():
-            raise ValueError("repository_commit must not be empty.")
 
         if not self.conditions or len(set(self.conditions)) != len(
             self.conditions

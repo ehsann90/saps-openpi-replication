@@ -24,9 +24,9 @@ from saps.evaluation.experiment_session import write_json_atomic
 @dataclasses.dataclass
 class Args:
     manifest_path: str
+    repository_commit: str
     output_dir: str = "outputs/operator_experiment"
     dry_run: bool = False
-    require_clean_repository: bool = True
     continue_on_invalid_attempt: bool = False
 
 
@@ -36,18 +36,6 @@ def _utc_now() -> str:
     return datetime.datetime.now(
         datetime.timezone.utc
     ).isoformat()
-
-
-def _git_output(*arguments: str) -> str:
-    """Return stripped output from a read-only Git command."""
-
-    result = subprocess.run(
-        ["git", *arguments],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    return result.stdout.strip()
 
 
 def _load_task_config(path: Path) -> dict[str, Any]:
@@ -228,21 +216,34 @@ def main(args: Args) -> None:
         output_root=output_root,
     )
 
-    repository_commit = _git_output("rev-parse", "HEAD")
+    repository_commit = args.repository_commit.strip()
 
-    if repository_commit != manifest.repository_commit:
-        raise ValueError(
-            "Current repository commit does not match the manifest: "
-            f"current={repository_commit}, "
-            f"manifest={manifest.repository_commit}."
-        )
-
-    if args.require_clean_repository and _git_output(
-        "status", "--porcelain"
+    if len(repository_commit) != 40 or any(
+        character not in "0123456789abcdef"
+        for character in repository_commit.lower()
     ):
         raise ValueError(
-            "Formal collection requires a clean repository."
+            "repository_commit must be a full 40-character Git hash."
         )
+
+    provenance_path = output_root / "repository_provenance.json"
+    provenance = {
+        "repository_commit": repository_commit,
+        "manifest_sha256": manifest_sha256(manifest),
+    }
+
+    if provenance_path.exists():
+        with provenance_path.open("r", encoding="utf-8") as file:
+            stored_provenance = json.load(file)
+
+        if stored_provenance != provenance:
+            raise ValueError(
+                "The session output belongs to a different repository "
+                "commit or manifest. Use its original checkout or start "
+                "a new output directory."
+            )
+    else:
+        write_json_atomic(provenance_path, provenance)
 
     schedule_path = output_root / "schedule.json"
     events_path = output_root / "session_events.jsonl"

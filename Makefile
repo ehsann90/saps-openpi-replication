@@ -27,8 +27,9 @@ PROBE_OUTPUT ?= outputs/seeded_policy_probe
 SCENE_OUTPUT ?= outputs/scene_inspection
 PREVIEW_OUTPUT ?= outputs/perturbation_preview
 ANALYSIS_OUTPUT ?= results/analysis
-MANIFEST ?= outputs/operator_experiment_manifest.json
+MANIFEST ?= configs/operator_experiment_manifest.json
 SESSION_OUTPUT ?= outputs/operator_experiment
+REPOSITORY_COMMIT := $(shell git rev-parse HEAD)
 
 DX ?= 0.0
 DY ?= 0.0
@@ -93,9 +94,11 @@ operator-smoke:
 
 .PHONY: operator-session
 operator-session:
+	@test -z "$$(git status --porcelain)" || \
+		{ echo "Formal collection requires a clean repository."; exit 1; }
 	$(COMPOSE) run --rm --no-deps \
 		-e SAPS_SCRIPT=/workspace/scripts/run_operator_experiment.py \
-		-e SAPS_RUNTIME_ARGS="--manifest-path $(MANIFEST) --output-dir $(SESSION_OUTPUT)" \
+		-e SAPS_RUNTIME_ARGS="--manifest-path $(MANIFEST) --repository-commit $(REPOSITORY_COMMIT) --output-dir $(SESSION_OUTPUT)" \
 		runtime
 
 .PHONY: teleop

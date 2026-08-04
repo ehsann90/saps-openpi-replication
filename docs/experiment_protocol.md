@@ -79,12 +79,11 @@ The session runner will consume an immutable JSON manifest similar to:
 
 ```json
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "experiment_id": "saps_libero_operator_v1",
-  "repository_commit": "<commit>",
+  "config_path": "configs/libero_cream_cheese_offsets.json",
   "conditions": ["nominal", "p01", "p02"],
   "modes": [
-    "autonomous",
     "teleoperation",
     "takeover",
     "fixed_blend",
@@ -97,7 +96,6 @@ The session runner will consume an immutable JSON manifest similar to:
   "fixed_autonomy_weight": 0.5,
   "cosine_gain": 6.0,
   "control_frequency_hz": 20.0,
-  "autonomous_max_steps": 280,
   "operator_max_steps": 1200,
   "ordering_seed": 20260801
 }
@@ -106,13 +104,12 @@ The session runner will consume an immutable JSON manifest similar to:
 The finalized manifest is copied into the output root and must not be edited
 after data collection begins. Changes require a new experiment ID.
 
-Start from
-`configs/operator_experiment_manifest.example.json`, copy it to
-`outputs/operator_experiment_manifest.json`, and replace `repository_commit`
-with the exact clean commit returned by `git rev-parse HEAD`. Keeping the
-study-specific manifest under the ignored `outputs/` directory avoids changing
-the repository it identifies. The operator runner rejects commit mismatches and
-dirty tracked repositories for formal collection.
+The version-controlled protocol is
+`configs/operator_experiment_manifest.json`. Commit any protocol changes before
+collection. The Make target rejects a dirty worktree, obtains the exact Git
+commit on the host, and records it alongside the frozen manifest in
+`repository_provenance.json`. Git is therefore not required in the runtime
+container, and the manifest does not contain a self-referential commit hash.
 
 ## 7. Episode schedule
 
@@ -153,7 +150,7 @@ Generate or resume the session with the policy server already running:
 
 ```bash
 make operator-session \
-  MANIFEST=outputs/operator_experiment_manifest.json \
+  MANIFEST=configs/operator_experiment_manifest.json \
   SESSION_OUTPUT=outputs/saps_libero_operator_v1
 ```
 
