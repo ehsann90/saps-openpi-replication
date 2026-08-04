@@ -4,7 +4,9 @@
 from __future__ import annotations
 
 import dataclasses
+import json
 import logging
+from pathlib import Path
 import time
 
 import cv2
@@ -27,6 +29,9 @@ class Args:
 
     duration_seconds: float = 300.0
     frame_frequency_hz: float = 10.0
+    output_path: str = (
+        "outputs/operator_smoke/input_events.jsonl"
+    )
 
 
 def make_test_frame(
@@ -128,6 +133,12 @@ def main(args: Args) -> None:
     frame_period = 1.0 / args.frame_frequency_hz
     next_frame_time = start_time
     previous_signature = None
+    output_path = Path(args.output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    events_file = output_path.open("w", encoding="utf-8")
+
+    print(f"Input trace: {output_path}")
+    print()
 
     try:
         while True:
@@ -162,6 +173,16 @@ def main(args: Args) -> None:
                         suppress_small=True,
                     ),
                 )
+                events_file.write(
+                    json.dumps(
+                        {
+                            "elapsed_seconds": elapsed,
+                            **sample.as_dict(),
+                        }
+                    )
+                    + "\n"
+                )
+                events_file.flush()
                 previous_signature = signature
 
             if now >= next_frame_time:
@@ -214,6 +235,7 @@ def main(args: Args) -> None:
         print("\nKeyboard interrupt received.")
 
     finally:
+        events_file.close()
         operator.close()
 
 
