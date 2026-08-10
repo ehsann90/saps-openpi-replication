@@ -189,6 +189,8 @@ COSINE_GAIN ?= 6.0
 SCHEDULER_MODE ?= strict_pause
 REPLAN_STEPS ?= 5
 PREFETCH_REMAINING_ACTIONS ?= 12
+MOCK_OPERATOR_TRACE ?=
+MOCK_OPERATOR_TRACE_ARG = $(if $(strip $(MOCK_OPERATOR_TRACE)),--mock-operator-trace $(MOCK_OPERATOR_TRACE),)
 MAX_PLAN_AGE_SECONDS ?= 1.5
 MAX_PLAN_TRANSLATION_M ?= 0.15
 MAX_PLAN_ROTATION_RADIANS ?= 0.75
@@ -200,7 +202,7 @@ CONTROL_FREQUENCY_HZ ?= 20.0
 define RUN_SHARED_AUTONOMY
 	$(COMPOSE) run --rm --no-deps \
 		-e SAPS_SCRIPT=/workspace/scripts/run_shared_autonomy_episode.py \
-		-e SAPS_RUNTIME_ARGS="--arbitration-mode $(1) --fixed-autonomy-weight $(FIXED_AUTONOMY_WEIGHT) --cosine-gain $(COSINE_GAIN) --scheduler-mode $(SCHEDULER_MODE) --replan-steps $(REPLAN_STEPS) --prefetch-remaining-actions $(PREFETCH_REMAINING_ACTIONS) --max-plan-age-seconds $(MAX_PLAN_AGE_SECONDS) --max-plan-translation-m $(MAX_PLAN_TRANSLATION_M) --max-plan-rotation-radians $(MAX_PLAN_ROTATION_RADIANS) --max-plan-gripper-delta $(MAX_PLAN_GRIPPER_DELTA) --handoff-steps $(HANDOFF_STEPS) --exhaustion-fallback $(EXHAUSTION_FALLBACK) --control-frequency-hz $(CONTROL_FREQUENCY_HZ) --condition-id $(CONDITION) --trial-index $(TRIAL) --initial-state-index $(INITIAL_STATE) --environment-seed $(ENVIRONMENT_SEED) --policy-base-seed $(POLICY_BASE_SEED) --max-steps $(SHARED_MAX_STEPS) --default-speed-mode $(SPEED_MODE) --output-dir $(SHARED_OUTPUT)" \
+		-e SAPS_RUNTIME_ARGS="--arbitration-mode $(1) --fixed-autonomy-weight $(FIXED_AUTONOMY_WEIGHT) --cosine-gain $(COSINE_GAIN) --scheduler-mode $(SCHEDULER_MODE) --replan-steps $(REPLAN_STEPS) --prefetch-remaining-actions $(PREFETCH_REMAINING_ACTIONS) --max-plan-age-seconds $(MAX_PLAN_AGE_SECONDS) --max-plan-translation-m $(MAX_PLAN_TRANSLATION_M) --max-plan-rotation-radians $(MAX_PLAN_ROTATION_RADIANS) --max-plan-gripper-delta $(MAX_PLAN_GRIPPER_DELTA) --handoff-steps $(HANDOFF_STEPS) --exhaustion-fallback $(EXHAUSTION_FALLBACK) --control-frequency-hz $(CONTROL_FREQUENCY_HZ) --condition-id $(CONDITION) --trial-index $(TRIAL) --initial-state-index $(INITIAL_STATE) --environment-seed $(ENVIRONMENT_SEED) --policy-base-seed $(POLICY_BASE_SEED) --max-steps $(SHARED_MAX_STEPS) --default-speed-mode $(SPEED_MODE) $(MOCK_OPERATOR_TRACE_ARG) --output-dir $(SHARED_OUTPUT)" \
 		runtime
 endef
 

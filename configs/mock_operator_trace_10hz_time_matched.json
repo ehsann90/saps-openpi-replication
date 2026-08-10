@@ -1,0 +1,11 @@
+{
+  "trace_format_version": 1,
+  "segments": [
+    {
+      "start_control_step": 20,
+      "end_control_step": 28,
+      "action": [0.1, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0],
+      "label": "translation_intervention_time_matched_to_20hz"
+    }
+  ]
+}

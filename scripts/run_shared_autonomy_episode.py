@@ -6,6 +6,7 @@ from __future__ import annotations
 import dataclasses
 import logging
 from pathlib import Path
+import shutil
 import time
 from typing import Any
 
@@ -38,8 +39,12 @@ from saps.evaluation.operator_episode import (
     write_json_atomic,
 )
 from saps.evaluation.shared_episode_loop import (
+    OperatorInterface,
+)
+from saps.evaluation.shared_episode_loop import (
     run_shared_episode_loop,
 )
+from saps.human_input.mock_operator import MockOperatorTrace
 from saps.human_input.web_operator import (
     BrowserOperatorServer,
 )
@@ -116,6 +121,7 @@ class Args:
     jpeg_quality: int = 85
     client_timeout_seconds: float = 120.0
     arm_timeout_seconds: float = 300.0
+    mock_operator_trace: str | None = None
 
     # Output
     output_dir: str = "outputs/shared_autonomy_smoke"
@@ -164,6 +170,7 @@ class SharedAutonomyEpisodeResult:
     total_elapsed_seconds: float
 
     operator_connected_at_start: bool
+    mock_operator_trace: str | None
 
     object_position_before: list[float]
     object_position_after_settle: list[float]
@@ -367,9 +374,14 @@ def main(args: Args) -> None:
         parents=True,
         exist_ok=True,
     )
+    if args.mock_operator_trace is not None:
+        shutil.copyfile(
+            args.mock_operator_trace,
+            episode_directory / "mock_operator_trace.json",
+        )
 
     env: Any | None = None
-    operator: BrowserOperatorServer | None = None
+    operator: OperatorInterface | None = None
     policy_worker: AsyncPolicyWorker | None = None
 
     simulation_steps = 0
@@ -526,111 +538,92 @@ def main(args: Args) -> None:
                 "Could not submit initial policy prefetch."
             )
 
-        operator = BrowserOperatorServer(
-            host=args.host,
-            websocket_port=args.websocket_port,
-            http_port=args.http_port,
-            fine_translation_gain=(
-                args.fine_translation_gain
-            ),
-            normal_translation_gain=(
-                args.translation_gain
-            ),
-            fast_translation_gain=(
-                args.fast_translation_gain
-            ),
-            fine_rotation_gain=(
-                args.fine_rotation_gain
-            ),
-            normal_rotation_gain=(
-                args.rotation_gain
-            ),
-            fast_rotation_gain=(
-                args.fast_rotation_gain
-            ),
-            default_speed_mode=(
-                args.default_speed_mode
-            ),
-            jpeg_quality=args.jpeg_quality,
-        )
-        operator.start()
-
         scene_image = operator_view_rgb(obs)
+        if args.mock_operator_trace is not None:
+            operator = MockOperatorTrace.from_json(
+                Path(args.mock_operator_trace),
+                control_frequency_hz=args.control_frequency_hz,
+            )
+            operator_connected_at_start = True
+            logging.info(
+                "Using deterministic mock operator trace: %s",
+                args.mock_operator_trace,
+            )
+        else:
+            browser_operator = BrowserOperatorServer(
+                host=args.host,
+                websocket_port=args.websocket_port,
+                http_port=args.http_port,
+                fine_translation_gain=args.fine_translation_gain,
+                normal_translation_gain=args.translation_gain,
+                fast_translation_gain=args.fast_translation_gain,
+                fine_rotation_gain=args.fine_rotation_gain,
+                normal_rotation_gain=args.rotation_gain,
+                fast_rotation_gain=args.fast_rotation_gain,
+                default_speed_mode=args.default_speed_mode,
+                jpeg_quality=args.jpeg_quality,
+            )
+            browser_operator.start()
+            operator = browser_operator
 
-        operator.publish_frame_rgb(
-            scene_image,
-            runtime_status={
-                "phase": "waiting_for_browser",
-                "arbitration_mode": mode.value,
-                "configured_autonomy_weight": (
-                    args.fixed_autonomy_weight
-                    if mode
-                    is ArbitrationMode.FIXED_BLEND
-                    else None
-                ),
-                "cosine_gain": (
-                    args.cosine_gain
-                    if mode
-                    is ArbitrationMode.COSINE_BLEND
-                    else None
-                ),
-                "condition_id": args.condition_id,
-                "trial_index": args.trial_index,
-                "task": task_description,
-                "policy_episode_seed": (
-                    policy_episode_seed
-                ),
-            },
-        )
-
-        print()
-        print("SAPS shared-autonomy episode")
-        print()
-        print(f"Mode: {mode.value}")
-        if mode is ArbitrationMode.FIXED_BLEND:
+            operator.publish_frame_rgb(
+                scene_image,
+                runtime_status={
+                    "phase": "waiting_for_browser",
+                    "arbitration_mode": mode.value,
+                    "configured_autonomy_weight": (
+                        args.fixed_autonomy_weight
+                        if mode is ArbitrationMode.FIXED_BLEND
+                        else None
+                    ),
+                    "cosine_gain": (
+                        args.cosine_gain
+                        if mode is ArbitrationMode.COSINE_BLEND
+                        else None
+                    ),
+                    "condition_id": args.condition_id,
+                    "trial_index": args.trial_index,
+                    "task": task_description,
+                    "policy_episode_seed": policy_episode_seed,
+                },
+            )
+            print()
+            print("SAPS shared-autonomy episode")
+            print()
+            print(f"Mode: {mode.value}")
+            if mode is ArbitrationMode.FIXED_BLEND:
+                print(
+                    "Configured autonomy weight: "
+                    f"{args.fixed_autonomy_weight:.3f}"
+                )
+            elif mode is ArbitrationMode.COSINE_BLEND:
+                print(f"Cosine gain: {args.cosine_gain:.3f}")
+            print(f"Task: {task_description}")
             print(
-                "Configured autonomy weight: "
-                f"{args.fixed_autonomy_weight:.3f}"
+                f"Condition: {args.condition_id} "
+                f"(dx={delta_x:.3f}, dy={delta_y:.3f})"
             )
-        elif mode is ArbitrationMode.COSINE_BLEND:
-            print(f"Cosine gain: {args.cosine_gain:.3f}")
-        print(f"Task: {task_description}")
-        print(
-            f"Condition: {args.condition_id} "
-            f"(dx={delta_x:.3f}, dy={delta_y:.3f})"
-        )
-        print(
-            "Matched policy seed: "
-            f"{policy_episode_seed}"
-        )
-        print(f"Replan steps: {args.replan_steps}")
-        print(f"Scheduler mode: {args.scheduler_mode}")
-        print()
-        print(f"Open: {operator.operator_url}")
-        print()
-        print(
-            "Click 'Arm controls' to begin. "
-            "Escape aborts the episode."
-        )
-        print()
+            print(f"Matched policy seed: {policy_episode_seed}")
+            print(f"Replan steps: {args.replan_steps}")
+            print(f"Scheduler mode: {args.scheduler_mode}")
+            print()
+            print(f"Open: {browser_operator.operator_url}")
+            print()
+            print("Click 'Arm controls' to begin. Escape aborts the episode.")
+            print()
 
-        if not operator.wait_for_client(
-            timeout_seconds=(
-                args.client_timeout_seconds
+            if not browser_operator.wait_for_client(
+                timeout_seconds=args.client_timeout_seconds
+            ):
+                raise TimeoutError("Timed out waiting for the operator browser.")
+
+            operator_connected_at_start = True
+            wait_until_armed(
+                operator=browser_operator,
+                scene_image=scene_image,
+                timeout_seconds=args.arm_timeout_seconds,
+                episode_label="shared-autonomy episode",
             )
-        ):
-            raise TimeoutError(
-                "Timed out waiting for the operator browser."
-            )
-
-        operator_connected_at_start = True
-
-        wait_until_armed(
-            operator=operator,
-            scene_image=scene_image,
-            timeout_seconds=args.arm_timeout_seconds,
-            episode_label="shared-autonomy episode",
-        )
 
         logging.info(
             "Starting %s control at %.1f Hz.",
@@ -818,6 +811,7 @@ def main(args: Args) -> None:
             operator_connected_at_start=(
                 operator_connected_at_start
             ),
+            mock_operator_trace=args.mock_operator_trace,
             object_position_before=(
                 perturbation.body_position_before
             ),
@@ -856,7 +850,9 @@ def main(args: Args) -> None:
             policy_worker.close()
 
         if operator is not None:
-            operator.close()
+            close = getattr(operator, "close", None)
+            if callable(close):
+                close()
 
         if env is not None:
             close = getattr(env, "close", None)

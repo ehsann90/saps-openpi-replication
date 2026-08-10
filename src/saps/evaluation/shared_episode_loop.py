@@ -24,7 +24,7 @@ from saps.policies.seeding import SEED_PROTOCOL
 
 
 class OperatorInterface(Protocol):
-    """Browser interface required by the shared-control loop."""
+    """Operator interface required by the shared-control loop."""
 
     def sample(self) -> HumanInputSample:
         """Return the latest operator input."""
@@ -856,6 +856,14 @@ def run_shared_episode_loop(
 
             simulation_steps += 1
             control_steps += 1
+
+            control_step_completed = getattr(
+                operator,
+                "control_step_completed",
+                None,
+            )
+            if callable(control_step_completed):
+                control_step_completed()
 
             last_executed_gripper = float(
                 arbitration_result
