@@ -151,6 +151,7 @@ For operator-controlled modes, open the displayed browser URL and click
 - [Installation and environment setup](docs/setup.md)
 - [Command runbook](docs/runbook.md)
 - [Testing and validation](docs/testing.md)
+- [Gate 1 RTX 5080 AC/performance characterization](docs/gate1_rtx5080_ac_performance.md)
 - [Shared-autonomy semantics and runtime](docs/shared_autonomy.md)
 - [Phase 1 perturbations and deterministic sampling](docs/phase1_libero_perturbations_and_determinism.md)
 - [Formal experiment protocol](docs/experiment_protocol.md)
