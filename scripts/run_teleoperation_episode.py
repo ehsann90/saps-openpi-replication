@@ -38,9 +38,14 @@ from saps.evaluation.operator_episode import (
 from saps.evaluation.operator_episode import (
     write_json_atomic,
 )
+from saps.evaluation.operator_episode import validated_human_action
 from saps.human_input.web_operator import (
     BrowserOperatorServer,
 )
+from saps.human_input.spacemouse import parse_axis_mapping
+from saps.human_input.spacemouse import parse_axis_maxima
+from saps.human_input.spacemouse import parse_axis_signs
+from saps.human_input.spacemouse_profile import load_spacemouse_profile
 from saps.policies.seeding import make_policy_episode_seed
 from saps.policies.seeding import SEED_PROTOCOL
 
@@ -85,6 +90,19 @@ class Args:
     fast_translation_gain: float = 0.25
     fast_rotation_gain: float = 0.30
     default_speed_mode: str = "fine"
+
+    input_source: str = "keyboard"
+    spacemouse_device_path: str = ""
+    spacemouse_deadzone: float = 0.08
+    spacemouse_axis_mapping: str = (
+        "ABS_X,ABS_Y,ABS_Z,ABS_RX,ABS_RY,ABS_RZ"
+    )
+    spacemouse_axis_signs: str = "1,1,1,1,1,1"
+    spacemouse_axis_maxima: str = "350,350,350,350,350,350"
+    spacemouse_stale_input_timeout_seconds: float = 0.25
+    spacemouse_open_button: int = 256
+    spacemouse_close_button: int = 257
+    spacemouse_profile_path: str = ""
 
     jpeg_quality: int = 85
     client_timeout_seconds: float = 120.0
@@ -162,6 +180,19 @@ def main(args: Args) -> None:
     if args.arm_timeout_seconds <= 0.0:
         raise ValueError(
             "arm_timeout_seconds must be positive."
+        )
+
+    spacemouse_config = None
+    if args.spacemouse_profile_path:
+        if args.input_source.strip().lower() != "spacemouse":
+            raise ValueError(
+                "spacemouse_profile_path requires "
+                "input_source='spacemouse'."
+            )
+        spacemouse_config = load_spacemouse_profile(
+            Path(args.spacemouse_profile_path)
+        ).to_config(
+            device_path=args.spacemouse_device_path
         )
 
     total_start = time.perf_counter()
@@ -356,6 +387,26 @@ def main(args: Args) -> None:
             default_speed_mode=(
                 args.default_speed_mode
             ),
+            input_source=args.input_source,
+            spacemouse_device_path=(
+                args.spacemouse_device_path
+            ),
+            spacemouse_deadzone=args.spacemouse_deadzone,
+            spacemouse_axis_mapping=parse_axis_mapping(
+                args.spacemouse_axis_mapping
+            ),
+            spacemouse_axis_signs=parse_axis_signs(
+                args.spacemouse_axis_signs
+            ),
+            spacemouse_axis_maxima=parse_axis_maxima(
+                args.spacemouse_axis_maxima
+            ),
+            spacemouse_stale_input_timeout_seconds=(
+                args.spacemouse_stale_input_timeout_seconds
+            ),
+            spacemouse_open_button=args.spacemouse_open_button,
+            spacemouse_close_button=args.spacemouse_close_button,
+            spacemouse_config=spacemouse_config,
             jpeg_quality=args.jpeg_quality,
         )
         operator.start()
@@ -454,23 +505,9 @@ def main(args: Args) -> None:
                     )
                     break
 
-                human_action = np.asarray(
-                    sample.action,
-                    dtype=np.float32,
+                human_action = validated_human_action(
+                    sample.action
                 )
-
-                if human_action.shape != (7,):
-                    raise ValueError(
-                        "Expected human action shape "
-                        f"(7,), received "
-                        f"{human_action.shape}."
-                    )
-
-                human_action = np.clip(
-                    human_action,
-                    -1.0,
-                    1.0,
-                ).astype(np.float32)
 
                 # Pure teleoperation:
                 # executed action equals human action.
@@ -572,6 +609,7 @@ def main(args: Args) -> None:
                     "operator_last_event_monotonic_seconds": (
                         sample.last_event_monotonic_seconds
                     ),
+                    "human_input": sample.as_dict(),
                     "human_action": (
                         human_action.tolist()
                     ),

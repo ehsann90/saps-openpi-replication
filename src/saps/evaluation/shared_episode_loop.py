@@ -16,7 +16,7 @@ from saps.arbitration import ActionArbitrator
 from saps.arbitration import ArbitrationMode
 from saps.arbitration import SAPS_ACTIVITY_THRESHOLD
 from saps.evaluation.operator_episode import operator_view_rgb
-from saps.human_input.keyboard import HumanInputSample
+from saps.human_input.sample import HumanInputSample
 from saps.policies.async_worker import AsyncPolicyChunk
 from saps.policies.async_worker import AsyncPolicyRequest
 from saps.policies.async_worker import AsyncPolicyWorker
@@ -588,6 +588,7 @@ def run_shared_episode_loop(
                     "operator_pressed_keys": list(
                         sample.pressed_keys
                     ),
+                    "human_input": sample.as_dict(),
                     "wall_time_unix_seconds": (
                         time.time()
                     ),
@@ -899,6 +900,7 @@ def run_shared_episode_loop(
                     sample
                     .last_event_monotonic_seconds
                 ),
+                "human_input": sample.as_dict(),
                 "reward": float(reward),
                 "done": bool(done),
                 "eef_position": eef_position.tolist(),

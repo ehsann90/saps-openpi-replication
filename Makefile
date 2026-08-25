@@ -17,6 +17,28 @@ TELEOP_MAX_STEPS ?= 1800
 AUTONOMOUS_MAX_STEPS ?= 280
 DURATION ?= 180
 SPEED_MODE ?= fine
+INPUT_SOURCE ?= keyboard
+SPACEMOUSE_DEVICE ?=
+SPACEMOUSE_TRANSLATION_GAIN ?= 0.30
+SPACEMOUSE_ROTATION_GAIN ?= 0.08
+SPACEMOUSE_DEADZONE ?= 0.08
+SPACEMOUSE_AXIS_MAPPING ?= ABS_X,ABS_Y,ABS_Z,ABS_RX,ABS_RY,ABS_RZ
+SPACEMOUSE_AXIS_SIGNS ?= 1,1,1,1,1,1
+SPACEMOUSE_AXIS_MAXIMA ?= 350,350,350,350,350,350
+SPACEMOUSE_STALE_TIMEOUT ?= 0.25
+SPACEMOUSE_OPEN_BUTTON ?= 256
+SPACEMOUSE_CLOSE_BUTTON ?= 257
+SPACEMOUSE_REFRESH_HZ ?= 20
+SPACEMOUSE_PROFILE ?=
+CALIBRATION_PROFILE ?= configs/spacemouse_profile.json
+CALIBRATION_TRANSLATION_GAIN ?= 0.30
+CALIBRATION_ROTATION_GAIN ?= 0.08
+SPACEMOUSE_DEVICE_RUNNER_ARG = $(if $(strip $(SPACEMOUSE_DEVICE)),--spacemouse-device-path $(SPACEMOUSE_DEVICE),)
+SPACEMOUSE_DEVICE_DIAGNOSTIC_ARG = $(if $(strip $(SPACEMOUSE_DEVICE)),--device-path $(SPACEMOUSE_DEVICE),)
+SPACEMOUSE_PROFILE_ARG = $(if $(strip $(SPACEMOUSE_PROFILE)),--spacemouse-profile-path $(SPACEMOUSE_PROFILE),)
+
+HUMAN_INPUT_ARGS = --input-source $(INPUT_SOURCE) $(SPACEMOUSE_DEVICE_RUNNER_ARG) $(SPACEMOUSE_PROFILE_ARG) --translation-gain $(SPACEMOUSE_TRANSLATION_GAIN) --rotation-gain $(SPACEMOUSE_ROTATION_GAIN) --spacemouse-deadzone $(SPACEMOUSE_DEADZONE) --spacemouse-axis-mapping $(SPACEMOUSE_AXIS_MAPPING) --spacemouse-axis-signs $(SPACEMOUSE_AXIS_SIGNS) --spacemouse-axis-maxima $(SPACEMOUSE_AXIS_MAXIMA) --spacemouse-stale-input-timeout-seconds $(SPACEMOUSE_STALE_TIMEOUT) --spacemouse-open-button $(SPACEMOUSE_OPEN_BUTTON) --spacemouse-close-button $(SPACEMOUSE_CLOSE_BUTTON)
+SESSION_INPUT_ARGS = --input-source $(INPUT_SOURCE) $(SPACEMOUSE_DEVICE_RUNNER_ARG) --spacemouse-deadzone $(SPACEMOUSE_DEADZONE) --spacemouse-axis-mapping $(SPACEMOUSE_AXIS_MAPPING) --spacemouse-axis-signs $(SPACEMOUSE_AXIS_SIGNS) --spacemouse-axis-maxima $(SPACEMOUSE_AXIS_MAXIMA) --spacemouse-stale-input-timeout-seconds $(SPACEMOUSE_STALE_TIMEOUT) --spacemouse-open-button $(SPACEMOUSE_OPEN_BUTTON) --spacemouse-close-button $(SPACEMOUSE_CLOSE_BUTTON)
 
 ENVIRONMENT_SEED ?= 7
 POLICY_BASE_SEED ?= 20260724
@@ -67,6 +89,8 @@ help:
 	@echo "  make seeded-probe"
 	@echo "  make scene-inspect"
 	@echo "  make perturbation-preview DX=0.10 DY=0.08 LABEL=p02"
+	@echo "  make spacemouse-diagnostic"
+	@echo "  make spacemouse-calibrate"
 	@echo "  make analyze SUMMARY=<sweep_summary.json>"
 	@echo "  make analyze-comparison"
 	@echo
@@ -107,7 +131,7 @@ operator-session:
 		{ echo "Formal collection requires a clean repository."; exit 1; }
 	$(COMPOSE) run --rm --no-deps \
 		-e SAPS_SCRIPT=/workspace/scripts/run_operator_experiment.py \
-		-e SAPS_RUNTIME_ARGS="--manifest-path $(MANIFEST) --repository-commit $(REPOSITORY_COMMIT) --output-dir $(SESSION_OUTPUT) $(REDO_EPISODES_ARG)" \
+		-e SAPS_RUNTIME_ARGS="--manifest-path $(MANIFEST) --repository-commit $(REPOSITORY_COMMIT) --output-dir $(SESSION_OUTPUT) $(SESSION_INPUT_ARGS) $(REDO_EPISODES_ARG)" \
 		runtime
 
 .PHONY: teleoperation-session
@@ -126,7 +150,21 @@ shared-autonomy-session:
 teleop:
 	$(COMPOSE) run --rm --no-deps \
 		-e SAPS_SCRIPT=/workspace/scripts/run_teleoperation_episode.py \
-		-e SAPS_RUNTIME_ARGS="--condition-id $(CONDITION) --trial-index $(TRIAL) --initial-state-index $(INITIAL_STATE) --environment-seed $(ENVIRONMENT_SEED) --policy-base-seed $(POLICY_BASE_SEED) --max-steps $(TELEOP_MAX_STEPS) --default-speed-mode $(SPEED_MODE) --output-dir $(TELEOP_OUTPUT)" \
+		-e SAPS_RUNTIME_ARGS="--condition-id $(CONDITION) --trial-index $(TRIAL) --initial-state-index $(INITIAL_STATE) --environment-seed $(ENVIRONMENT_SEED) --policy-base-seed $(POLICY_BASE_SEED) --max-steps $(TELEOP_MAX_STEPS) --default-speed-mode $(SPEED_MODE) $(HUMAN_INPUT_ARGS) --output-dir $(TELEOP_OUTPUT)" \
+		runtime
+
+.PHONY: spacemouse-diagnostic
+spacemouse-diagnostic:
+	$(COMPOSE) run --rm --no-deps \
+		-e SAPS_SCRIPT=/workspace/tools/diagnostics/inspect_spacemouse_input.py \
+		-e SAPS_RUNTIME_ARGS="$(SPACEMOUSE_DEVICE_DIAGNOSTIC_ARG) --translation-gain $(SPACEMOUSE_TRANSLATION_GAIN) --rotation-gain $(SPACEMOUSE_ROTATION_GAIN) --deadzone $(SPACEMOUSE_DEADZONE) --axis-mapping $(SPACEMOUSE_AXIS_MAPPING) --axis-signs $(SPACEMOUSE_AXIS_SIGNS) --axis-maxima $(SPACEMOUSE_AXIS_MAXIMA) --stale-input-timeout-seconds $(SPACEMOUSE_STALE_TIMEOUT) --open-button $(SPACEMOUSE_OPEN_BUTTON) --close-button $(SPACEMOUSE_CLOSE_BUTTON) --refresh-frequency-hz $(SPACEMOUSE_REFRESH_HZ)" \
+		runtime
+
+.PHONY: spacemouse-calibrate
+spacemouse-calibrate:
+	$(COMPOSE) run --rm --no-deps \
+		-e SAPS_SCRIPT=/workspace/scripts/run_spacemouse_calibration.py \
+		-e SAPS_RUNTIME_ARGS="$(SPACEMOUSE_DEVICE_DIAGNOSTIC_ARG) --profile-path $(CALIBRATION_PROFILE) --translation-gain $(CALIBRATION_TRANSLATION_GAIN) --rotation-gain $(CALIBRATION_ROTATION_GAIN) --deadzone $(SPACEMOUSE_DEADZONE) --stale-input-timeout-seconds $(SPACEMOUSE_STALE_TIMEOUT) --open-button $(SPACEMOUSE_OPEN_BUTTON) --close-button $(SPACEMOUSE_CLOSE_BUTTON)" \
 		runtime
 
 .PHONY: autonomous-smoke
@@ -226,7 +264,7 @@ COSINE_GAIN ?= 6.0
 define RUN_SHARED_AUTONOMY
 	$(COMPOSE) run --rm --no-deps \
 		-e SAPS_SCRIPT=/workspace/scripts/run_shared_autonomy_episode.py \
-		-e SAPS_RUNTIME_ARGS="--arbitration-mode $(1) --fixed-autonomy-weight $(FIXED_AUTONOMY_WEIGHT) --cosine-gain $(COSINE_GAIN) --condition-id $(CONDITION) --trial-index $(TRIAL) --initial-state-index $(INITIAL_STATE) --environment-seed $(ENVIRONMENT_SEED) --policy-base-seed $(POLICY_BASE_SEED) --max-steps $(SHARED_MAX_STEPS) --default-speed-mode $(SPEED_MODE) --output-dir $(SHARED_OUTPUT)" \
+		-e SAPS_RUNTIME_ARGS="--arbitration-mode $(1) --fixed-autonomy-weight $(FIXED_AUTONOMY_WEIGHT) --cosine-gain $(COSINE_GAIN) --condition-id $(CONDITION) --trial-index $(TRIAL) --initial-state-index $(INITIAL_STATE) --environment-seed $(ENVIRONMENT_SEED) --policy-base-seed $(POLICY_BASE_SEED) --max-steps $(SHARED_MAX_STEPS) --default-speed-mode $(SPEED_MODE) $(HUMAN_INPUT_ARGS) --output-dir $(SHARED_OUTPUT)" \
 		runtime
 
 endef

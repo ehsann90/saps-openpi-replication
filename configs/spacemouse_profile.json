@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "device_type": "3Dconnexion SpaceMouse Wireless",
+  "axis_mapping": [
+    "ABS_Y",
+    "ABS_X",
+    "ABS_Z",
+    "ABS_RY",
+    "ABS_RX",
+    "ABS_RZ"
+  ],
+  "axis_signs": [-1.0, 1.0, -1.0, -1.0, 1.0, 1.0],
+  "axis_maxima": [350.0, 350.0, 350.0, 350.0, 350.0, 350.0],
+  "translation_gain": 0.3,
+  "rotation_gain": 0.08,
+  "axis_scales": [1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+  "axis_enabled": [true, true, true, true, true, true],
+  "deadzone": 0.08,
+  "stale_input_timeout_seconds": 0.25,
+  "open_button": 256,
+  "close_button": 257
+}

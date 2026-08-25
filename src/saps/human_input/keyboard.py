@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import dataclasses
 import time
-from typing import Any
 from typing import Iterable
 from typing import Optional
-from typing import Tuple
 
 import numpy as np
+
+from saps.human_input.sample import HumanInputSample
 
 
 SPEED_MODES = ("fine", "normal", "fast")
@@ -41,46 +41,6 @@ ALLOWED_KEYS = MOTION_KEYS | GRIPPER_KEYS
 class SpeedProfile:
     translation_gain: float
     rotation_gain: float
-
-
-@dataclasses.dataclass(frozen=True)
-class HumanInputSample:
-    """One snapshot of the operator command state."""
-
-    action: np.ndarray
-    motion_active: bool
-    connected: bool
-    armed: bool
-    abort_requested: bool
-    pressed_keys: Tuple[str, ...]
-    gripper_command: float
-
-    speed_mode: str
-    translation_gain: float
-    rotation_gain: float
-
-    sample_monotonic_seconds: float
-    last_event_monotonic_seconds: Optional[float]
-
-    def as_dict(self) -> dict[str, Any]:
-        return {
-            "action": self.action.tolist(),
-            "motion_active": self.motion_active,
-            "connected": self.connected,
-            "armed": self.armed,
-            "abort_requested": self.abort_requested,
-            "pressed_keys": list(self.pressed_keys),
-            "gripper_command": self.gripper_command,
-            "speed_mode": self.speed_mode,
-            "translation_gain": self.translation_gain,
-            "rotation_gain": self.rotation_gain,
-            "sample_monotonic_seconds": (
-                self.sample_monotonic_seconds
-            ),
-            "last_event_monotonic_seconds": (
-                self.last_event_monotonic_seconds
-            ),
-        }
 
 
 class KeyboardActionMapper:

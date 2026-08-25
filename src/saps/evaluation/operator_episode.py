@@ -206,6 +206,22 @@ def write_json_atomic(
     temporary_path.replace(path)
 
 
+def validated_human_action(action: np.ndarray) -> np.ndarray:
+    """Validate and clip one controller-neutral seven-dimensional action."""
+
+    human_action = np.asarray(action, dtype=np.float32)
+    if human_action.shape != (7,):
+        raise ValueError(
+            "Expected human action shape (7,), "
+            f"received {human_action.shape}."
+        )
+    if not np.all(np.isfinite(human_action)):
+        raise ValueError(
+            "Human action must contain only finite values."
+        )
+    return np.clip(human_action, -1.0, 1.0).astype(np.float32)
+
+
 def wait_until_armed(
     *,
     operator: BrowserOperatorServer,
