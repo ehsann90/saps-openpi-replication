@@ -241,6 +241,10 @@ make check
 make operator-smoke DURATION=30
 ```
 
+For SpaceMouse host access and the hardware-only diagnostic, see
+[`human_input.md`](human_input.md). The runtime explicitly mounts `/dev/input`;
+the policy-server container does not need the device.
+
 Start the deterministic server in a dedicated terminal:
 
 ```bash

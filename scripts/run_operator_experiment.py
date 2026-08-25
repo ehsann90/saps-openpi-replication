@@ -19,6 +19,12 @@ from saps.evaluation.experiment_session import load_manifest
 from saps.evaluation.experiment_session import manifest_sha256
 from saps.evaluation.experiment_session import validate_summary
 from saps.evaluation.experiment_session import write_json_atomic
+from saps.human_input.spacemouse import parse_axis_mapping
+from saps.human_input.spacemouse import parse_axis_maxima
+from saps.human_input.spacemouse import parse_axis_signs
+from saps.human_input.spacemouse import SpaceMouseConfig
+from saps.human_input.spacemouse_profile import load_spacemouse_profile
+from saps.human_input.spacemouse_profile import spacemouse_profile_identity
 
 
 @dataclasses.dataclass
@@ -29,6 +35,18 @@ class Args:
     dry_run: bool = False
     continue_on_invalid_attempt: bool = False
     redo_episode_ids: str = ""
+    input_source: str = "keyboard"
+    spacemouse_device_path: str = ""
+    spacemouse_profile_path: str = ""
+    spacemouse_deadzone: float = 0.08
+    spacemouse_axis_mapping: str = (
+        "ABS_X,ABS_Y,ABS_Z,ABS_RX,ABS_RY,ABS_RZ"
+    )
+    spacemouse_axis_signs: str = "1,1,1,1,1,1"
+    spacemouse_axis_maxima: str = "350,350,350,350,350,350"
+    spacemouse_stale_input_timeout_seconds: float = 0.25
+    spacemouse_open_button: int = 256
+    spacemouse_close_button: int = 257
 
 
 def _utc_now() -> str:
@@ -113,6 +131,7 @@ def _episode_command(
     manifest: Any,
     episode: dict[str, Any],
     attempt_root: Path,
+    args: Args,
 ) -> list[str]:
     """Build the existing single-episode command for one schedule row."""
 
@@ -147,9 +166,44 @@ def _episode_command(
         str(manifest.fast_rotation_gain),
         "--default-speed-mode",
         manifest.default_speed_mode,
+        "--input-source",
+        args.input_source,
         "--output-dir",
         str(attempt_root),
     ]
+    if args.input_source.strip().lower() == "keyboard":
+        common.extend(
+            [
+                "--spacemouse-deadzone",
+                str(args.spacemouse_deadzone),
+                "--spacemouse-axis-mapping",
+                args.spacemouse_axis_mapping,
+                "--spacemouse-axis-signs",
+                args.spacemouse_axis_signs,
+                "--spacemouse-axis-maxima",
+                args.spacemouse_axis_maxima,
+                "--spacemouse-stale-input-timeout-seconds",
+                str(args.spacemouse_stale_input_timeout_seconds),
+                "--spacemouse-open-button",
+                str(args.spacemouse_open_button),
+                "--spacemouse-close-button",
+                str(args.spacemouse_close_button),
+            ]
+        )
+    if args.spacemouse_device_path:
+        common.extend(
+            [
+                "--spacemouse-device-path",
+                args.spacemouse_device_path,
+            ]
+        )
+    if args.spacemouse_profile_path:
+        common.extend(
+            [
+                "--spacemouse-profile-path",
+                args.spacemouse_profile_path,
+            ]
+        )
     mode = str(episode["mode"])
 
     if mode == "teleoperation":
@@ -170,6 +224,95 @@ def _episode_command(
         "5",
         *common,
     ]
+
+
+def _human_input_configuration(
+    *,
+    args: Args,
+    manifest: Any,
+) -> dict[str, Any]:
+    """Validate and serialize session-level input provenance."""
+
+    input_source = args.input_source.strip().lower()
+    if input_source not in {"keyboard", "spacemouse"}:
+        raise ValueError(
+            "input_source must be 'keyboard' or 'spacemouse'."
+        )
+
+    if input_source == "spacemouse":
+        if not args.spacemouse_profile_path:
+            raise ValueError(
+                "SpaceMouse operator sessions require an explicit "
+                "spacemouse_profile_path."
+            )
+        profile = load_spacemouse_profile(
+            Path(args.spacemouse_profile_path)
+        )
+        profile_identity = spacemouse_profile_identity(
+            profile,
+            path=args.spacemouse_profile_path,
+        )
+        return {
+            "input_source": input_source,
+            "spacemouse_device_path": args.spacemouse_device_path,
+            "spacemouse_profile": {
+                **profile_identity,
+                "contents": profile.as_dict(),
+            },
+        }
+
+    if args.spacemouse_profile_path:
+        raise ValueError(
+            "spacemouse_profile_path requires "
+            "input_source='spacemouse'."
+        )
+
+    spacemouse = SpaceMouseConfig(
+        device_path=args.spacemouse_device_path,
+        translation_gain=manifest.normal_translation_gain,
+        rotation_gain=manifest.normal_rotation_gain,
+        deadzone=args.spacemouse_deadzone,
+        axis_mapping=parse_axis_mapping(
+            args.spacemouse_axis_mapping
+        ),
+        axis_signs=parse_axis_signs(args.spacemouse_axis_signs),
+        axis_maxima=parse_axis_maxima(args.spacemouse_axis_maxima),
+        stale_input_timeout_seconds=(
+            args.spacemouse_stale_input_timeout_seconds
+        ),
+        open_button=args.spacemouse_open_button,
+        close_button=args.spacemouse_close_button,
+    )
+    return {
+        "input_source": input_source,
+        "spacemouse": json.loads(
+            json.dumps(dataclasses.asdict(spacemouse))
+        ),
+    }
+
+
+def _validate_child_human_input(
+    *,
+    summary: dict[str, Any],
+    input_configuration: dict[str, Any],
+) -> None:
+    """Verify child profile identity against frozen session provenance."""
+
+    if input_configuration["input_source"] != "spacemouse":
+        return
+
+    profile = input_configuration["spacemouse_profile"]
+    expected = {
+        "path": profile["path"],
+        "schema_version": profile["schema_version"],
+        "sha256": profile["sha256"],
+    }
+    actual = summary.get("spacemouse_profile")
+    if actual != expected:
+        raise ValueError(
+            "Episode SpaceMouse profile does not match the frozen "
+            "session profile."
+        )
 
 
 def _append_event(path: Path, event: dict[str, Any]) -> None:
@@ -224,12 +367,36 @@ def _write_session_summary(
 
 
 def main(args: Args) -> None:
+    preview_manifest = load_manifest(Path(args.manifest_path))
+    input_configuration = _human_input_configuration(
+        args=args,
+        manifest=preview_manifest,
+    )
     output_root = Path(args.output_dir)
     output_root.mkdir(parents=True, exist_ok=True)
     manifest, schedule = _initialize_experiment(
         manifest_path=Path(args.manifest_path),
         output_root=output_root,
     )
+    input_configuration_path = (
+        output_root / "human_input.json"
+    )
+    if input_configuration_path.exists():
+        with input_configuration_path.open(
+            "r",
+            encoding="utf-8",
+        ) as file:
+            stored_input_configuration = json.load(file)
+        if stored_input_configuration != input_configuration:
+            raise ValueError(
+                "The session output belongs to a different human-input "
+                "configuration. Use a new output directory."
+            )
+    else:
+        write_json_atomic(
+            input_configuration_path,
+            input_configuration,
+        )
 
     repository_commit = args.repository_commit.strip()
 
@@ -320,6 +487,7 @@ def main(args: Args) -> None:
             manifest=manifest,
             episode=episode,
             attempt_root=attempt_root,
+            args=args,
         )
 
         if args.dry_run:
@@ -372,6 +540,10 @@ def main(args: Args) -> None:
             summary = validate_summary(
                 summary_path=summary_path,
                 episode=episode,
+            )
+            _validate_child_human_input(
+                summary=summary,
+                input_configuration=input_configuration,
             )
             attempt["summary_path"] = str(summary_path)
             attempt["valid"] = True

@@ -33,6 +33,10 @@ Human motion is active when:
 norm(human_action[:6]) > 0.001
 ```
 
+The normalized action may come from the browser keyboard or SpaceMouse through
+the same sample interface. Device discovery, analog processing, and safety are
+documented in [`human_input.md`](human_input.md).
+
 The motion blend is:
 
 ```text
@@ -173,6 +177,8 @@ Every LIBERO step records:
 - inference latency and worker state;
 - generation and result disposition;
 - operator keys, gains, timing, and connection state;
+- controller source, physical-device state, raw/mapped axes, buttons, and
+  native input timestamp in the additive `human_input` record;
 - robot and object state;
 - reward, success, and control timing.
 

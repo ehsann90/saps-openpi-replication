@@ -11,6 +11,7 @@ Detailed explanations are in:
 - [`setup.md`](setup.md)
 - [`testing.md`](testing.md)
 - [`shared_autonomy.md`](shared_autonomy.md)
+- [`human_input.md`](human_input.md)
 - [`experiment_protocol.md`](experiment_protocol.md)
 - [`analysis.md`](analysis.md)
 
@@ -78,6 +79,10 @@ make clean-python
 
 ```bash
 make operator-smoke DURATION=60
+make spacemouse-diagnostic \
+  SPACEMOUSE_DEVICE=/dev/input/by-id/usb-3Dconnexion_SpaceMouse_Wireless-event-joystick
+make spacemouse-calibrate \
+  SPACEMOUSE_DEVICE=/dev/input/by-id/usb-3Dconnexion_SpaceMouse_Wireless-event-joystick
 make seeded-probe CONDITION=nominal TRIAL=0
 make scene-inspect
 make perturbation-preview DX=0.10 DY=0.08 LABEL=p02

@@ -1,4 +1,4 @@
-"""Browser-based operator interface for keyboard and future gamepad input."""
+"""Browser console with controller-neutral normalized human input."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import asyncio
 import http.server
 import json
 import logging
+from pathlib import Path
 import threading
 import time
 from typing import Any
@@ -16,9 +17,13 @@ import numpy as np
 import websockets
 
 from saps.human_input.keyboard import ALLOWED_KEYS
-from saps.human_input.keyboard import HumanInputSample
 from saps.human_input.keyboard import KeyboardActionMapper
 from saps.human_input.keyboard import SPEED_MODES
+from saps.human_input.sample import HumanInputSample
+from saps.human_input.spacemouse import SpaceMouseBackend
+from saps.human_input.spacemouse import SpaceMouseConfig
+from saps.human_input.spacemouse_profile import save_spacemouse_profile
+from saps.human_input.spacemouse_profile import SpaceMouseProfile
 
 
 LOGGER = logging.getLogger(__name__)
@@ -27,6 +32,7 @@ LOGGER = logging.getLogger(__name__)
 def _build_operator_page(
     *,
     websocket_port: int,
+    calibration_mode: bool = False,
 ) -> str:
     return f"""<!doctype html>
 <html lang="en">
@@ -153,6 +159,17 @@ def _build_operator_page(
       border-collapse: collapse;
     }}
 
+    input[type="range"] {{
+      width: 100%;
+    }}
+
+    input[type="number"],
+    select {{
+      width: 100%;
+      box-sizing: border-box;
+      padding: 5px;
+    }}
+
     th,
     td {{
       padding: 5px 8px;
@@ -181,6 +198,15 @@ def _build_operator_page(
 
         <div class="label">Controls</div>
         <div id="armed" class="warning">Disarmed</div>
+
+        <div class="label">Input source</div>
+        <div id="input-source">Keyboard</div>
+
+        <div class="label">Physical device</div>
+        <div id="physical-device">Not applicable</div>
+
+        <div class="label">Input stale</div>
+        <div id="input-stale">Not applicable</div>
 
         <div class="label">Pressed keys</div>
         <div id="pressed">None</div>
@@ -248,6 +274,108 @@ def _build_operator_page(
 
       <h3>Runtime status</h3>
       <pre id="runtime-status">{{}}</pre>
+
+      <section id="calibration-panel" hidden>
+        <h2>SpaceMouse calibration</h2>
+        <p class="warning">
+          Disposable shakedown mode. Applying changes, resetting, or
+          saving disarms controls; re-arm explicitly before testing.
+        </p>
+        <h3>Applied values</h3>
+        <div class="status">
+          <div class="label">Translation gain</div>
+          <div id="cal-applied-translation-gain">Waiting</div>
+          <div class="label">Rotation gain</div>
+          <div id="cal-applied-rotation-gain">Waiting</div>
+          <div class="label">Deadzone</div>
+          <div id="cal-applied-deadzone">Waiting</div>
+        </div>
+        <p>
+          These read-only values come from the running server. The editable
+          fields below are drafts and do not become active until Apply.
+        </p>
+
+        <h3>Raw device axes</h3>
+        <table>
+          <tbody id="raw-axis-rows"></tbody>
+        </table>
+
+        <h3>Mapped application axes</h3>
+        <p>
+          Translation convention: +dx is screen forward, +dy is screen
+          right, and +dz is upward. Judge the gripper motion; objects in the
+          wrist-camera image can appear to move in the opposite direction.
+        </p>
+        <table>
+          <tbody id="mapped-axis-rows"></tbody>
+        </table>
+        <p>
+          The final gain/scale/enable result is shown above under
+          <strong>Current 7D action</strong> and is the action sent to LIBERO
+          while armed.
+        </p>
+
+        <h3>Draft calibration values</h3>
+        <div class="status">
+          <div class="label">Translation gain</div>
+          <input id="cal-translation-gain" type="number"
+                 min="0.001" max="1" step="0.01">
+          <div class="label">Rotation gain</div>
+          <input id="cal-rotation-gain" type="number"
+                 min="0.001" max="1" step="0.01">
+          <div class="label">Deadzone</div>
+          <input id="cal-deadzone" type="number"
+                 min="0" max="0.99" step="0.01">
+        </div>
+        <p>
+          Deadzone is the per-axis fraction of full puck travel ignored around
+          the neutral center. For example, at 0.08 the central 8% in either
+          direction produces zero. Motion beyond that boundary is rescaled
+          smoothly so full deflection still reaches full normalized magnitude.
+          Increasing it suppresses drift and small accidental tilt, but also
+          requires a larger deliberate movement. This one setting applies to
+          all six raw axes.
+        </p>
+
+        <table>
+          <thead>
+            <tr>
+              <th>Output</th><th>Raw axis</th><th>Sign</th>
+              <th>Scale</th><th>Enabled</th>
+            </tr>
+          </thead>
+          <tbody id="calibration-axis-rows"></tbody>
+        </table>
+
+        <p>
+          <button id="cal-translation-only">Stage 1: Translation only</button>
+          <button id="cal-rotation-only">Stage 2: Rotation only</button>
+          <button id="cal-enable-all">Stage 3: Enable all six</button>
+        </p>
+        <p>
+          A stage button edits the enable checkboxes. Click Apply to activate
+          that selection; Apply disarms before changing the live mapping.
+        </p>
+        <h3>Rotation-only test order</h3>
+        <ol>
+          <li>Twist the puck clockwise, then counter-clockwise.</li>
+          <li>Tilt the top of the puck forward, then backward.</li>
+          <li>Tilt the top of the puck right, then left.</li>
+        </ol>
+        <p>
+          For each gesture, note the dominant raw axis and sign, the dominant
+          mapped output and sign, and the observed gripper rotation. Ignore
+          smaller coupled raw-axis motion during this isolated stage.
+        </p>
+        <p>
+          <button id="cal-apply">Apply (disarms)</button>
+          <button id="cal-reset">Reset nominal scene</button>
+          <button id="cal-save">Save profile</button>
+        </p>
+        <div id="calibration-status" class="warning">
+          Waiting for device state.
+        </div>
+      </section>
     </section>
   </div>
 </main>
@@ -256,6 +384,7 @@ def _build_operator_page(
 "use strict";
 
 const websocketPort = {websocket_port};
+const calibrationMode = {str(calibration_mode).lower()};
 const websocketUrl =
   `ws://${{window.location.hostname}}:${{websocketPort}}`;
 
@@ -277,6 +406,12 @@ const connectionElement =
   document.getElementById("connection");
 const armedElement =
   document.getElementById("armed");
+const inputSourceElement =
+  document.getElementById("input-source");
+const physicalDeviceElement =
+  document.getElementById("physical-device");
+const inputStaleElement =
+  document.getElementById("input-stale");
 const pressedElement =
   document.getElementById("pressed");
 const motionElement =
@@ -291,6 +426,119 @@ const runtimeStatusElement =
   document.getElementById("runtime-status");
 const cameraElement =
   document.getElementById("camera");
+const calibrationPanel =
+  document.getElementById("calibration-panel");
+const calibrationStatusElement =
+  document.getElementById("calibration-status");
+const rawAxisNames = [
+  "ABS_X", "ABS_Y", "ABS_Z", "ABS_RX", "ABS_RY", "ABS_RZ"
+];
+const outputAxisNames = ["dx", "dy", "dz", "roll", "pitch", "yaw"];
+let calibrationFormInitialized = false;
+
+function initializeCalibrationPanel() {{
+  if (!calibrationMode) {{
+    return;
+  }}
+  calibrationPanel.hidden = false;
+  const rawRows = document.getElementById("raw-axis-rows");
+  const mappedRows = document.getElementById("mapped-axis-rows");
+  const calibrationRows =
+    document.getElementById("calibration-axis-rows");
+
+  rawAxisNames.forEach((name, index) => {{
+    const row = document.createElement("tr");
+    row.innerHTML =
+      `<td>${{name}}</td>` +
+      `<td><input id="raw-axis-${{index}}" type="range" ` +
+      `min="-350" max="350" value="0" disabled></td>` +
+      `<td id="raw-axis-value-${{index}}">0</td>`;
+    rawRows.appendChild(row);
+  }});
+
+  outputAxisNames.forEach((name, index) => {{
+    const mappedRow = document.createElement("tr");
+    mappedRow.innerHTML =
+      `<td>${{name}}</td>` +
+      `<td><input id="mapped-axis-${{index}}" type="range" ` +
+      `min="-1" max="1" step="0.001" value="0" disabled></td>` +
+      `<td id="mapped-axis-value-${{index}}">0.000</td>`;
+    mappedRows.appendChild(mappedRow);
+
+    const controlRow = document.createElement("tr");
+    const options = rawAxisNames.map(
+      rawName => `<option value="${{rawName}}">${{rawName}}</option>`
+    ).join("");
+    controlRow.innerHTML =
+      `<td>${{name}}</td>` +
+      `<td><select id="cal-map-${{index}}">${{options}}</select></td>` +
+      `<td><select id="cal-sign-${{index}}">` +
+      `<option value="1">+1</option>` +
+      `<option value="-1">-1</option></select></td>` +
+      `<td><input id="cal-scale-${{index}}" type="number" ` +
+      `min="0" max="10" step="0.05" value="1"></td>` +
+      `<td><input id="cal-enabled-${{index}}" ` +
+      `type="checkbox" checked></td>`;
+    calibrationRows.appendChild(controlRow);
+  }});
+}}
+
+function populateCalibrationForm(sample) {{
+  if (!calibrationMode || calibrationFormInitialized ||
+      !sample.axis_mapping) {{
+    return;
+  }}
+  document.getElementById("cal-translation-gain").value =
+    sample.translation_gain;
+  document.getElementById("cal-rotation-gain").value =
+    sample.rotation_gain;
+  document.getElementById("cal-deadzone").value = sample.deadzone;
+  outputAxisNames.forEach((name, index) => {{
+    document.getElementById(`cal-map-${{index}}`).value =
+      sample.axis_mapping[index];
+    document.getElementById(`cal-sign-${{index}}`).value =
+      String(sample.axis_signs[index]);
+    document.getElementById(`cal-scale-${{index}}`).value =
+      sample.axis_scales[index];
+    document.getElementById(`cal-enabled-${{index}}`).checked =
+      sample.axis_enabled[index];
+  }});
+  calibrationFormInitialized = true;
+}}
+
+function updateCalibrationVisualization(sample) {{
+  if (!calibrationMode) {{
+    return;
+  }}
+  populateCalibrationForm(sample);
+  document.getElementById("cal-applied-translation-gain").textContent =
+    Number(sample.translation_gain).toFixed(3);
+  document.getElementById("cal-applied-rotation-gain").textContent =
+    Number(sample.rotation_gain).toFixed(3);
+  document.getElementById("cal-applied-deadzone").textContent =
+    Number(sample.deadzone).toFixed(3);
+  if (sample.raw_axes && sample.axis_maxima) {{
+    sample.raw_axes.forEach((value, index) => {{
+      const slider = document.getElementById(`raw-axis-${{index}}`);
+      slider.min = -sample.axis_maxima[index];
+      slider.max = sample.axis_maxima[index];
+      slider.value = value;
+      document.getElementById(`raw-axis-value-${{index}}`).textContent =
+        String(value);
+    }});
+  }}
+  if (sample.mapped_axes) {{
+    sample.mapped_axes.forEach((value, index) => {{
+      document.getElementById(`mapped-axis-${{index}}`).value = value;
+      document.getElementById(
+        `mapped-axis-value-${{index}}`
+      ).textContent = Number(value).toFixed(3);
+    }});
+  }}
+  if (sample.calibration_status) {{
+    calibrationStatusElement.textContent = sample.calibration_status;
+  }}
+}}
 
 function send(message) {{
   if (socket && socket.readyState === WebSocket.OPEN) {{
@@ -354,6 +602,29 @@ function connect() {{
         armedElement.className =
           sample.armed ? "good" : "warning";
 
+        inputSourceElement.textContent = sample.input_source;
+        if (sample.physical_device_connected === null) {{
+          physicalDeviceElement.textContent = "Not applicable";
+          physicalDeviceElement.className = "";
+        }} else if (sample.physical_device_connected) {{
+          physicalDeviceElement.textContent =
+            `${{sample.selected_device_name || "SpaceMouse"}} ` +
+            "(connected)";
+          physicalDeviceElement.className = "good";
+        }} else {{
+          physicalDeviceElement.textContent =
+            sample.physical_device_error || "Disconnected";
+          physicalDeviceElement.className = "danger";
+        }}
+        if (sample.physical_device_connected === null) {{
+          inputStaleElement.textContent = "Not applicable";
+          inputStaleElement.className = "";
+        }} else {{
+          inputStaleElement.textContent = String(sample.stale_input);
+          inputStaleElement.className =
+            sample.stale_input ? "warning" : "good";
+        }}
+
         pressedElement.textContent =
           sample.pressed_keys.length
             ? sample.pressed_keys.join(", ")
@@ -374,6 +645,8 @@ function connect() {{
 
         actionElement.textContent =
           JSON.stringify(sample.action, null, 2);
+
+        updateCalibrationVisualization(sample);
 
         runtimeStatusElement.textContent =
           JSON.stringify(
@@ -503,6 +776,81 @@ document.getElementById("speed-fast").onclick = () => {{
   send({{type: "speed", value: "fast"}});
 }};
 
+function selectAxisIsolation(firstEnabled, lastEnabled, label) {{
+  outputAxisNames.forEach((name, index) => {{
+    document.getElementById(`cal-enabled-${{index}}`).checked =
+      index >= firstEnabled && index < lastEnabled;
+  }});
+  calibrationStatusElement.textContent =
+    `${{label}} selected; click Apply to activate it.`;
+}}
+
+function readCalibrationValues() {{
+  return {{
+    translation_gain: Number(
+      document.getElementById("cal-translation-gain").value
+    ),
+    rotation_gain: Number(
+      document.getElementById("cal-rotation-gain").value
+    ),
+    deadzone: Number(document.getElementById("cal-deadzone").value),
+    axis_mapping: outputAxisNames.map(
+      (name, index) => document.getElementById(`cal-map-${{index}}`).value
+    ),
+    axis_signs: outputAxisNames.map(
+      (name, index) => Number(
+        document.getElementById(`cal-sign-${{index}}`).value
+      )
+    ),
+    axis_scales: outputAxisNames.map(
+      (name, index) => Number(
+        document.getElementById(`cal-scale-${{index}}`).value
+      )
+    ),
+    axis_enabled: outputAxisNames.map(
+      (name, index) => document.getElementById(
+        `cal-enabled-${{index}}`
+      ).checked
+    )
+  }};
+}}
+
+if (calibrationMode) {{
+  document.getElementById("cal-translation-only").onclick = () => {{
+    selectAxisIsolation(0, 3, "Translation-only stage");
+  }};
+  document.getElementById("cal-rotation-only").onclick = () => {{
+    selectAxisIsolation(3, 6, "Rotation-only stage");
+  }};
+  document.getElementById("cal-enable-all").onclick = () => {{
+    selectAxisIsolation(0, 6, "All-six stage");
+  }};
+  document.getElementById("cal-apply").onclick = () => {{
+    send({{type: "arm", value: false}});
+    send({{
+      type: "calibration_apply",
+      ...readCalibrationValues()
+    }});
+    calibrationStatusElement.textContent =
+      "Apply requested; controls disarmed.";
+  }};
+  document.getElementById("cal-reset").onclick = () => {{
+    send({{type: "arm", value: false}});
+    send({{type: "calibration_reset"}});
+  }};
+  document.getElementById("cal-save").onclick = () => {{
+    send({{type: "arm", value: false}});
+    send({{
+      type: "calibration_apply",
+      ...readCalibrationValues()
+    }});
+    send({{type: "calibration_save"}});
+    calibrationStatusElement.textContent =
+      "Apply and save requested; controls disarmed.";
+  }};
+}}
+
+initializeCalibrationPanel();
 connect();
 </script>
 </body>
@@ -528,6 +876,28 @@ class BrowserOperatorServer:
         default_speed_mode: str = "fine",
         translation_gain: Optional[float] = None,
         rotation_gain: Optional[float] = None,
+        input_source: str = "keyboard",
+        spacemouse_device_path: str = "",
+        spacemouse_deadzone: float = 0.08,
+        spacemouse_axis_mapping: tuple[str, ...] = (
+            "ABS_X",
+            "ABS_Y",
+            "ABS_Z",
+            "ABS_RX",
+            "ABS_RY",
+            "ABS_RZ",
+        ),
+        spacemouse_axis_signs: tuple[float, ...] = (1.0,) * 6,
+        spacemouse_axis_maxima: tuple[float, ...] = (350.0,) * 6,
+        spacemouse_stale_input_timeout_seconds: float = 0.25,
+        spacemouse_open_button: int = 256,
+        spacemouse_close_button: int = 257,
+        spacemouse_backend: Optional[SpaceMouseBackend] = None,
+        spacemouse_config: Optional[SpaceMouseConfig] = None,
+        calibration_mode: bool = False,
+        calibration_profile_path: Optional[str] = None,
+        calibration_profile_owner_uid: Optional[int] = None,
+        calibration_profile_owner_gid: Optional[int] = None,
         jpeg_quality: int = 85,
     ) -> None:
         if not 1 <= jpeg_quality <= 100:
@@ -539,6 +909,39 @@ class BrowserOperatorServer:
         self.websocket_port = int(websocket_port)
         self.http_port = int(http_port)
         self.jpeg_quality = int(jpeg_quality)
+
+        normalized_source = input_source.strip().lower()
+        if normalized_source not in {"keyboard", "spacemouse"}:
+            raise ValueError(
+                "input_source must be 'keyboard' or 'spacemouse'."
+            )
+        self.input_source = normalized_source
+        self.calibration_mode = bool(calibration_mode)
+        if self.calibration_mode and self.input_source != "spacemouse":
+            raise ValueError(
+                "calibration_mode requires input_source='spacemouse'."
+            )
+        if spacemouse_config is not None and self.input_source != "spacemouse":
+            raise ValueError(
+                "spacemouse_config requires input_source='spacemouse'."
+            )
+        self._calibration_profile_path = (
+            Path(calibration_profile_path)
+            if calibration_profile_path is not None
+            else None
+        )
+        self._calibration_profile_owner_uid = (
+            calibration_profile_owner_uid
+        )
+        self._calibration_profile_owner_gid = (
+            calibration_profile_owner_gid
+        )
+        self._calibration_status: Optional[str] = (
+            "Calibration ready; arm only after reviewing values."
+            if self.calibration_mode
+            else None
+        )
+        self._calibration_reset_requested = threading.Event()
 
         # Preserve the concise legacy arguments used by the
         # Phase 2.1 operator test. They configure normal speed.
@@ -575,6 +978,26 @@ class BrowserOperatorServer:
                 default_speed_mode
             ),
         )
+
+        self._spacemouse: Optional[SpaceMouseBackend] = None
+        if self.input_source == "spacemouse":
+            self._spacemouse = spacemouse_backend or SpaceMouseBackend(
+                spacemouse_config or SpaceMouseConfig(
+                    device_path=spacemouse_device_path,
+                    translation_gain=normal_translation_gain,
+                    rotation_gain=normal_rotation_gain,
+                    deadzone=spacemouse_deadzone,
+                    axis_mapping=spacemouse_axis_mapping,
+                    axis_signs=spacemouse_axis_signs,
+                    axis_maxima=spacemouse_axis_maxima,
+                    stale_input_timeout_seconds=(
+                        spacemouse_stale_input_timeout_seconds
+                    ),
+                    open_button=spacemouse_open_button,
+                    close_button=spacemouse_close_button,
+                )
+            )
+        self._physical_device_was_connected = False
 
         self._lock = threading.Lock()
         self._pressed_keys: set[str] = set()
@@ -626,7 +1049,16 @@ class BrowserOperatorServer:
 
         self._stopping.clear()
 
-        self._start_http_server()
+        if self._spacemouse is not None:
+            self._spacemouse.start()
+            self._physical_device_was_connected = True
+
+        try:
+            self._start_http_server()
+        except Exception:
+            if self._spacemouse is not None:
+                self._spacemouse.close()
+            raise
 
         self._websocket_thread = threading.Thread(
             target=self._run_websocket_thread,
@@ -638,6 +1070,7 @@ class BrowserOperatorServer:
     def _start_http_server(self) -> None:
         page = _build_operator_page(
             websocket_port=self.websocket_port,
+            calibration_mode=self.calibration_mode,
         ).encode("utf-8")
 
         class OperatorPageHandler(
@@ -839,6 +1272,13 @@ class BrowserOperatorServer:
             message.get("type", "")
         )
 
+        if message_type.startswith("calibration_"):
+            self._apply_calibration_message(
+                message_type=message_type,
+                message=message,
+            )
+            return
+
         with self._lock:
             self._last_event_monotonic_seconds = (
                 time.monotonic()
@@ -892,6 +1332,127 @@ class BrowserOperatorServer:
                 self._gripper_command = (
                     1.0 if value > 0.0 else -1.0
                 )
+
+    def _apply_calibration_message(
+        self,
+        *,
+        message_type: str,
+        message: dict[str, Any],
+    ) -> None:
+        """Apply calibration-only controls after forcing disarm."""
+
+        if not self.calibration_mode or self._spacemouse is None:
+            LOGGER.warning(
+                "Ignoring calibration message outside calibration mode."
+            )
+            return
+
+        self.disarm()
+        try:
+            if message_type == "calibration_apply":
+                raw_enabled = message.get("axis_enabled", [])
+                if not isinstance(raw_enabled, list) or any(
+                    not isinstance(value, bool)
+                    for value in raw_enabled
+                ):
+                    raise ValueError(
+                        "axis_enabled must contain six booleans."
+                    )
+                updated = self._spacemouse.update_calibration(
+                    axis_mapping=tuple(
+                        str(value).upper()
+                        for value in message.get("axis_mapping", [])
+                    ),
+                    axis_signs=tuple(
+                        float(value)
+                        for value in message.get("axis_signs", [])
+                    ),
+                    translation_gain=float(
+                        message.get("translation_gain")
+                    ),
+                    rotation_gain=float(
+                        message.get("rotation_gain")
+                    ),
+                    deadzone=float(message.get("deadzone")),
+                    axis_scales=tuple(
+                        float(value)
+                        for value in message.get("axis_scales", [])
+                    ),
+                    axis_enabled=tuple(raw_enabled),
+                )
+                self._set_calibration_status(
+                    "Calibration applied while disarmed: "
+                    f"T={updated.translation_gain:.3f}, "
+                    f"R={updated.rotation_gain:.3f}, "
+                    f"deadzone={updated.deadzone:.3f}. Re-arm to test."
+                )
+            elif message_type == "calibration_reset":
+                self._calibration_reset_requested.set()
+                self._set_calibration_status(
+                    "Nominal-scene reset requested; controls disarmed."
+                )
+            elif message_type == "calibration_save":
+                if self._calibration_profile_path is None:
+                    raise ValueError(
+                        "No calibration profile path is configured."
+                    )
+                info = self._spacemouse.device_info
+                device_type = (
+                    info.name
+                    if info is not None
+                    else "3Dconnexion SpaceMouse Wireless"
+                )
+                profile = SpaceMouseProfile.from_config(
+                    self._spacemouse.config,
+                    device_type=device_type,
+                )
+                save_spacemouse_profile(
+                    self._calibration_profile_path,
+                    profile,
+                    owner_uid=self._calibration_profile_owner_uid,
+                    owner_gid=self._calibration_profile_owner_gid,
+                )
+                self._set_calibration_status(
+                    "Saved calibration profile while disarmed: "
+                    f"{self._calibration_profile_path}"
+                )
+            else:
+                raise ValueError(
+                    f"Unknown calibration message {message_type!r}."
+                )
+        except (OSError, TypeError, ValueError) as error:
+            LOGGER.error("Calibration request failed: %s", error)
+            self._set_calibration_status(
+                f"Calibration request failed: {error}"
+            )
+
+    def _set_calibration_status(self, message: str) -> None:
+        with self._lock:
+            self._calibration_status = message
+
+    def publish_calibration_status(self, message: str) -> None:
+        """Publish calibration feedback to the browser panel."""
+
+        if not self.calibration_mode:
+            raise RuntimeError(
+                "Calibration status requires calibration mode."
+            )
+        self._set_calibration_status(message)
+
+    def disarm(self) -> None:
+        """Clear motion authority without changing abort state."""
+
+        with self._lock:
+            self._armed = False
+            self._pressed_keys.clear()
+
+    def consume_calibration_reset_request(self) -> bool:
+        """Consume one calibration-scene reset request."""
+
+        if not self._calibration_reset_requested.is_set():
+            return False
+        self._calibration_reset_requested.clear()
+        return True
 
     async def _broadcast_loop(self) -> None:
         last_frame_version = -1
@@ -982,15 +1543,117 @@ class BrowserOperatorServer:
             last_event = (
                 self._last_event_monotonic_seconds
             )
+            calibration_status = self._calibration_status
 
-        return self._mapper.sample(
-            pressed_keys=pressed_keys,
-            gripper_command=gripper_command,
-            speed_mode=speed_mode,
+        if self._spacemouse is None:
+            return self._mapper.sample(
+                pressed_keys=pressed_keys,
+                gripper_command=gripper_command,
+                speed_mode=speed_mode,
+                connected=connected,
+                armed=armed,
+                abort_requested=abort_requested,
+                last_event_monotonic_seconds=last_event,
+            )
+
+        device_sample = self._spacemouse.sample()
+
+        with self._lock:
+            if (
+                self._physical_device_was_connected
+                and not device_sample.connected
+            ):
+                # A physical reconnect never restores authority. The
+                # browser operator must intentionally arm again.
+                self._armed = False
+                self._pressed_keys.clear()
+
+            self._physical_device_was_connected = (
+                device_sample.connected
+            )
+
+            if device_sample.connected:
+                if device_sample.close_button_pressed:
+                    self._gripper_command = 1.0
+                elif device_sample.open_button_pressed:
+                    self._gripper_command = -1.0
+
+            pressed_keys = set(self._pressed_keys)
+            gripper_command = self._gripper_command
+            connected = self._connected_clients > 0
+            armed = self._armed
+            abort_requested = self._abort_requested
+
+        motion = np.zeros(6, dtype=np.float32)
+        if (
+            connected
+            and armed
+            and not abort_requested
+            and device_sample.connected
+            and not device_sample.stale
+        ):
+            motion = np.asarray(
+                device_sample.final_motion,
+                dtype=np.float32,
+            )
+
+        action = np.concatenate(
+            (
+                motion,
+                np.asarray(
+                    [np.clip(gripper_command, -1.0, 1.0)],
+                    dtype=np.float32,
+                ),
+            )
+        ).astype(np.float32)
+        config = self._spacemouse.config
+
+        return HumanInputSample(
+            action=action,
+            motion_active=bool(
+                np.linalg.norm(action[:6]) > config.idle_threshold
+            ),
             connected=connected,
             armed=armed,
             abort_requested=abort_requested,
-            last_event_monotonic_seconds=last_event,
+            pressed_keys=tuple(sorted(pressed_keys)),
+            gripper_command=float(action[6]),
+            speed_mode="analog",
+            translation_gain=config.translation_gain,
+            rotation_gain=config.rotation_gain,
+            sample_monotonic_seconds=time.monotonic(),
+            last_event_monotonic_seconds=(
+                device_sample.last_event_monotonic_seconds
+            ),
+            input_source="spacemouse",
+            physical_device_connected=device_sample.connected,
+            selected_device_name=device_sample.device_name,
+            selected_device_path=device_sample.device_path,
+            raw_axes=device_sample.raw_axes,
+            mapped_axes=device_sample.mapped_axes,
+            deadzone=config.deadzone,
+            axis_mapping=config.axis_mapping,
+            axis_signs=config.axis_signs,
+            axis_maxima=config.axis_maxima,
+            axis_scales=config.axis_scales,
+            axis_enabled=config.axis_enabled,
+            stale_input=device_sample.stale,
+            stale_input_timeout_seconds=(
+                config.stale_input_timeout_seconds
+            ),
+            open_button=config.open_button,
+            close_button=config.close_button,
+            open_button_pressed=(
+                device_sample.open_button_pressed
+            ),
+            close_button_pressed=(
+                device_sample.close_button_pressed
+            ),
+            native_event_timestamp_seconds=(
+                device_sample.native_event_timestamp_seconds
+            ),
+            physical_device_error=device_sample.error,
+            calibration_status=calibration_status,
         )
 
     def publish_frame_rgb(
@@ -1054,6 +1717,9 @@ class BrowserOperatorServer:
 
     def close(self) -> None:
         self._stopping.set()
+
+        if self._spacemouse is not None:
+            self._spacemouse.close()
 
         if self._http_server is not None:
             self._http_server.shutdown()

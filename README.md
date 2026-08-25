@@ -28,7 +28,8 @@ analysis are the next phase.
 | SAPS cream-cheese perturbations | Implemented and validated |
 | Deterministic per-episode and per-replan sampling | Implemented and validated |
 | Autonomous baseline and resumable sweeps | Implemented |
-| Browser keyboard teleoperation | Implemented and validated |
+| Browser keyboard and SpaceMouse input paths | Implemented and physically validated |
+| Disposable SpaceMouse graphical calibration | Implemented and physically validated |
 | Hard takeover | Implemented and validated |
 | Fixed/equal action blending | Implemented and validated |
 | Cosine-similarity blending | Implemented and validated |
@@ -145,6 +146,9 @@ make cosine-blend \
 
 For operator-controlled modes, open the displayed browser URL and click
 **Arm controls** before issuing commands.
+
+SpaceMouse setup, safety behavior, and the hardware-only diagnostic are in
+[the human-input guide](docs/human_input.md).
 
 ## Documentation
 

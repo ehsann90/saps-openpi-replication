@@ -43,6 +43,11 @@ from saps.evaluation.shared_episode_loop import (
 from saps.human_input.web_operator import (
     BrowserOperatorServer,
 )
+from saps.human_input.spacemouse import parse_axis_mapping
+from saps.human_input.spacemouse import parse_axis_maxima
+from saps.human_input.spacemouse import parse_axis_signs
+from saps.human_input.spacemouse_profile import load_spacemouse_profile
+from saps.human_input.spacemouse_profile import spacemouse_profile_identity
 from saps.policies.async_worker import (
     AsyncPolicyWorker,
 )
@@ -103,6 +108,19 @@ class Args:
     fast_rotation_gain: float = 0.30
     default_speed_mode: str = "fine"
 
+    input_source: str = "keyboard"
+    spacemouse_device_path: str = ""
+    spacemouse_deadzone: float = 0.08
+    spacemouse_axis_mapping: str = (
+        "ABS_X,ABS_Y,ABS_Z,ABS_RX,ABS_RY,ABS_RZ"
+    )
+    spacemouse_axis_signs: str = "1,1,1,1,1,1"
+    spacemouse_axis_maxima: str = "350,350,350,350,350,350"
+    spacemouse_stale_input_timeout_seconds: float = 0.25
+    spacemouse_open_button: int = 256
+    spacemouse_close_button: int = 257
+    spacemouse_profile_path: str = ""
+
     jpeg_quality: int = 85
     client_timeout_seconds: float = 120.0
     arm_timeout_seconds: float = 300.0
@@ -142,6 +160,7 @@ class SharedAutonomyEpisodeResult:
     total_elapsed_seconds: float
 
     operator_connected_at_start: bool
+    spacemouse_profile: dict[str, Any] | None
 
     object_position_before: list[float]
     object_position_after_settle: list[float]
@@ -257,6 +276,24 @@ def validate_args(args: Args) -> ArbitrationMode:
 
 def main(args: Args) -> None:
     mode = validate_args(args)
+    spacemouse_config = None
+    spacemouse_profile = None
+    if args.spacemouse_profile_path:
+        if args.input_source.strip().lower() != "spacemouse":
+            raise ValueError(
+                "spacemouse_profile_path requires "
+                "input_source='spacemouse'."
+            )
+        loaded_profile = load_spacemouse_profile(
+            Path(args.spacemouse_profile_path)
+        )
+        spacemouse_config = loaded_profile.to_config(
+            device_path=args.spacemouse_device_path
+        )
+        spacemouse_profile = spacemouse_profile_identity(
+            loaded_profile,
+            path=args.spacemouse_profile_path,
+        )
     total_start = time.perf_counter()
 
     config = load_config(
@@ -492,6 +529,26 @@ def main(args: Args) -> None:
             default_speed_mode=(
                 args.default_speed_mode
             ),
+            input_source=args.input_source,
+            spacemouse_device_path=(
+                args.spacemouse_device_path
+            ),
+            spacemouse_deadzone=args.spacemouse_deadzone,
+            spacemouse_axis_mapping=parse_axis_mapping(
+                args.spacemouse_axis_mapping
+            ),
+            spacemouse_axis_signs=parse_axis_signs(
+                args.spacemouse_axis_signs
+            ),
+            spacemouse_axis_maxima=parse_axis_maxima(
+                args.spacemouse_axis_maxima
+            ),
+            spacemouse_stale_input_timeout_seconds=(
+                args.spacemouse_stale_input_timeout_seconds
+            ),
+            spacemouse_open_button=args.spacemouse_open_button,
+            spacemouse_close_button=args.spacemouse_close_button,
+            spacemouse_config=spacemouse_config,
             jpeg_quality=args.jpeg_quality,
         )
         operator.start()
@@ -708,6 +765,7 @@ def main(args: Args) -> None:
             operator_connected_at_start=(
                 operator_connected_at_start
             ),
+            spacemouse_profile=spacemouse_profile,
             object_position_before=(
                 perturbation.body_position_before
             ),

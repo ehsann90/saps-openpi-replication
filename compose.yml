@@ -12,6 +12,7 @@ services:
     volumes:
       - ./third_party/openpi:/app
       - ./:/workspace
+      - /dev/input:/dev/input
       - /tmp/.X11-unix:/tmp/.X11-unix:ro
 
     environment:

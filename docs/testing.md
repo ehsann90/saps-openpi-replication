@@ -28,6 +28,10 @@ The unit suite covers:
 - autonomous, takeover, fixed, and cosine arbitration;
 - asynchronous scheduler behavior during human activity;
 - invalid action, weight, gain, and protocol inputs.
+- SpaceMouse normalization, mapping, device discovery, exclusive access,
+  stale/lost-input safety, cleanup, and diagnostic CLI wiring.
+- calibration profile validation/round-trip, per-axis sensitivity and enable
+  masks, safe live apply/reset/save behavior, and normal-runner defaults.
 
 Do not rely on a hard-coded expected test count. New regression tests should
 increase the count while every test still reports `ok`.
@@ -49,7 +53,34 @@ Confirm:
 - gripper and speed-mode commands update;
 - Escape aborts cleanly.
 
-## 3. Deterministic policy probe
+## 3. SpaceMouse input diagnostic
+
+This manual diagnostic requires hardware but starts no LIBERO environment or
+policy server:
+
+```bash
+make spacemouse-diagnostic \
+  SPACEMOUSE_DEVICE=/dev/input/by-id/usb-3Dconnexion_SpaceMouse_Wireless-event-joystick
+```
+
+Confirm all six raw axes change, mapped axes and signs match the intended robot
+frame, the final action respects gains/deadzone, both configured buttons work,
+and unplugging zeros motion and requires re-arming after reconnection. Follow
+the ownership diagnostics in [`human_input.md`](human_input.md) if acquisition
+fails.
+
+For application-level calibration after the low-level diagnostic passes:
+
+```bash
+make spacemouse-calibrate \
+  SPACEMOUSE_DEVICE=/dev/input/by-id/usb-3Dconnexion_SpaceMouse_Wireless-event-joystick
+```
+
+This mode is interactive and is not part of automated verification. Confirm
+that Apply/Reset/Save disarm, translation/rotation isolation works, resetting
+restores the nominal scene, and the saved profile matches the browser values.
+
+## 4. Deterministic policy probe
 
 Start the policy server first:
 
@@ -67,7 +98,7 @@ Repeat the same probe before and after a complete policy-server restart. The
 same episode seed and replan index should reproduce the same action chunk and
 latent-noise hash.
 
-## 4. Perturbation preview
+## 5. Perturbation preview
 
 ```bash
 make perturbation-preview \
@@ -80,7 +111,7 @@ Inspect the saved initial, perturbed, and settled images and the recorded object
 pose. The operation must preserve object height and orientation while changing
 only planar position.
 
-## 5. Autonomous smoke test
+## 6. Autonomous smoke test
 
 With the policy server running:
 
@@ -99,7 +130,7 @@ Expected evidence:
 - a success or explicit timeout/termination reason;
 - no human-action influence.
 
-## 6. Pure teleoperation smoke test
+## 7. Pure teleoperation smoke test
 
 The policy server is not required:
 
@@ -116,7 +147,7 @@ Use the displayed browser interface. A nominal pilot previously completed in
 796 control steps, but completion time is operator-dependent and is not an
 acceptance threshold.
 
-## 7. Shared-autonomy smoke tests
+## 8. Shared-autonomy smoke tests
 
 Keep the policy server running. Use unique trial indices or output roots for
 repeated attempts.
@@ -171,7 +202,7 @@ Apply varied human commands. Confirm that logs contain computed similarities,
 dynamic weights, continuous policy requests during human activity, and explicit
 `cosine_blend_policy_wait` records when inference is pending.
 
-## 8. Output-integrity checks
+## 9. Output-integrity checks
 
 Every completed episode should contain:
 
@@ -199,7 +230,7 @@ wc -l <path-to-steps.jsonl>
 Check that action arrays are length seven and finite, and that the output path
 matches the requested mode, condition, initial state, and trial.
 
-## 9. Milestone checklist
+## 10. Milestone checklist
 
 Before committing a functional or documentation milestone:
 
