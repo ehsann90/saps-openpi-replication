@@ -38,7 +38,7 @@ SPACEMOUSE_DEVICE_DIAGNOSTIC_ARG = $(if $(strip $(SPACEMOUSE_DEVICE)),--device-p
 SPACEMOUSE_PROFILE_ARG = $(if $(strip $(SPACEMOUSE_PROFILE)),--spacemouse-profile-path $(SPACEMOUSE_PROFILE),)
 
 HUMAN_INPUT_ARGS = --input-source $(INPUT_SOURCE) $(SPACEMOUSE_DEVICE_RUNNER_ARG) $(SPACEMOUSE_PROFILE_ARG) --translation-gain $(SPACEMOUSE_TRANSLATION_GAIN) --rotation-gain $(SPACEMOUSE_ROTATION_GAIN) --spacemouse-deadzone $(SPACEMOUSE_DEADZONE) --spacemouse-axis-mapping $(SPACEMOUSE_AXIS_MAPPING) --spacemouse-axis-signs $(SPACEMOUSE_AXIS_SIGNS) --spacemouse-axis-maxima $(SPACEMOUSE_AXIS_MAXIMA) --spacemouse-stale-input-timeout-seconds $(SPACEMOUSE_STALE_TIMEOUT) --spacemouse-open-button $(SPACEMOUSE_OPEN_BUTTON) --spacemouse-close-button $(SPACEMOUSE_CLOSE_BUTTON)
-SESSION_INPUT_ARGS = --input-source $(INPUT_SOURCE) $(SPACEMOUSE_DEVICE_RUNNER_ARG) --spacemouse-deadzone $(SPACEMOUSE_DEADZONE) --spacemouse-axis-mapping $(SPACEMOUSE_AXIS_MAPPING) --spacemouse-axis-signs $(SPACEMOUSE_AXIS_SIGNS) --spacemouse-axis-maxima $(SPACEMOUSE_AXIS_MAXIMA) --spacemouse-stale-input-timeout-seconds $(SPACEMOUSE_STALE_TIMEOUT) --spacemouse-open-button $(SPACEMOUSE_OPEN_BUTTON) --spacemouse-close-button $(SPACEMOUSE_CLOSE_BUTTON)
+SESSION_INPUT_ARGS = --input-source $(INPUT_SOURCE) $(SPACEMOUSE_DEVICE_RUNNER_ARG) $(SPACEMOUSE_PROFILE_ARG) --spacemouse-deadzone $(SPACEMOUSE_DEADZONE) --spacemouse-axis-mapping $(SPACEMOUSE_AXIS_MAPPING) --spacemouse-axis-signs $(SPACEMOUSE_AXIS_SIGNS) --spacemouse-axis-maxima $(SPACEMOUSE_AXIS_MAXIMA) --spacemouse-stale-input-timeout-seconds $(SPACEMOUSE_STALE_TIMEOUT) --spacemouse-open-button $(SPACEMOUSE_OPEN_BUTTON) --spacemouse-close-button $(SPACEMOUSE_CLOSE_BUTTON)
 
 ENVIRONMENT_SEED ?= 7
 POLICY_BASE_SEED ?= 20260724
@@ -97,6 +97,7 @@ help:
 	@echo "Common overrides:"
 	@echo "  CONDITION, CONDITION_IDS, TRIAL, INITIAL_STATE"
 	@echo "  NUM_TRIALS, TELEOP_MAX_STEPS, AUTONOMOUS_MAX_STEPS, SPEED_MODE"
+	@echo "  INPUT_SOURCE, SPACEMOUSE_DEVICE, SPACEMOUSE_PROFILE"
 	@echo "  TELEOP_OUTPUT, AUTONOMOUS_OUTPUT, SHARED_OUTPUT"
 	@echo "  FIXED_AUTONOMY_WEIGHT, COSINE_GAIN"
 

@@ -232,7 +232,7 @@ The versioned profile format is:
   "axis_mapping": ["ABS_Y", "ABS_X", "ABS_Z", "ABS_RY", "ABS_RX", "ABS_RZ"],
   "axis_signs": [-1.0, 1.0, -1.0, -1.0, 1.0, 1.0],
   "axis_maxima": [350.0, 350.0, 350.0, 350.0, 350.0, 350.0],
-  "translation_gain": 0.14,
+  "translation_gain": 0.3,
   "rotation_gain": 0.08,
   "axis_scales": [1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
   "axis_enabled": [true, true, true, true, true, true],
@@ -259,6 +259,21 @@ make teleop \
 This capability does not add the profile to any manifest or experimental
 schedule.
 
+Manifest-driven SpaceMouse sessions require the calibrated profile explicitly:
+
+```bash
+make operator-session \
+  INPUT_SOURCE=spacemouse \
+  SPACEMOUSE_DEVICE=/dev/input/by-id/usb-3Dconnexion_SpaceMouse_Wireless-event-joystick \
+  SPACEMOUSE_PROFILE=configs/spacemouse_profile.json
+```
+
+The manifest fine/normal/fast gains continue to configure keyboard input. For
+SpaceMouse input, the supplied profile is the single source of mapping, signs,
+maxima, translation and rotation gains, per-axis scales, enable mask, deadzone,
+stale timeout, and button mapping. The runtime device path remains separate
+because it is machine-specific.
+
 ## Logging
 
 Existing per-step operator and arbitration fields are preserved. Each step and
@@ -267,5 +282,12 @@ browser connection, physical connection, selected name/path, raw and mapped
 axes, processed 7-D action, motion-active and stale state, gains, deadzone,
 mapping, signs, maxima, configured and current buttons, device error, and native
 event timestamp when available. Axis scales and the enable mask are also
-recorded. Manifest-driven sessions freeze the runtime
-selection in `human_input.json` without changing the manifest schema.
+recorded. Manifest-driven sessions freeze the runtime selection in
+`human_input.json` without changing the manifest schema. For a SpaceMouse
+session, that file includes the path as supplied, validated profile contents,
+schema version, canonical SHA-256, and the separate runtime device path.
+`repository_provenance.json` continues to freeze the repository commit. An
+identical profile can resume the session; changed contents, path, or device
+selection are rejected. Each episode summary records the same compact profile
+path/schema/hash identity, which the session verifies before accepting the
+attempt. Profile contents are not duplicated into per-step records.

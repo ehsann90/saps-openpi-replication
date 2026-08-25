@@ -119,6 +119,15 @@ Make target rejects a dirty worktree, obtains the exact Git commit on the host,
 and records it alongside the frozen manifest in `repository_provenance.json`.
 Git is therefore not required in the runtime container.
 
+When `INPUT_SOURCE=spacemouse`, `operator-session` also requires
+`SPACEMOUSE_PROFILE`. The session validates and freezes the supplied profile in
+`human_input.json`, then passes the same path to every teleoperation, takeover,
+fixed-blend, and cosine-blend child episode. The manifest input gains remain the
+keyboard speed profile; they do not replace calibrated SpaceMouse gains. The
+runtime SpaceMouse device path is recorded separately from the portable
+profile. Resuming with different profile contents, profile path, or device path
+is rejected.
+
 ## 7. Episode schedule
 
 The generated schedule should store one row per episode:

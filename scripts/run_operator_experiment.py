@@ -23,6 +23,8 @@ from saps.human_input.spacemouse import parse_axis_mapping
 from saps.human_input.spacemouse import parse_axis_maxima
 from saps.human_input.spacemouse import parse_axis_signs
 from saps.human_input.spacemouse import SpaceMouseConfig
+from saps.human_input.spacemouse_profile import load_spacemouse_profile
+from saps.human_input.spacemouse_profile import spacemouse_profile_identity
 
 
 @dataclasses.dataclass
@@ -35,6 +37,7 @@ class Args:
     redo_episode_ids: str = ""
     input_source: str = "keyboard"
     spacemouse_device_path: str = ""
+    spacemouse_profile_path: str = ""
     spacemouse_deadzone: float = 0.08
     spacemouse_axis_mapping: str = (
         "ABS_X,ABS_Y,ABS_Z,ABS_RX,ABS_RY,ABS_RZ"
@@ -165,28 +168,40 @@ def _episode_command(
         manifest.default_speed_mode,
         "--input-source",
         args.input_source,
-        "--spacemouse-deadzone",
-        str(args.spacemouse_deadzone),
-        "--spacemouse-axis-mapping",
-        args.spacemouse_axis_mapping,
-        "--spacemouse-axis-signs",
-        args.spacemouse_axis_signs,
-        "--spacemouse-axis-maxima",
-        args.spacemouse_axis_maxima,
-        "--spacemouse-stale-input-timeout-seconds",
-        str(args.spacemouse_stale_input_timeout_seconds),
-        "--spacemouse-open-button",
-        str(args.spacemouse_open_button),
-        "--spacemouse-close-button",
-        str(args.spacemouse_close_button),
         "--output-dir",
         str(attempt_root),
     ]
+    if args.input_source.strip().lower() == "keyboard":
+        common.extend(
+            [
+                "--spacemouse-deadzone",
+                str(args.spacemouse_deadzone),
+                "--spacemouse-axis-mapping",
+                args.spacemouse_axis_mapping,
+                "--spacemouse-axis-signs",
+                args.spacemouse_axis_signs,
+                "--spacemouse-axis-maxima",
+                args.spacemouse_axis_maxima,
+                "--spacemouse-stale-input-timeout-seconds",
+                str(args.spacemouse_stale_input_timeout_seconds),
+                "--spacemouse-open-button",
+                str(args.spacemouse_open_button),
+                "--spacemouse-close-button",
+                str(args.spacemouse_close_button),
+            ]
+        )
     if args.spacemouse_device_path:
         common.extend(
             [
                 "--spacemouse-device-path",
                 args.spacemouse_device_path,
+            ]
+        )
+    if args.spacemouse_profile_path:
+        common.extend(
+            [
+                "--spacemouse-profile-path",
+                args.spacemouse_profile_path,
             ]
         )
     mode = str(episode["mode"])
@@ -224,6 +239,34 @@ def _human_input_configuration(
             "input_source must be 'keyboard' or 'spacemouse'."
         )
 
+    if input_source == "spacemouse":
+        if not args.spacemouse_profile_path:
+            raise ValueError(
+                "SpaceMouse operator sessions require an explicit "
+                "spacemouse_profile_path."
+            )
+        profile = load_spacemouse_profile(
+            Path(args.spacemouse_profile_path)
+        )
+        profile_identity = spacemouse_profile_identity(
+            profile,
+            path=args.spacemouse_profile_path,
+        )
+        return {
+            "input_source": input_source,
+            "spacemouse_device_path": args.spacemouse_device_path,
+            "spacemouse_profile": {
+                **profile_identity,
+                "contents": profile.as_dict(),
+            },
+        }
+
+    if args.spacemouse_profile_path:
+        raise ValueError(
+            "spacemouse_profile_path requires "
+            "input_source='spacemouse'."
+        )
+
     spacemouse = SpaceMouseConfig(
         device_path=args.spacemouse_device_path,
         translation_gain=manifest.normal_translation_gain,
@@ -246,6 +289,30 @@ def _human_input_configuration(
             json.dumps(dataclasses.asdict(spacemouse))
         ),
     }
+
+
+def _validate_child_human_input(
+    *,
+    summary: dict[str, Any],
+    input_configuration: dict[str, Any],
+) -> None:
+    """Verify child profile identity against frozen session provenance."""
+
+    if input_configuration["input_source"] != "spacemouse":
+        return
+
+    profile = input_configuration["spacemouse_profile"]
+    expected = {
+        "path": profile["path"],
+        "schema_version": profile["schema_version"],
+        "sha256": profile["sha256"],
+    }
+    actual = summary.get("spacemouse_profile")
+    if actual != expected:
+        raise ValueError(
+            "Episode SpaceMouse profile does not match the frozen "
+            "session profile."
+        )
 
 
 def _append_event(path: Path, event: dict[str, Any]) -> None:
@@ -473,6 +540,10 @@ def main(args: Args) -> None:
             summary = validate_summary(
                 summary_path=summary_path,
                 episode=episode,
+            )
+            _validate_child_human_input(
+                summary=summary,
+                input_configuration=input_configuration,
             )
             attempt["summary_path"] = str(summary_path)
             attempt["valid"] = True

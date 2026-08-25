@@ -47,6 +47,7 @@ from saps.human_input.spacemouse import parse_axis_mapping
 from saps.human_input.spacemouse import parse_axis_maxima
 from saps.human_input.spacemouse import parse_axis_signs
 from saps.human_input.spacemouse_profile import load_spacemouse_profile
+from saps.human_input.spacemouse_profile import spacemouse_profile_identity
 from saps.policies.async_worker import (
     AsyncPolicyWorker,
 )
@@ -159,6 +160,7 @@ class SharedAutonomyEpisodeResult:
     total_elapsed_seconds: float
 
     operator_connected_at_start: bool
+    spacemouse_profile: dict[str, Any] | None
 
     object_position_before: list[float]
     object_position_after_settle: list[float]
@@ -275,16 +277,22 @@ def validate_args(args: Args) -> ArbitrationMode:
 def main(args: Args) -> None:
     mode = validate_args(args)
     spacemouse_config = None
+    spacemouse_profile = None
     if args.spacemouse_profile_path:
         if args.input_source.strip().lower() != "spacemouse":
             raise ValueError(
                 "spacemouse_profile_path requires "
                 "input_source='spacemouse'."
             )
-        spacemouse_config = load_spacemouse_profile(
+        loaded_profile = load_spacemouse_profile(
             Path(args.spacemouse_profile_path)
-        ).to_config(
+        )
+        spacemouse_config = loaded_profile.to_config(
             device_path=args.spacemouse_device_path
+        )
+        spacemouse_profile = spacemouse_profile_identity(
+            loaded_profile,
+            path=args.spacemouse_profile_path,
         )
     total_start = time.perf_counter()
 
@@ -757,6 +765,7 @@ def main(args: Args) -> None:
             operator_connected_at_start=(
                 operator_connected_at_start
             ),
+            spacemouse_profile=spacemouse_profile,
             object_position_before=(
                 perturbation.body_position_before
             ),

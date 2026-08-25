@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -193,6 +194,31 @@ def load_spacemouse_profile(path: Path) -> SpaceMouseProfile:
     if not isinstance(data, dict):
         raise ValueError("SpaceMouse profile root must be a JSON object.")
     return SpaceMouseProfile.from_dict(data)
+
+
+def spacemouse_profile_sha256(profile: SpaceMouseProfile) -> str:
+    """Return a stable identity for validated profile contents."""
+
+    encoded = json.dumps(
+        profile.as_dict(),
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def spacemouse_profile_identity(
+    profile: SpaceMouseProfile,
+    *,
+    path: str,
+) -> dict[str, Any]:
+    """Return compact provenance shared by sessions and episodes."""
+
+    return {
+        "path": path,
+        "schema_version": profile.schema_version,
+        "sha256": spacemouse_profile_sha256(profile),
+    }
 
 
 def save_spacemouse_profile(
