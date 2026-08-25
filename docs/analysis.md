@@ -29,6 +29,10 @@ Generate the current paper-style autonomous/operator comparison with:
 make analyze-comparison
 ```
 
+The default operator roots are the formal `saps_libero_teleoperation_v2` and
+`saps_libero_shared_autonomy_v2` session outputs. The autonomous default remains
+the completed Phase 1 `autonomous_deterministic_n20_state0_v1` collection.
+
 Override `AUTONOMOUS_RESULTS`, `TELEOP_RESULTS`, `SHARED_RESULTS`, or
 `COMPARISON_OUTPUT` when analyzing another collection. Outputs include:
 

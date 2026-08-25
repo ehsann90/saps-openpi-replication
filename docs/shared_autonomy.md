@@ -198,6 +198,11 @@ Start the policy server:
 make policy-server
 ```
 
+The commands below use keyboard input by default. Add
+`INPUT_SOURCE=spacemouse` and, when needed, a stable `SPACEMOUSE_DEVICE` path to
+use the committed calibrated profile. Make supplies
+`configs/spacemouse_profile.json` automatically for SpaceMouse runs.
+
 Hard takeover:
 
 ```bash
@@ -242,6 +247,8 @@ The completed implementation has passed:
 - takeover start, release, resynchronization, and stale-generation rejection;
 - finite seven-dimensional action checks;
 - explicit scheduler waits without artificial LIBERO steps.
+- physically validated calibrated SpaceMouse teleoperation, fixed-blend, and
+  cosine-blend smoke runs with matching profile identities.
 
 These checks establish functional correctness. They do not replace the formal,
 manifest-driven multi-condition experiment described in

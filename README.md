@@ -17,9 +17,10 @@ and reproducible experiment tooling.
 
 ## Current status
 
-The functional replication stack is complete through action-level arbitration.
-Formal multi-condition, operator-assisted experiments and unified statistical
-analysis are the next phase.
+The functional replication stack includes action-level arbitration,
+manifest-driven operator sessions, calibrated SpaceMouse input, and unified
+comparison analysis. The next experimental gate is intentionally not described
+here until its protocol is finalized.
 
 | Component | Status |
 |---|---|
@@ -33,8 +34,8 @@ analysis are the next phase.
 | Hard takeover | Implemented and validated |
 | Fixed/equal action blending | Implemented and validated |
 | Cosine-similarity blending | Implemented and validated |
-| Manifest-driven operator experiment sessions | Planned for Phase 3 |
-| Unified multi-mode analysis | Planned for Phase 3 |
+| Manifest-driven operator experiment sessions | Implemented and validated |
+| Unified multi-mode analysis | Implemented and tested |
 
 The completed Phase 1 autonomous degradation study contains 200 episodes:
 20 trials for the nominal condition and each of nine perturbation conditions.
@@ -123,8 +124,8 @@ teleoperation and the browser input smoke test do not require the policy server.
 # Autonomous smoke test
 make autonomous-smoke CONDITION=nominal
 
-# Pure teleoperation
-make teleop CONDITION=nominal TRIAL=0 TELEOP_MAX_STEPS=1800
+# Pure teleoperation with the default keyboard input
+make teleop CONDITION=nominal TRIAL=0
 
 # Hard takeover
 make takeover \
@@ -147,13 +148,30 @@ make cosine-blend \
 For operator-controlled modes, open the displayed browser URL and click
 **Arm controls** before issuing commands.
 
-SpaceMouse setup, safety behavior, and the hardware-only diagnostic are in
-[the human-input guide](docs/human_input.md).
+For the physically calibrated SpaceMouse path, the Make targets automatically
+load `configs/spacemouse_profile.json` when `INPUT_SOURCE=spacemouse`:
+
+```bash
+make spacemouse-diagnostic \
+  SPACEMOUSE_DEVICE=/dev/input/by-id/usb-3Dconnexion_SpaceMouse_Wireless-event-joystick
+
+make teleop \
+  INPUT_SOURCE=spacemouse \
+  SPACEMOUSE_DEVICE=/dev/input/by-id/usb-3Dconnexion_SpaceMouse_Wireless-event-joystick \
+  CONDITION=nominal \
+  TRIAL=0
+```
+
+The explicit device path is optional when capability-based auto-discovery finds
+the intended device. The same `INPUT_SOURCE` and `SPACEMOUSE_DEVICE` overrides
+apply to takeover, fixed-blend, cosine-blend, and formal session targets. See
+[the human-input guide](docs/human_input.md) for setup and safety details.
 
 ## Documentation
 
 - [Installation and environment setup](docs/setup.md)
 - [Command runbook](docs/runbook.md)
+- [Keyboard and SpaceMouse input](docs/human_input.md)
 - [Testing and validation](docs/testing.md)
 - [Gate 1 RTX 5080 AC/performance characterization](docs/gate1_rtx5080_ac_performance.md)
 - [Shared-autonomy semantics and runtime](docs/shared_autonomy.md)

@@ -375,14 +375,18 @@ prepared for:
 8. asynchronous policy inference with explicit non-stepping scheduler waits;
 9. step-level human, policy, executed-action, weight, and latency logging.
 
-Phase 3 now focuses on formal reproducibility:
+The Phase 3 reproducibility infrastructure is now implemented:
 
 1. an immutable experiment manifest;
 2. deterministic and counterbalanced episode schedules;
 3. a resumable operator-session runner for all non-autonomous modes;
 4. artifact validation and duplicate protection;
 5. unified paired analysis across modes and perturbations;
-6. execution on lower-latency hardware suitable for operator experiments.
+6. latency characterization on the intended operator-experiment hardware.
+
+Formal multi-condition operator collection remains separate from these
+implementation milestones. Pilot and smoke episodes must not be relabeled as
+formal results.
 
 See:
 

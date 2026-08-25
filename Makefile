@@ -19,26 +19,15 @@ DURATION ?= 180
 SPEED_MODE ?= fine
 INPUT_SOURCE ?= keyboard
 SPACEMOUSE_DEVICE ?=
-SPACEMOUSE_TRANSLATION_GAIN ?= 0.30
-SPACEMOUSE_ROTATION_GAIN ?= 0.08
-SPACEMOUSE_DEADZONE ?= 0.08
-SPACEMOUSE_AXIS_MAPPING ?= ABS_X,ABS_Y,ABS_Z,ABS_RX,ABS_RY,ABS_RZ
-SPACEMOUSE_AXIS_SIGNS ?= 1,1,1,1,1,1
-SPACEMOUSE_AXIS_MAXIMA ?= 350,350,350,350,350,350
-SPACEMOUSE_STALE_TIMEOUT ?= 0.25
-SPACEMOUSE_OPEN_BUTTON ?= 256
-SPACEMOUSE_CLOSE_BUTTON ?= 257
 SPACEMOUSE_REFRESH_HZ ?= 20
-SPACEMOUSE_PROFILE ?=
-CALIBRATION_PROFILE ?= configs/spacemouse_profile.json
-CALIBRATION_TRANSLATION_GAIN ?= 0.30
-CALIBRATION_ROTATION_GAIN ?= 0.08
-SPACEMOUSE_DEVICE_RUNNER_ARG = $(if $(strip $(SPACEMOUSE_DEVICE)),--spacemouse-device-path $(SPACEMOUSE_DEVICE),)
+SPACEMOUSE_PROFILE ?= configs/spacemouse_profile.json
+SPACEMOUSE_DEVICE_RUNNER_ARG = $(if $(and $(filter spacemouse,$(strip $(INPUT_SOURCE))),$(strip $(SPACEMOUSE_DEVICE))),--spacemouse-device-path $(SPACEMOUSE_DEVICE),)
 SPACEMOUSE_DEVICE_DIAGNOSTIC_ARG = $(if $(strip $(SPACEMOUSE_DEVICE)),--device-path $(SPACEMOUSE_DEVICE),)
-SPACEMOUSE_PROFILE_ARG = $(if $(strip $(SPACEMOUSE_PROFILE)),--spacemouse-profile-path $(SPACEMOUSE_PROFILE),)
+SPACEMOUSE_PROFILE_ARG = $(if $(and $(filter spacemouse,$(strip $(INPUT_SOURCE))),$(strip $(SPACEMOUSE_PROFILE))),--spacemouse-profile-path $(SPACEMOUSE_PROFILE),)
+SPACEMOUSE_DIAGNOSTIC_PROFILE_ARG = $(if $(strip $(SPACEMOUSE_PROFILE)),--profile-path $(SPACEMOUSE_PROFILE),)
 
-HUMAN_INPUT_ARGS = --input-source $(INPUT_SOURCE) $(SPACEMOUSE_DEVICE_RUNNER_ARG) $(SPACEMOUSE_PROFILE_ARG) --translation-gain $(SPACEMOUSE_TRANSLATION_GAIN) --rotation-gain $(SPACEMOUSE_ROTATION_GAIN) --spacemouse-deadzone $(SPACEMOUSE_DEADZONE) --spacemouse-axis-mapping $(SPACEMOUSE_AXIS_MAPPING) --spacemouse-axis-signs $(SPACEMOUSE_AXIS_SIGNS) --spacemouse-axis-maxima $(SPACEMOUSE_AXIS_MAXIMA) --spacemouse-stale-input-timeout-seconds $(SPACEMOUSE_STALE_TIMEOUT) --spacemouse-open-button $(SPACEMOUSE_OPEN_BUTTON) --spacemouse-close-button $(SPACEMOUSE_CLOSE_BUTTON)
-SESSION_INPUT_ARGS = --input-source $(INPUT_SOURCE) $(SPACEMOUSE_DEVICE_RUNNER_ARG) $(SPACEMOUSE_PROFILE_ARG) --spacemouse-deadzone $(SPACEMOUSE_DEADZONE) --spacemouse-axis-mapping $(SPACEMOUSE_AXIS_MAPPING) --spacemouse-axis-signs $(SPACEMOUSE_AXIS_SIGNS) --spacemouse-axis-maxima $(SPACEMOUSE_AXIS_MAXIMA) --spacemouse-stale-input-timeout-seconds $(SPACEMOUSE_STALE_TIMEOUT) --spacemouse-open-button $(SPACEMOUSE_OPEN_BUTTON) --spacemouse-close-button $(SPACEMOUSE_CLOSE_BUTTON)
+HUMAN_INPUT_ARGS = --input-source $(INPUT_SOURCE) $(SPACEMOUSE_DEVICE_RUNNER_ARG) $(SPACEMOUSE_PROFILE_ARG)
+SESSION_INPUT_ARGS = --input-source $(INPUT_SOURCE) $(SPACEMOUSE_DEVICE_RUNNER_ARG) $(SPACEMOUSE_PROFILE_ARG)
 
 ENVIRONMENT_SEED ?= 7
 POLICY_BASE_SEED ?= 20260724
@@ -51,8 +40,8 @@ PREVIEW_OUTPUT ?= outputs/perturbation_preview
 ANALYSIS_OUTPUT ?= results/analysis
 COMPARISON_OUTPUT ?= results/saps_libero_current
 AUTONOMOUS_RESULTS ?= outputs/autonomous_deterministic_n20_state0_v1
-TELEOP_RESULTS ?= outputs/saps_libero_teleoperation_v1
-SHARED_RESULTS ?= outputs/saps_libero_shared_autonomy_v1
+TELEOP_RESULTS ?= outputs/saps_libero_teleoperation_v2
+SHARED_RESULTS ?= outputs/saps_libero_shared_autonomy_v2
 REDO_EPISODES ?=
 REDO_EPISODES_ARG = $(if $(strip $(REDO_EPISODES)),--redo-episode-ids $(REDO_EPISODES),)
 MANIFEST ?= configs/operator_shared_autonomy_manifest.json
@@ -71,7 +60,8 @@ help:
 	@echo "  make policy-server"
 	@echo "  make autonomous-smoke"
 	@echo "  make autonomous-sweep NUM_TRIALS=20"
-	@echo "  make teleop CONDITION=nominal TRIAL=4"
+	@echo "  make teleop CONDITION=nominal TRIAL=0"
+	@echo "  make teleop INPUT_SOURCE=spacemouse CONDITION=nominal TRIAL=0"
 	@echo "  make takeover CONDITION=nominal TRIAL=0"
 	@echo "  make fixed-blend FIXED_AUTONOMY_WEIGHT=0.5"
 	@echo "  make cosine-blend COSINE_GAIN=6.0"
@@ -82,7 +72,7 @@ help:
 	@echo "Tests:"
 	@echo "  make check"
 	@echo "  make unit-test"
-	@echo "  make operator-smoke"
+	@echo "  make operator-smoke  # keyboard-only browser input"
 	@echo "  make compile"
 	@echo
 	@echo "Diagnostics:"
@@ -158,14 +148,14 @@ teleop:
 spacemouse-diagnostic:
 	$(COMPOSE) run --rm --no-deps \
 		-e SAPS_SCRIPT=/workspace/tools/diagnostics/inspect_spacemouse_input.py \
-		-e SAPS_RUNTIME_ARGS="$(SPACEMOUSE_DEVICE_DIAGNOSTIC_ARG) --translation-gain $(SPACEMOUSE_TRANSLATION_GAIN) --rotation-gain $(SPACEMOUSE_ROTATION_GAIN) --deadzone $(SPACEMOUSE_DEADZONE) --axis-mapping $(SPACEMOUSE_AXIS_MAPPING) --axis-signs $(SPACEMOUSE_AXIS_SIGNS) --axis-maxima $(SPACEMOUSE_AXIS_MAXIMA) --stale-input-timeout-seconds $(SPACEMOUSE_STALE_TIMEOUT) --open-button $(SPACEMOUSE_OPEN_BUTTON) --close-button $(SPACEMOUSE_CLOSE_BUTTON) --refresh-frequency-hz $(SPACEMOUSE_REFRESH_HZ)" \
+		-e SAPS_RUNTIME_ARGS="$(SPACEMOUSE_DEVICE_DIAGNOSTIC_ARG) $(SPACEMOUSE_DIAGNOSTIC_PROFILE_ARG) --refresh-frequency-hz $(SPACEMOUSE_REFRESH_HZ)" \
 		runtime
 
 .PHONY: spacemouse-calibrate
 spacemouse-calibrate:
 	$(COMPOSE) run --rm --no-deps \
 		-e SAPS_SCRIPT=/workspace/scripts/run_spacemouse_calibration.py \
-		-e SAPS_RUNTIME_ARGS="$(SPACEMOUSE_DEVICE_DIAGNOSTIC_ARG) --profile-path $(CALIBRATION_PROFILE) --translation-gain $(CALIBRATION_TRANSLATION_GAIN) --rotation-gain $(CALIBRATION_ROTATION_GAIN) --deadzone $(SPACEMOUSE_DEADZONE) --stale-input-timeout-seconds $(SPACEMOUSE_STALE_TIMEOUT) --open-button $(SPACEMOUSE_OPEN_BUTTON) --close-button $(SPACEMOUSE_CLOSE_BUTTON)" \
+		-e SAPS_RUNTIME_ARGS="$(SPACEMOUSE_DEVICE_DIAGNOSTIC_ARG) $(SPACEMOUSE_DIAGNOSTIC_PROFILE_ARG)" \
 		runtime
 
 .PHONY: autonomous-smoke
@@ -227,26 +217,6 @@ compile:
 .PHONY: check
 check: unit-test compile
 
-.PHONY: help-teleop
-help-teleop:
-	$(RUNTIME) /bin/bash -lc \
-		'source /.venv/bin/activate && python /workspace/scripts/run_teleoperation_episode.py --help'
-
-.PHONY: help-autonomous
-help-autonomous:
-	$(RUNTIME) /bin/bash -lc \
-		'source /.venv/bin/activate && python /workspace/scripts/run_autonomous_sweep.py --help'
-
-.PHONY: help-operator
-help-operator:
-	$(RUNTIME) /bin/bash -lc \
-		'source /.venv/bin/activate && python /workspace/tests/manual/keyboard_operator_smoke.py --help'
-
-.PHONY: help-probe
-help-probe:
-	$(RUNTIME) /bin/bash -lc \
-		'source /.venv/bin/activate && python /workspace/tools/diagnostics/probe_seeded_policy.py --help'
-
 .PHONY: clean-python
 clean-python:
 	find . \
@@ -281,8 +251,3 @@ fixed-blend:
 .PHONY: cosine-blend
 cosine-blend:
 	$(call RUN_SHARED_AUTONOMY,cosine_blend)
-
-.PHONY: help-shared-autonomy
-help-shared-autonomy:
-	$(COMPOSE) run --rm --no-deps runtime /bin/bash -lc \
-		'source /.venv/bin/activate && python /workspace/scripts/run_shared_autonomy_episode.py --help'

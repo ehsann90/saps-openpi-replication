@@ -241,6 +241,15 @@ make check
 make operator-smoke DURATION=30
 ```
 
+`operator-smoke` is the keyboard-only browser diagnostic and does not start
+LIBERO. On a SpaceMouse host, separately verify device access and the committed
+calibration with:
+
+```bash
+make spacemouse-diagnostic \
+  SPACEMOUSE_DEVICE=/dev/input/by-id/usb-3Dconnexion_SpaceMouse_Wireless-event-joystick
+```
+
 For SpaceMouse host access and the hardware-only diagnostic, see
 [`human_input.md`](human_input.md). The runtime explicitly mounts `/dev/input`;
 the policy-server container does not need the device.

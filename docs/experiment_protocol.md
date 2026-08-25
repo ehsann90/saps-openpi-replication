@@ -55,10 +55,11 @@ the intervention protocol consistently.
 
 ## 5. Hardware and latency
 
-Formal operator-assisted collection should run on the more capable system where
-policy latency is small enough not to dominate the interaction. The runtime
-already records inference latency and scheduler wait ticks, so residual latency
-can be quantified rather than hidden.
+Formal operator-assisted collection must run on hardware that satisfies the
+validated latency requirements in
+[`gate1_rtx5080_ac_performance.md`](gate1_rtx5080_ac_performance.md). The runtime
+records inference latency and scheduler wait ticks, so residual latency can be
+quantified rather than hidden.
 
 Changing hardware must not change:
 
@@ -75,7 +76,8 @@ Record the hardware and software inventory described in [`setup.md`](setup.md).
 
 ## 6. Manifest
 
-The session runner will consume an immutable JSON manifest similar to:
+The session runner consumes an immutable JSON manifest. The shared-autonomy
+manifest currently has this structure:
 
 ```json
 {
@@ -119,18 +121,18 @@ Make target rejects a dirty worktree, obtains the exact Git commit on the host,
 and records it alongside the frozen manifest in `repository_provenance.json`.
 Git is therefore not required in the runtime container.
 
-When `INPUT_SOURCE=spacemouse`, `operator-session` also requires
-`SPACEMOUSE_PROFILE`. The session validates and freezes the supplied profile in
+When `INPUT_SOURCE=spacemouse`, the Python session runner requires an explicit
+profile path. Make supplies `configs/spacemouse_profile.json` by default through
+`SPACEMOUSE_PROFILE`. The session validates and freezes that profile in
 `human_input.json`, then passes the same path to every teleoperation, takeover,
-fixed-blend, and cosine-blend child episode. The manifest input gains remain the
-keyboard speed profile; they do not replace calibrated SpaceMouse gains. The
-runtime SpaceMouse device path is recorded separately from the portable
-profile. Resuming with different profile contents, profile path, or device path
-is rejected.
+fixed-blend, and cosine-blend child episode. Manifest gains remain the keyboard
+speed profile; they do not replace calibrated SpaceMouse gains. The runtime
+device path is recorded separately. Resuming with different profile contents,
+profile path, or device path is rejected.
 
 ## 7. Episode schedule
 
-The generated schedule should store one row per episode:
+The generated schedule stores one row per episode:
 
 ```text
 episode_id
@@ -143,11 +145,13 @@ order_index
 status
 attempt_count
 output_directory
-started_at
-finished_at
+attempts
 termination_reason
 success
 ```
+
+Each attempt records its number, start/finish timestamps, return code, output
+root, summary path, validity, analysis selection, redo status, and error.
 
 Requirements:
 
@@ -166,13 +170,17 @@ not attempt unattended loops for operator-controlled conditions.
 Generate or resume the teleoperation session without a policy server:
 
 ```bash
-make teleoperation-session
+make teleoperation-session \
+  INPUT_SOURCE=spacemouse \
+  SPACEMOUSE_DEVICE=/dev/input/by-id/usb-3Dconnexion_SpaceMouse_Wireless-event-joystick
 ```
 
 Run shared autonomy separately with the policy server already running:
 
 ```bash
-make shared-autonomy-session
+make shared-autonomy-session \
+  INPUT_SOURCE=spacemouse \
+  SPACEMOUSE_DEVICE=/dev/input/by-id/usb-3Dconnexion_SpaceMouse_Wireless-event-joystick
 ```
 
 The first invocation freezes `manifest.json`, creates `schedule.json`, and asks
@@ -227,9 +235,10 @@ Before a collection session:
 2. record the repository and submodule commits;
 3. start the policy server and confirm the checkpoint;
 4. run one excluded warm-up episode;
-5. verify browser focus and key release;
-6. calibrate the operator and document the intervention instruction;
-7. start or resume the immutable schedule.
+5. run the calibrated SpaceMouse diagnostic and verify the profile/device;
+6. verify browser focus, arming, and SpaceMouse stale-input behavior;
+7. calibrate the operator and document the intervention instruction;
+8. start or resume the immutable schedule.
 
 The intervention policy must be written before formal data collection. Examples
 include intervening only when predicted failure is apparent or continuously

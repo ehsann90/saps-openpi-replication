@@ -32,6 +32,8 @@ The unit suite covers:
   stale/lost-input safety, cleanup, and diagnostic CLI wiring.
 - calibration profile validation/round-trip, per-axis sensitivity and enable
   masks, safe live apply/reset/save behavior, and normal-runner defaults.
+- manifest-session profile propagation, immutable profile provenance, resume
+  protection, and Make-to-runner argument contracts.
 
 Do not rely on a hard-coded expected test count. New regression tests should
 increase the count while every test still reports `ok`.
@@ -63,6 +65,10 @@ make spacemouse-diagnostic \
   SPACEMOUSE_DEVICE=/dev/input/by-id/usb-3Dconnexion_SpaceMouse_Wireless-event-joystick
 ```
 
+The Make target loads `configs/spacemouse_profile.json` by default, so mapped
+axes and actions should match the physically validated calibration. Set
+`SPACEMOUSE_PROFILE=` only for an intentional raw/default diagnostic.
+
 Confirm all six raw axes change, mapped axes and signs match the intended robot
 frame, the final action respects gains/deadzone, both configured buttons work,
 and unplugging zeros motion and requires re-arming after reconnection. Follow
@@ -79,6 +85,8 @@ make spacemouse-calibrate \
 This mode is interactive and is not part of automated verification. Confirm
 that Apply/Reset/Save disarm, translation/rotation isolation works, resetting
 restores the nominal scene, and the saved profile matches the browser values.
+The same `SPACEMOUSE_PROFILE` variable selects the diagnostic, calibration, and
+runtime profile.
 
 ## 4. Deterministic policy probe
 
@@ -132,7 +140,7 @@ Expected evidence:
 
 ## 7. Pure teleoperation smoke test
 
-The policy server is not required:
+The policy server is not required. Verify the keyboard path with:
 
 ```bash
 make teleop \
@@ -146,6 +154,22 @@ make teleop \
 Use the displayed browser interface. A nominal pilot previously completed in
 796 control steps, but completion time is operator-dependent and is not an
 acceptance threshold.
+
+Verify the calibrated SpaceMouse path separately with a unique output root:
+
+```bash
+make teleop \
+  INPUT_SOURCE=spacemouse \
+  SPACEMOUSE_DEVICE=/dev/input/by-id/usb-3Dconnexion_SpaceMouse_Wireless-event-joystick \
+  CONDITION=nominal \
+  TRIAL=0 \
+  TELEOP_OUTPUT=outputs/spacemouse_teleop_smoke
+```
+
+The summary must contain the calibrated profile identity. Every step must log
+the SpaceMouse source, selected device, `0.30/0.08` gains, calibrated
+mapping/signs, and finite seven-dimensional actions. Stale neutral samples are
+expected when the puck is idle, but their six motion dimensions must be zero.
 
 ## 8. Shared-autonomy smoke tests
 
@@ -170,6 +194,8 @@ active takeover, and stale pre-takeover inference should be rejected.
 
 ```bash
 make fixed-blend \
+  INPUT_SOURCE=spacemouse \
+  SPACEMOUSE_DEVICE=/dev/input/by-id/usb-3Dconnexion_SpaceMouse_Wireless-event-joystick \
   FIXED_AUTONOMY_WEIGHT=0.5 \
   CONDITION=nominal \
   TRIAL=0 \
@@ -191,6 +217,8 @@ When the human is idle, the effective autonomy weight must be `1.0`.
 
 ```bash
 make cosine-blend \
+  INPUT_SOURCE=spacemouse \
+  SPACEMOUSE_DEVICE=/dev/input/by-id/usb-3Dconnexion_SpaceMouse_Wireless-event-joystick \
   COSINE_GAIN=6.0 \
   CONDITION=nominal \
   TRIAL=0 \
@@ -218,6 +246,11 @@ Shared-autonomy episodes also contain:
 ```text
 scheduler_waits.jsonl
 ```
+
+Profile-backed SpaceMouse episodes also record `spacemouse_profile` in
+`summary.json`. Its path, schema version, and SHA-256 must match the configured
+profile and the session-level `human_input.json` when launched by a manifest
+session.
 
 Basic inspection:
 

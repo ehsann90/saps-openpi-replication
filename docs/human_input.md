@@ -79,7 +79,7 @@ neutral drift and small accidental tilt, but also requires a larger deliberate
 movement before an axis responds. The current profile has one shared deadzone
 for all six axes, not separate translation and rotation deadzones.
 
-Defaults are:
+The unprofiled direct-runner fallback is:
 
 | Setting | Default |
 |---|---|
@@ -94,9 +94,11 @@ Defaults are:
 | open button | `256` (`BTN_0`) |
 | close button | `257` (`BTN_1`) |
 
-The mapping list is in application-axis order: its first entry supplies `dx`,
-its second supplies `dy`, and so on. The identity mapping and positive signs are
-the unchanged normal-runner defaults when no profile is supplied. Physical
+These values preserve direct Python CLI compatibility; they are not the
+recommended Make workflow for the calibrated lab device. The mapping list is in
+application-axis order: its first entry supplies `dx`, its second supplies `dy`,
+and so on. The identity mapping and positive signs are the unchanged
+normal-runner defaults when no profile is supplied. Physical
 shakedown established the following translation behavior:
 
 - puck up/down is `ABS_Z`, inverted so puck up produces `+dz`;
@@ -115,17 +117,18 @@ The physically validated profile uses mapping
 `-1,1,-1,-1,1,1`. It is stored at `configs/spacemouse_profile.json` with all six
 outputs enabled. Calibration loads that profile by default. If it is absent or
 loading is explicitly disabled, calibration starts with the same mapping and
-signs but enables translation only for a safe staged shakedown. Normal runner
-defaults remain unchanged until this profile is explicitly supplied.
+signs but enables translation only for a safe staged shakedown. Direct-runner
+defaults remain unchanged when no profile is supplied. Make targets
+automatically supply the committed profile whenever `INPUT_SOURCE=spacemouse`.
 
-The calibration-only translation-gain candidate is `0.30`, raised from `0.14`
+The calibrated translation gain is `0.30`, raised from `0.14`
 after physical testing found both single-axis and mechanically coupled diagonal
-motion too slow. This does not change the normal runner default or the analog
+motion too slow. This does not change the direct-runner fallback or the analog
 processing equation. Multi-axis SpaceMouse gestures commonly divide the puck's
 physical deflection among axes, so increasing the linear gain compensates
 without normalizing or otherwise reshaping the command vector.
 
-The calibration-only rotation-gain candidate is `0.08`, reduced from `0.18`
+The calibrated rotation gain is `0.08`, reduced from `0.18`
 after combined 6-DoF testing found that incidental puck tilt produced too much
 gripper rotation during intended translation. This reduces both intentional and
 incidental rotation proportionally; it does not introduce dominant-axis
@@ -147,30 +150,19 @@ unchanged.
 
 ## Diagnostic
 
-The diagnostic starts no LIBERO environment, policy server, or robot:
+The diagnostic starts no LIBERO environment, policy server, or robot. It loads
+the committed calibrated profile by default:
 
 ```bash
 make spacemouse-diagnostic \
   SPACEMOUSE_DEVICE=/dev/input/by-id/usb-3Dconnexion_SpaceMouse_Wireless-event-joystick
 ```
 
-It prints the selected name/path, six-axis capability ranges, exclusive-access
-status, connection and stale state, raw axes, mapped axes, final 7-D action,
-buttons, native event timestamp, and errors. Stop it with `Ctrl+C`.
-
-After mapping and signs are physically verified, a teleoperation check can use:
-
-```bash
-make teleop \
-  INPUT_SOURCE=spacemouse \
-  SPACEMOUSE_DEVICE=/dev/input/by-id/usb-3Dconnexion_SpaceMouse_Wireless-event-joystick \
-  SPACEMOUSE_AXIS_MAPPING=ABS_X,ABS_Y,ABS_Z,ABS_RX,ABS_RY,ABS_RZ \
-  SPACEMOUSE_AXIS_SIGNS=1,1,1,1,1,1 \
-  TELEOP_OUTPUT=outputs/spacemouse_teleop_manual
-```
-
-Use a unique output directory. Shared-autonomy modes use the same input
-overrides and still require the policy server.
+It prints the selected name/path, profile path, active mapping/signs/gains,
+six-axis capability ranges, exclusive-access status, connection and stale
+state, raw axes, mapped axes, final 7-D action, buttons, native event timestamp,
+and errors. Stop it with `Ctrl+C`. Set `SPACEMOUSE_PROFILE=` only when an
+unprofiled raw/default diagnostic is intentional.
 
 ## Graphical calibration shakedown
 
@@ -198,8 +190,8 @@ While disarmed, the operator can edit:
 Use the three stages in order:
 
 1. `Stage 1: Translation only`: verify forward/back, right/left, then up/down.
-2. `Stage 2: Rotation only`: confirm the calibrated roll, inverted pitch, and
-   unchanged yaw directions without translational motion.
+2. `Stage 2: Rotation only`: confirm the calibrated roll, pitch, and yaw
+   directions without translational motion.
 3. `Stage 3: Enable all six`: verify combined motion and tune sensitivity.
 
 Stage buttons edit the enable checkboxes but do not change live control until
@@ -244,28 +236,32 @@ The versioned profile format is:
 ```
 
 Profiles deliberately exclude `/dev/input/eventX` and the stable device path.
-The latter remains a runtime argument. Existing single-episode teleoperation
-and shared-autonomy runners can load a saved candidate without changing their
-defaults:
+The latter remains a runtime argument. Make automatically supplies the
+committed profile for SpaceMouse application runs:
 
 ```bash
 make teleop \
   INPUT_SOURCE=spacemouse \
   SPACEMOUSE_DEVICE=/dev/input/by-id/usb-3Dconnexion_SpaceMouse_Wireless-event-joystick \
-  SPACEMOUSE_PROFILE=configs/spacemouse_profile.json \
   TELEOP_OUTPUT=outputs/spacemouse_profile_shakedown
 ```
 
-This capability does not add the profile to any manifest or experimental
-schedule.
+Use a unique output directory. Shared-autonomy modes use the same input
+overrides and still require the policy server. Override
+`SPACEMOUSE_PROFILE=<path>` only to select another validated profile.
 
-Manifest-driven SpaceMouse sessions require the calibrated profile explicitly:
+Manifest-driven SpaceMouse sessions require a calibrated profile. The Make
+targets satisfy that requirement with the committed default:
 
 ```bash
-make operator-session \
+make teleoperation-session \
   INPUT_SOURCE=spacemouse \
-  SPACEMOUSE_DEVICE=/dev/input/by-id/usb-3Dconnexion_SpaceMouse_Wireless-event-joystick \
-  SPACEMOUSE_PROFILE=configs/spacemouse_profile.json
+  SPACEMOUSE_DEVICE=/dev/input/by-id/usb-3Dconnexion_SpaceMouse_Wireless-event-joystick
+
+# With the policy server already running:
+make shared-autonomy-session \
+  INPUT_SOURCE=spacemouse \
+  SPACEMOUSE_DEVICE=/dev/input/by-id/usb-3Dconnexion_SpaceMouse_Wireless-event-joystick
 ```
 
 The manifest fine/normal/fast gains continue to configure keyboard input. For
@@ -273,6 +269,16 @@ SpaceMouse input, the supplied profile is the single source of mapping, signs,
 maxima, translation and rotation gains, per-axis scales, enable mask, deadzone,
 stale timeout, and button mapping. The runtime device path remains separate
 because it is machine-specific.
+
+This Makefile cleanup removes the legacy individual `SPACEMOUSE_*` calibration
+overrides. Select a profile file instead. Previously, the SpaceMouse
+translation and rotation variables were also forwarded as the generic
+normal-speed gains during single-episode keyboard runs. Keyboard runs now use
+the runners' normal-speed defaults (`0.14` translation and `0.18` rotation);
+their default fine-speed gains remain `0.07` and `0.10`. Formal manifest-driven
+keyboard gains are unchanged. A legacy one-off keyboard trajectory collected
+after switching to normal speed is therefore not directly comparable unless
+the old gains are supplied explicitly to the Python runner.
 
 ## Logging
 

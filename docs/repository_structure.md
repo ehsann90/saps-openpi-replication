@@ -7,10 +7,16 @@ saps-openpi-replication/
 ├── README.md
 ├── compose.yml
 ├── configs/
-│   └── libero_cream_cheese_offsets.json
+│   ├── libero_cream_cheese_offsets.json
+│   ├── operator_shared_autonomy_manifest.json
+│   ├── operator_teleoperation_manifest.json
+│   └── spacemouse_profile.json
 ├── docs/
 │   ├── analysis.md
+│   ├── environment-baseline.md
 │   ├── experiment_protocol.md
+│   ├── gate1_rtx5080_ac_performance.md
+│   ├── human_input.md
 │   ├── phase1_libero_perturbations_and_determinism.md
 │   ├── repository_structure.md
 │   ├── runbook.md
@@ -23,7 +29,9 @@ saps-openpi-replication/
 ├── scripts/
 │   ├── run_autonomous_sweep.py
 │   ├── run_libero.py
+│   ├── run_operator_experiment.py
 │   ├── run_shared_autonomy_episode.py
+│   ├── run_spacemouse_calibration.py
 │   ├── run_teleoperation_episode.py
 │   └── serve_seeded_policy.py
 ├── src/saps/
@@ -58,18 +66,21 @@ saps-openpi-replication/
 object names, and nominal plus perturbed planar offsets. Experiment scripts
 should read this configuration rather than duplicate the values.
 
+The operator manifests define immutable teleoperation and shared-autonomy
+schedules. `configs/spacemouse_profile.json` is the portable, physically
+validated SpaceMouse calibration; runtime device paths remain outside it.
+
 ## Project scripts
 
 - `serve_seeded_policy.py`: deterministic OpenPI server wrapper.
 - `run_libero.py`: one autonomous episode.
 - `run_autonomous_sweep.py`: resumable autonomous condition sweep.
+- `run_operator_experiment.py`: manifest-driven, resumable operator sessions.
 - `run_teleoperation_episode.py`: pure browser-controlled LIBERO episode.
 - `run_shared_autonomy_episode.py`: autonomous, takeover, fixed, or cosine
   arbitration through the asynchronous shared-control runtime.
-
-The future Phase 3 operator-session runner will also live in `scripts/` and will
-orchestrate these existing episode entry points rather than duplicate their
-control logic.
+- `run_spacemouse_calibration.py`: disposable graphical SpaceMouse calibration
+  and profile writer.
 
 ## Python package
 
@@ -89,7 +100,8 @@ policy scheduling, and shared-control state transitions.
 
 ### `src/saps/human_input`
 
-Keyboard mapping and the browser operator server.
+Keyboard mapping, SpaceMouse discovery and processing, calibration profiles,
+normalized human-input samples, and the browser operator server.
 
 ### `src/saps/policies`
 
@@ -106,8 +118,8 @@ history.
 
 ## Tools
 
-- `tools/diagnostics/`: scene inspection, perturbation previews, and deterministic
-  policy probes.
+- `tools/diagnostics/`: SpaceMouse inspection, scene inspection, perturbation
+  previews, and deterministic policy probes.
 - `tools/analysis/`: stable analysis entry points.
 - `tools/monitoring/`: development-oriented monitoring utilities. Files here are
   not automatically part of the supported public CLI.
