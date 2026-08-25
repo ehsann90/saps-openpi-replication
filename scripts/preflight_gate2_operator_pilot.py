@@ -14,6 +14,7 @@ from saps.evaluation.experiment_session import manifest_sha256
 from saps.evaluation.gate2_protocol import GATE2_MANIFEST_PATH
 from saps.evaluation.gate2_protocol import GATE2_OUTPUT_ROOT
 from saps.evaluation.gate2_protocol import GATE2_PROFILE_PATH
+from saps.evaluation.gate2_protocol import gate2_ordering_metrics
 from saps.evaluation.gate2_protocol import validate_gate2_protocol
 
 
@@ -45,6 +46,7 @@ def main(args: Args) -> None:
         (episode["mode"], episode["condition_id"])
         for episode in episodes
     )
+    ordering = gate2_ordering_metrics(result["schedule"])
 
     print("Gate-2 excluded operator pilot preflight: PASSED")
     print(f"Experiment ID: {manifest.experiment_id}")
@@ -76,10 +78,33 @@ def main(args: Args) -> None:
     print(f"Environment seed: {manifest.environment_seed}")
     print(f"Policy base seed: {manifest.policy_base_seed}")
     print(f"Ordering seed: {manifest.ordering_seed}")
+    print(f"Ordering method: {ordering['ordering_method']}")
     print(f"Fixed autonomy weight: {manifest.fixed_autonomy_weight}")
     print(f"Cosine gain: {manifest.cosine_gain}")
     print(f"Control frequency: {manifest.control_frequency_hz} Hz")
     print(f"Horizon: {manifest.operator_max_steps} steps")
+    print(
+        "Maximum same-mode run length: "
+        f"{ordering['maximum_same_mode_run_length']}"
+    )
+    print(
+        "Maximum same-condition run length: "
+        f"{ordering['maximum_same_condition_run_length']}"
+    )
+    print(
+        "Minimum matched condition-trial intervening episodes: "
+        f"{ordering['minimum_same_identity_intervening_episodes']}"
+    )
+    print("Pairwise mode precedence by condition:")
+    for condition_id, precedence in ordering[
+        "pairwise_mode_precedence"
+    ].items():
+        print(f"  {condition_id}:")
+        for label, count in precedence.items():
+            first_mode, second_mode = label.split("_before_", 1)
+            print(
+                f"    {first_mode} before {second_mode}: {count}/5"
+            )
     print()
     print("index  mode            condition  trial  policy_seed")
     for episode in episodes:

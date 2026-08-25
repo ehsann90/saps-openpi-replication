@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from collections import Counter
+import itertools
 from pathlib import Path
+import random
 from typing import Any
 
 from saps.evaluation.experiment_session import build_schedule
@@ -29,6 +31,10 @@ GATE2_CONDITIONS = ("nominal", "p02", "p06", "p09")
 GATE2_MODES = ("teleoperation", "fixed_blend", "cosine_blend")
 GATE2_TRIALS = tuple(range(5))
 GATE2_TASK_ID = 1
+GATE2_ORDERING_METHOD = "gate2_constrained_counterbalance_v1"
+GATE2_UNITS_PER_TRIAL = len(GATE2_CONDITIONS) * len(GATE2_MODES)
+GATE2_MODE_PAIRS = tuple(itertools.combinations(GATE2_MODES, 2))
+GATE2_MAX_ORDERING_ATTEMPTS = 10000
 GATE2_EXPECTED_MANIFEST: dict[str, Any] = {
     "schema_version": 3,
     "experiment_id": GATE2_EXPERIMENT_ID,
@@ -70,6 +76,224 @@ def validate_gate2_manifest(manifest: ExperimentManifest) -> None:
         )
 
 
+def _interleave_trial_round(
+    *,
+    mode_orders: dict[str, tuple[str, ...]],
+    previous_condition: str | None,
+    previous_mode: str | None,
+    previous_mode_run_length: int,
+    randomizer: random.Random,
+) -> list[tuple[str, str]] | None:
+    """Interleave four condition queues under Gate-2 run constraints."""
+
+    positions = {condition_id: 0 for condition_id in GATE2_CONDITIONS}
+    selected: list[tuple[str, str]] = []
+
+    def search(
+        last_condition: str | None,
+        last_mode: str | None,
+        mode_run_length: int,
+    ) -> bool:
+        if len(selected) == GATE2_UNITS_PER_TRIAL:
+            return True
+
+        candidates: list[tuple[str, str]] = []
+        for condition_id in GATE2_CONDITIONS:
+            position = positions[condition_id]
+            if position >= len(GATE2_MODES):
+                continue
+            if condition_id == last_condition:
+                continue
+            mode = mode_orders[condition_id][position]
+            if mode == last_mode and mode_run_length >= 2:
+                continue
+            candidates.append((condition_id, mode))
+
+        randomizer.shuffle(candidates)
+        for condition_id, mode in candidates:
+            positions[condition_id] += 1
+            selected.append((mode, condition_id))
+            next_run_length = (
+                mode_run_length + 1 if mode == last_mode else 1
+            )
+            if search(condition_id, mode, next_run_length):
+                return True
+            selected.pop()
+            positions[condition_id] -= 1
+
+        return False
+
+    if search(
+        previous_condition,
+        previous_mode,
+        previous_mode_run_length,
+    ):
+        return selected
+    return None
+
+
+def _gate2_order_cells(
+    manifest: ExperimentManifest,
+) -> list[tuple[int, str, str]]:
+    """Search deterministically for one constrained five-round ordering."""
+
+    randomizer = random.Random(manifest.ordering_seed)
+    mode_permutations = list(itertools.permutations(GATE2_MODES))
+
+    for _ in range(GATE2_MAX_ORDERING_ATTEMPTS):
+        orders_by_condition: dict[str, list[tuple[str, ...]]] = {}
+        for condition_id in GATE2_CONDITIONS:
+            candidates = list(mode_permutations)
+            randomizer.shuffle(candidates)
+            orders_by_condition[condition_id] = candidates[:5]
+
+        cells: list[tuple[int, str, str]] = []
+        previous_condition: str | None = None
+        previous_mode: str | None = None
+        previous_mode_run_length = 0
+        feasible = True
+
+        for trial_index in GATE2_TRIALS:
+            mode_orders = {
+                condition_id: orders_by_condition[condition_id][trial_index]
+                for condition_id in GATE2_CONDITIONS
+            }
+            trial_units = _interleave_trial_round(
+                mode_orders=mode_orders,
+                previous_condition=previous_condition,
+                previous_mode=previous_mode,
+                previous_mode_run_length=previous_mode_run_length,
+                randomizer=randomizer,
+            )
+            if trial_units is None:
+                feasible = False
+                break
+
+            for mode, condition_id in trial_units:
+                cells.append((trial_index, mode, condition_id))
+                if mode == previous_mode:
+                    previous_mode_run_length += 1
+                else:
+                    previous_mode = mode
+                    previous_mode_run_length = 1
+                previous_condition = condition_id
+
+        if feasible:
+            return cells
+
+    raise ValueError(
+        "Could not construct a Gate-2 schedule satisfying all ordering "
+        f"constraints after {GATE2_MAX_ORDERING_ATTEMPTS} attempts."
+    )
+
+
+def build_gate2_schedule(
+    *,
+    manifest: ExperimentManifest,
+    task_id: int,
+    output_root: Path,
+) -> dict[str, Any]:
+    """Build the Gate-2-specific constrained deterministic schedule."""
+
+    if (
+        manifest.conditions != GATE2_CONDITIONS
+        or manifest.modes != GATE2_MODES
+        or manifest.trials_per_condition != len(GATE2_TRIALS)
+    ):
+        raise ValueError(
+            "Gate-2 constrained ordering requires the fixed cells and trials."
+        )
+
+    schedule = build_schedule(
+        manifest=manifest,
+        task_id=task_id,
+        output_root=output_root,
+    )
+    episode_by_cell = {
+        (
+            int(episode["trial_index"]),
+            str(episode["mode"]),
+            str(episode["condition_id"]),
+        ): episode
+        for episode in schedule["episodes"]
+    }
+    ordered_episodes = []
+    for order_index, cell in enumerate(_gate2_order_cells(manifest)):
+        episode = episode_by_cell[cell]
+        episode["order_index"] = order_index
+        ordered_episodes.append(episode)
+
+    schedule["episodes"] = ordered_episodes
+    schedule["ordering_method"] = GATE2_ORDERING_METHOD
+    validate_gate2_schedule(schedule, manifest=manifest)
+    return schedule
+
+
+def _maximum_run(values: list[str]) -> int:
+    maximum = 0
+    current = 0
+    previous: str | None = None
+    for value in values:
+        current = current + 1 if value == previous else 1
+        maximum = max(maximum, current)
+        previous = value
+    return maximum
+
+
+def gate2_ordering_metrics(schedule: dict[str, Any]) -> dict[str, Any]:
+    """Summarize all Gate-2 ordering constraints for preflight."""
+
+    episodes = schedule["episodes"]
+    positions = {
+        (
+            str(episode["condition_id"]),
+            int(episode["trial_index"]),
+            str(episode["mode"]),
+        ): index
+        for index, episode in enumerate(episodes)
+    }
+    precedence: dict[str, dict[str, int]] = {}
+    for condition_id in GATE2_CONDITIONS:
+        condition_counts: dict[str, int] = {}
+        for first_mode, second_mode in GATE2_MODE_PAIRS:
+            count = sum(
+                positions[(condition_id, trial_index, first_mode)]
+                < positions[(condition_id, trial_index, second_mode)]
+                for trial_index in GATE2_TRIALS
+            )
+            condition_counts[
+                f"{first_mode}_before_{second_mode}"
+            ] = count
+        precedence[condition_id] = condition_counts
+
+    separations = []
+    for condition_id in GATE2_CONDITIONS:
+        for trial_index in GATE2_TRIALS:
+            identity_positions = sorted(
+                positions[(condition_id, trial_index, mode)]
+                for mode in GATE2_MODES
+            )
+            separations.extend(
+                second - first - 1
+                for first, second in zip(
+                    identity_positions,
+                    identity_positions[1:],
+                )
+            )
+
+    return {
+        "ordering_method": schedule.get("ordering_method"),
+        "maximum_same_mode_run_length": _maximum_run(
+            [str(episode["mode"]) for episode in episodes]
+        ),
+        "maximum_same_condition_run_length": _maximum_run(
+            [str(episode["condition_id"]) for episode in episodes]
+        ),
+        "minimum_same_identity_intervening_episodes": min(separations),
+        "pairwise_mode_precedence": precedence,
+    }
+
+
 def validate_gate2_schedule(
     schedule: dict[str, Any],
     *,
@@ -84,6 +308,11 @@ def validate_gate2_schedule(
     episode_ids = [str(episode["episode_id"]) for episode in episodes]
     if len(set(episode_ids)) != len(episode_ids):
         raise ValueError("Gate-2 schedule contains duplicate episode IDs.")
+    if schedule.get("ordering_method") != GATE2_ORDERING_METHOD:
+        raise ValueError(
+            "Gate-2 schedule ordering_method does not match the fixed "
+            "counterbalancing protocol."
+        )
 
     cells = [
         (
@@ -119,6 +348,33 @@ def validate_gate2_schedule(
             "Gate-2 schedule must contain 5 episodes per mode-condition."
         )
 
+    for trial_index in GATE2_TRIALS:
+        start = trial_index * GATE2_UNITS_PER_TRIAL
+        trial_episodes = episodes[
+            start:start + GATE2_UNITS_PER_TRIAL
+        ]
+        trial_units = {
+            (episode["mode"], episode["condition_id"])
+            for episode in trial_episodes
+        }
+        expected_units = {
+            (mode, condition_id)
+            for mode in GATE2_MODES
+            for condition_id in GATE2_CONDITIONS
+        }
+        if (
+            len(trial_episodes) != GATE2_UNITS_PER_TRIAL
+            or trial_units != expected_units
+            or {
+                int(episode["trial_index"])
+                for episode in trial_episodes
+            } != {trial_index}
+        ):
+            raise ValueError(
+                f"Gate-2 trial round {trial_index} must contain all 12 "
+                "mode-condition units exactly once."
+            )
+
     for condition_id in GATE2_CONDITIONS:
         for trial_index in GATE2_TRIALS:
             matched = [
@@ -142,6 +398,29 @@ def validate_gate2_schedule(
                 raise ValueError(
                     "Gate-2 policy seeds are not matched across modes."
                 )
+
+    metrics = gate2_ordering_metrics(schedule)
+    if metrics["maximum_same_condition_run_length"] > 1:
+        raise ValueError(
+            "Gate-2 schedule contains consecutive identical conditions."
+        )
+    if metrics["maximum_same_mode_run_length"] > 2:
+        raise ValueError(
+            "Gate-2 schedule contains a same-mode run longer than two."
+        )
+    if metrics["minimum_same_identity_intervening_episodes"] < 1:
+        raise ValueError(
+            "Gate-2 matched condition-trial modes must have at least one "
+            "intervening episode."
+        )
+    for condition_id, precedence in metrics[
+        "pairwise_mode_precedence"
+    ].items():
+        if any(count not in {2, 3} for count in precedence.values()):
+            raise ValueError(
+                "Gate-2 pairwise mode precedence must be 2/3 balanced "
+                f"for condition {condition_id}."
+            )
 
 
 def validate_gate2_protocol(
@@ -193,12 +472,12 @@ def validate_gate2_protocol(
             "physically validated calibration."
         )
 
-    schedule = build_schedule(
+    schedule = build_gate2_schedule(
         manifest=manifest,
         task_id=GATE2_TASK_ID,
         output_root=output_root,
     )
-    regenerated = build_schedule(
+    regenerated = build_gate2_schedule(
         manifest=manifest,
         task_id=GATE2_TASK_ID,
         output_root=output_root,

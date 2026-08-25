@@ -23,13 +23,18 @@ from saps.evaluation.gate2_protocol import GATE2_CONDITIONS
 from saps.evaluation.gate2_protocol import GATE2_EXPECTED_MANIFEST
 from saps.evaluation.gate2_protocol import GATE2_EXPERIMENT_ID
 from saps.evaluation.gate2_protocol import GATE2_MANIFEST_PATH
+from saps.evaluation.gate2_protocol import GATE2_ORDERING_METHOD
 from saps.evaluation.gate2_protocol import GATE2_MODES
 from saps.evaluation.gate2_protocol import GATE2_OUTPUT_ROOT
 from saps.evaluation.gate2_protocol import GATE2_PROFILE_PATH
 from saps.evaluation.gate2_protocol import GATE2_TRIALS
+from saps.evaluation.gate2_protocol import GATE2_UNITS_PER_TRIAL
+from saps.evaluation.gate2_protocol import build_gate2_schedule
+from saps.evaluation.gate2_protocol import gate2_ordering_metrics
 from saps.evaluation.gate2_protocol import validate_gate2_manifest
 from saps.evaluation.gate2_protocol import validate_gate2_protocol
 from saps.human_input.spacemouse_profile import load_spacemouse_profile
+from saps.policies.seeding import make_policy_episode_seed
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -42,30 +47,6 @@ assert RUNNER_SPEC is not None and RUNNER_SPEC.loader is not None
 operator_runner = importlib.util.module_from_spec(RUNNER_SPEC)
 sys.modules[RUNNER_SPEC.name] = operator_runner
 RUNNER_SPEC.loader.exec_module(operator_runner)
-
-AUTONOMOUS_GATE2_SEEDS = {
-    ("nominal", 0): 1594108130,
-    ("nominal", 1): 252540981,
-    ("nominal", 2): 846374469,
-    ("nominal", 3): 1367343007,
-    ("nominal", 4): 1611811172,
-    ("p02", 0): 1805589632,
-    ("p02", 1): 1280121721,
-    ("p02", 2): 762959635,
-    ("p02", 3): 1694273979,
-    ("p02", 4): 1327508485,
-    ("p06", 0): 531065419,
-    ("p06", 1): 1630501309,
-    ("p06", 2): 328150321,
-    ("p06", 3): 427257404,
-    ("p06", 4): 1893540928,
-    ("p09", 0): 820753697,
-    ("p09", 1): 279031833,
-    ("p09", 2): 842708994,
-    ("p09", 3): 409407624,
-    ("p09", 4): 185183832,
-}
-
 
 def make_contract_args(target: str) -> list[str]:
     """Return parsed SAPS runtime arguments from a Make dry run."""
@@ -117,7 +98,7 @@ class Gate2ProtocolTest(unittest.TestCase):
         self.assertEqual(self.manifest.fixed_autonomy_weight, 0.5)
         self.assertEqual(self.manifest.cosine_gain, 6.0)
 
-    def test_schedule_has_exact_coverage_and_historical_seeds(self) -> None:
+    def test_schedule_has_exact_coverage_and_matched_seeds(self) -> None:
         result = self.validate()
         schedule = result["schedule"]
         assert isinstance(schedule, dict)
@@ -150,41 +131,163 @@ class Gate2ProtocolTest(unittest.TestCase):
         episode_ids = [episode["episode_id"] for episode in episodes]
         self.assertEqual(len(episode_ids), len(set(episode_ids)))
 
-        for identity, autonomous_seed in AUTONOMOUS_GATE2_SEEDS.items():
-            condition_id, trial_index = identity
-            matched = [
-                episode
-                for episode in episodes
-                if episode["condition_id"] == condition_id
-                and episode["trial_index"] == trial_index
-            ]
-            self.assertEqual(
-                {episode["mode"] for episode in matched},
-                set(GATE2_MODES),
-            )
-            self.assertEqual(
-                {episode["policy_episode_seed"] for episode in matched},
-                {autonomous_seed},
-            )
+        for condition_id in GATE2_CONDITIONS:
+            for trial_index in GATE2_TRIALS:
+                matched = [
+                    episode
+                    for episode in episodes
+                    if episode["condition_id"] == condition_id
+                    and episode["trial_index"] == trial_index
+                ]
+                expected_seed = make_policy_episode_seed(
+                    base_seed=self.manifest.policy_base_seed,
+                    condition_id=condition_id,
+                    trial_index=trial_index,
+                    task_id=1,
+                    initial_state_index=self.manifest.initial_state_index,
+                )
+                self.assertEqual(
+                    {episode["mode"] for episode in matched},
+                    set(GATE2_MODES),
+                )
+                self.assertEqual(
+                    {
+                        episode["policy_episode_seed"]
+                        for episode in matched
+                    },
+                    {expected_seed},
+                )
 
-    def test_schedule_regeneration_is_deterministic(self) -> None:
-        first = build_schedule(
+    def test_constrained_schedule_is_deterministic_and_seeded(self) -> None:
+        first = build_gate2_schedule(
             manifest=self.manifest,
             task_id=1,
             output_root=Path(GATE2_OUTPUT_ROOT),
         )
-        second = build_schedule(
+        second = build_gate2_schedule(
             manifest=self.manifest,
             task_id=1,
             output_root=Path(GATE2_OUTPUT_ROOT),
         )
         self.assertEqual(first, second)
-        units_per_trial = len(GATE2_MODES) * len(GATE2_CONDITIONS)
-        starts = [
-            first["episodes"][trial * units_per_trial]["episode_id"]
-            for trial in GATE2_TRIALS
+        changed_manifest = dataclasses.replace(
+            self.manifest,
+            ordering_seed=self.manifest.ordering_seed + 1,
+        )
+        changed = build_gate2_schedule(
+            manifest=changed_manifest,
+            task_id=1,
+            output_root=Path(GATE2_OUTPUT_ROOT),
+        )
+        first_order = [
+            (episode["mode"], episode["condition_id"])
+            for episode in first["episodes"]
         ]
-        self.assertEqual(len(starts), len(set(starts)))
+        changed_order = [
+            (episode["mode"], episode["condition_id"])
+            for episode in changed["episodes"]
+        ]
+        self.assertNotEqual(first_order, changed_order)
+        self.assertEqual(
+            {
+                (
+                    episode["mode"],
+                    episode["condition_id"],
+                    episode["trial_index"],
+                    episode["policy_episode_seed"],
+                )
+                for episode in first["episodes"]
+            },
+            {
+                (
+                    episode["mode"],
+                    episode["condition_id"],
+                    episode["trial_index"],
+                    episode["policy_episode_seed"],
+                )
+                for episode in changed["episodes"]
+            },
+        )
+
+    def test_each_trial_round_contains_all_twelve_units(self) -> None:
+        episodes = self.validate()["schedule"]["episodes"]
+        for trial_index in GATE2_TRIALS:
+            start = trial_index * GATE2_UNITS_PER_TRIAL
+            trial_episodes = episodes[
+                start:start + GATE2_UNITS_PER_TRIAL
+            ]
+            self.assertEqual(
+                {episode["trial_index"] for episode in trial_episodes},
+                {trial_index},
+            )
+            self.assertEqual(
+                Counter(episode["mode"] for episode in trial_episodes),
+                {mode: 4 for mode in GATE2_MODES},
+            )
+            self.assertEqual(
+                Counter(
+                    episode["condition_id"] for episode in trial_episodes
+                ),
+                {condition_id: 3 for condition_id in GATE2_CONDITIONS},
+            )
+            self.assertEqual(
+                {
+                    (episode["mode"], episode["condition_id"])
+                    for episode in trial_episodes
+                },
+                {
+                    (mode, condition_id)
+                    for mode in GATE2_MODES
+                    for condition_id in GATE2_CONDITIONS
+                },
+            )
+
+    def test_all_ordering_constraints_are_satisfied(self) -> None:
+        schedule = self.validate()["schedule"]
+        ordering = gate2_ordering_metrics(schedule)
+        self.assertEqual(
+            schedule["ordering_method"],
+            GATE2_ORDERING_METHOD,
+        )
+        self.assertEqual(ordering["ordering_method"], GATE2_ORDERING_METHOD)
+        self.assertEqual(ordering["maximum_same_condition_run_length"], 1)
+        self.assertLessEqual(ordering["maximum_same_mode_run_length"], 2)
+        self.assertGreaterEqual(
+            ordering["minimum_same_identity_intervening_episodes"],
+            1,
+        )
+        for precedence in ordering["pairwise_mode_precedence"].values():
+            self.assertTrue(
+                all(count in {2, 3} for count in precedence.values())
+            )
+
+    def test_legacy_scheduler_retains_previous_cyclic_order(self) -> None:
+        legacy = build_schedule(
+            manifest=self.manifest,
+            task_id=1,
+            output_root=Path(GATE2_OUTPUT_ROOT),
+        )
+        self.assertNotIn("ordering_method", legacy)
+        self.assertEqual(
+            [
+                (episode["mode"], episode["condition_id"])
+                for episode in legacy["episodes"][:12]
+            ],
+            [
+                ("cosine_blend", "p06"),
+                ("cosine_blend", "p02"),
+                ("teleoperation", "p09"),
+                ("cosine_blend", "p09"),
+                ("cosine_blend", "nominal"),
+                ("teleoperation", "nominal"),
+                ("fixed_blend", "p09"),
+                ("fixed_blend", "p06"),
+                ("fixed_blend", "p02"),
+                ("teleoperation", "p06"),
+                ("fixed_blend", "nominal"),
+                ("teleoperation", "p02"),
+            ],
+        )
 
     def test_gate2_rejects_protocol_and_input_drift(self) -> None:
         changed = dataclasses.replace(
@@ -280,12 +383,52 @@ class Gate2ProtocolTest(unittest.TestCase):
 
 
 class Gate2ResumeAndMakeContractTest(unittest.TestCase):
+    def test_preflight_and_session_use_the_same_gate2_order(self) -> None:
+        manifest = load_manifest(REPOSITORY_ROOT / GATE2_MANIFEST_PATH)
+        preflight = validate_gate2_protocol(
+            manifest=manifest,
+            input_source="spacemouse",
+            spacemouse_profile_path=GATE2_PROFILE_PATH,
+            spacemouse_device_path="/dev/input/by-id/test-device",
+            output_root=Path(GATE2_OUTPUT_ROOT),
+        )["schedule"]
+
+        with tempfile.TemporaryDirectory() as directory:
+            _, session = operator_runner._initialize_experiment(
+                manifest_path=REPOSITORY_ROOT / GATE2_MANIFEST_PATH,
+                output_root=Path(directory) / "session",
+                required_protocol_id=GATE2_EXPERIMENT_ID,
+            )
+
+        def ordering_identity(schedule: dict[str, object]) -> tuple:
+            episodes = schedule["episodes"]
+            assert isinstance(episodes, list)
+            return (
+                schedule["ordering_method"],
+                tuple(
+                    (
+                        episode["order_index"],
+                        episode["mode"],
+                        episode["condition_id"],
+                        episode["trial_index"],
+                        episode["policy_episode_seed"],
+                    )
+                    for episode in episodes
+                ),
+            )
+
+        self.assertEqual(
+            ordering_identity(preflight),
+            ordering_identity(session),
+        )
+
     def test_resume_preserves_state_and_rejects_schedule_drift(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             output_root = Path(directory) / "session"
             manifest, schedule = operator_runner._initialize_experiment(
                 manifest_path=REPOSITORY_ROOT / GATE2_MANIFEST_PATH,
                 output_root=output_root,
+                required_protocol_id=GATE2_EXPERIMENT_ID,
             )
             schedule["episodes"][0]["status"] = "completed"
             schedule["episodes"][0]["attempt_count"] = 1
@@ -297,16 +440,18 @@ class Gate2ResumeAndMakeContractTest(unittest.TestCase):
             _, resumed = operator_runner._initialize_experiment(
                 manifest_path=REPOSITORY_ROOT / GATE2_MANIFEST_PATH,
                 output_root=output_root,
+                required_protocol_id=GATE2_EXPERIMENT_ID,
             )
             self.assertEqual(resumed, schedule)
             self.assertEqual(manifest.experiment_id, GATE2_EXPERIMENT_ID)
 
-            schedule["episodes"][0]["mode"] = "takeover"
+            schedule["ordering_method"] = "changed_ordering_method"
             write_json_atomic(output_root / "schedule.json", schedule)
-            with self.assertRaisesRegex(ValueError, "immutable field"):
+            with self.assertRaisesRegex(ValueError, "ordering_method"):
                 operator_runner._initialize_experiment(
                     manifest_path=REPOSITORY_ROOT / GATE2_MANIFEST_PATH,
                     output_root=output_root,
+                    required_protocol_id=GATE2_EXPERIMENT_ID,
                 )
 
     def test_perturbation_provenance_rejects_changed_config(self) -> None:

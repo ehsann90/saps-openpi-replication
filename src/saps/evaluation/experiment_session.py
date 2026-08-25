@@ -336,6 +336,15 @@ def validate_schedule_identity(
                 "deterministically regenerated schedule."
             )
 
+    if (
+        "ordering_method" in expected
+        and stored.get("ordering_method") != expected["ordering_method"]
+    ):
+        raise ValueError(
+            "Stored schedule field 'ordering_method' does not match the "
+            "deterministically regenerated schedule."
+        )
+
     stored_episodes = stored.get("episodes")
     expected_episodes = expected.get("episodes")
     if not isinstance(stored_episodes, list):

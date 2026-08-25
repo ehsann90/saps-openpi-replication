@@ -34,9 +34,10 @@ The unit suite covers:
   masks, safe live apply/reset/save behavior, and normal-runner defaults.
 - manifest-session profile propagation, immutable profile provenance, resume
   protection, and Make-to-runner argument contracts.
-- exact Gate-2 manifest and 60-cell coverage, deterministic counterbalancing,
-  historical autonomous-seed matching, protocol/profile rejection, immutable
-  resume state, and Gate-2 Make-to-CLI contracts.
+- exact Gate-2 manifest and 60-cell coverage, constrained deterministic
+  counterbalancing, mode-independent matched-seed derivation, trial-round and
+  ordering constraints, unchanged legacy scheduling, protocol/profile
+  rejection, immutable resume state, and Gate-2 Make-to-CLI contracts.
 
 Do not rely on a hard-coded expected test count. New regression tests should
 increase the count while every test still reports `ok`.

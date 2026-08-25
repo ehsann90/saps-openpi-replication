@@ -22,6 +22,7 @@ from saps.evaluation.experiment_session import validate_schedule_identity
 from saps.evaluation.experiment_session import validate_summary
 from saps.evaluation.experiment_session import write_json_atomic
 from saps.evaluation.gate2_protocol import GATE2_EXPERIMENT_ID
+from saps.evaluation.gate2_protocol import build_gate2_schedule
 from saps.evaluation.gate2_protocol import validate_gate2_protocol
 from saps.human_input.spacemouse import parse_axis_mapping
 from saps.human_input.spacemouse import parse_axis_maxima
@@ -80,6 +81,7 @@ def _initialize_experiment(
     *,
     manifest_path: Path,
     output_root: Path,
+    required_protocol_id: str = "",
 ) -> tuple[Any, dict[str, Any]]:
     """Freeze the manifest and create or load its schedule."""
 
@@ -112,7 +114,12 @@ def _initialize_experiment(
             f"Manifest contains unknown conditions: {sorted(unknown)}"
         )
 
-    expected_schedule = build_schedule(
+    schedule_builder = (
+        build_gate2_schedule
+        if required_protocol_id == GATE2_EXPERIMENT_ID
+        else build_schedule
+    )
+    expected_schedule = schedule_builder(
         manifest=manifest,
         task_id=int(task_config["task_id"]),
         output_root=output_root,
@@ -404,6 +411,7 @@ def main(args: Args) -> None:
     manifest, schedule = _initialize_experiment(
         manifest_path=Path(args.manifest_path),
         output_root=output_root,
+        required_protocol_id=required_protocol_id,
     )
     perturbation_configuration = json_file_identity(
         Path(manifest.config_path)
