@@ -123,3 +123,19 @@ The analyzer should fail loudly or produce a blocking validation report for:
 - non-monotonic replan indices;
 - incomplete operator metadata;
 - output directories inconsistent with summaries.
+
+## 8. Gate-2 pilot analyzer
+
+Gate 2 uses a dedicated read-only analyzer because it requires frozen 60-row
+denominators, selected-redo semantics, fixed/cosine arbitration diagnostics,
+policy-wait reconstruction, SpaceMouse-profile validation, and exact autonomous
+pairing:
+
+```bash
+make gate2-analysis
+```
+
+See [`gate2_operator_pilot.md`](gate2_operator_pilot.md) for the artifact list,
+predeclared numerical thresholds, incomplete-collection behavior, and
+descriptive interpretation limits. The general comparison analyzer is not a
+substitute for this readiness command.

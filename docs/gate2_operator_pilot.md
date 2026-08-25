@@ -135,5 +135,72 @@ manifest itself freezes the blending parameters, frequency, horizon, seeds,
 ordering seed, and ordering-method identifier. Resume rejects immutable
 schedule drift or changed provenance instead of mixing runs.
 
+## Descriptive analysis and readiness
+
+After collection has started, generate the dedicated Gate-2 artifacts with:
+
+```bash
+make gate2-analysis
+```
+
+Override `GATE2_AUTONOMOUS_RESULTS` to point at the autonomous collection that
+should be considered for exact matching, and `GATE2_ANALYSIS_OUTPUT` to select a
+different derived-output directory. The command reads raw session outputs but
+does not modify them or launch an episode.
+
+The analyzer always retains all 60 scheduled Gate-2 episodes in
+`episode_metrics.csv`, including rows without a selected valid attempt. Mode and
+condition-mode summaries distinguish scheduled coverage, observed failures, and
+not-yet-analyzable episodes. Failed selected episodes remain in observed success
+denominators. A timeout is assigned the complete `280 / 20 = 14.0` seconds of
+simulated duration.
+
+Human-active duration and correction segments use executed control steps whose
+six-dimensional human-motion norm exceeds the existing SAPS activity threshold
+of `1e-3`. Duration is therefore simulated active-step time; activity observed
+while simulation is paused for policy inference is reported separately as
+policy-wait overlap.
+
+The generated artifacts are:
+
+```text
+episode_metrics.csv
+mode_summary.csv
+condition_mode_summary.csv
+matched_autonomous_comparisons.csv
+fixed_blend_diagnostics.csv
+cosine_blend_diagnostics.csv
+policy_wait_summary.csv
+validation_report.json
+REPORT.md
+plots/
+```
+
+Autonomous comparison requires an exact match on condition, trial, initial
+state, and policy episode seed. Near matches are not substituted. Recovery for
+`p06` and `p09` is reported as descriptive matched counts without defining an
+arbitrary success threshold.
+
+The cosine-weight thresholds were fixed before Gate-2 collection: near zero is
+`alpha <= 0.10`, near one is `alpha >= 0.90`, intermediate is the open interval
+between them, and a consecutive human-active weight change is material when
+`|delta alpha| >= 0.05`. The diagnostic reports count, undefined count, mean,
+median, sample SD, range, p10/p25/p75/p90, all three region fractions, and the
+material-change fraction. Fixed blending is checked against `alpha = 0.5` with
+an absolute tolerance of `1e-9`.
+
+Policy-wait duration is reported both as logged wait ticks divided by 20 Hz and
+from wait-event wall timestamps. Wait fraction is wait ticks divided by wait
+plus executed scheduler ticks. Event count, inference latency, wall/simulation
+ratio, and human-active wait overlap remain separate fields.
+
+`validation_report.json` blocks readiness for schedule/summary seed drift,
+multiple selected attempts, profile mismatch, malformed actions, missing wait
+logs, fixed-weight deviations, and duplicate autonomous identities. Incomplete
+coverage is reported as a warning rather than silently converted into failure.
+
+Gate 2 has only five repetitions per mode-condition. Its report is descriptive
+pilot evidence and does not center significance testing.
+
 Do not commit generated Gate-2 outputs. Gate-2 analysis is intentionally outside
-the scope of this protocol implementation.
+the raw collection protocol and must remain reproducible from frozen outputs.

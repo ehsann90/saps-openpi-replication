@@ -39,6 +39,8 @@ SCENE_OUTPUT ?= outputs/scene_inspection
 PREVIEW_OUTPUT ?= outputs/perturbation_preview
 ANALYSIS_OUTPUT ?= results/analysis
 COMPARISON_OUTPUT ?= results/saps_libero_current
+GATE2_ANALYSIS_OUTPUT ?= results/gate2_operator_pilot_v1
+GATE2_AUTONOMOUS_RESULTS ?= outputs/autonomous_deterministic_n20_state0_v1
 AUTONOMOUS_RESULTS ?= outputs/autonomous_deterministic_n20_state0_v1
 TELEOP_RESULTS ?= outputs/saps_libero_teleoperation_v2
 SHARED_RESULTS ?= outputs/saps_libero_shared_autonomy_v2
@@ -74,6 +76,7 @@ help:
 	@echo "  make shared-autonomy-session"
 	@echo "  make gate2-preflight SPACEMOUSE_DEVICE=/dev/input/by-id/..."
 	@echo "  make gate2-session SPACEMOUSE_DEVICE=/dev/input/by-id/..."
+	@echo "  make gate2-analysis"
 	@echo
 	@echo "Tests:"
 	@echo "  make check"
@@ -95,6 +98,7 @@ help:
 	@echo "  NUM_TRIALS, TELEOP_MAX_STEPS, AUTONOMOUS_MAX_STEPS, SPEED_MODE"
 	@echo "  INPUT_SOURCE, SPACEMOUSE_DEVICE, SPACEMOUSE_PROFILE"
 	@echo "  TELEOP_OUTPUT, AUTONOMOUS_OUTPUT, SHARED_OUTPUT"
+	@echo "  GATE2_ANALYSIS_OUTPUT, GATE2_AUTONOMOUS_RESULTS"
 	@echo "  FIXED_AUTONOMY_WEIGHT, COSINE_GAIN"
 
 .PHONY: apply-patch
@@ -161,6 +165,13 @@ gate2-session:
 	$(COMPOSE) run --rm --no-deps \
 		-e SAPS_SCRIPT=/workspace/scripts/run_operator_experiment.py \
 		-e SAPS_RUNTIME_ARGS="--manifest-path $(GATE2_MANIFEST) --repository-commit $(REPOSITORY_COMMIT) --output-dir $(GATE2_OUTPUT) --required-protocol-id $(GATE2_EXPERIMENT_ID) --input-source spacemouse --spacemouse-device-path $(SPACEMOUSE_DEVICE) --spacemouse-profile-path $(GATE2_PROFILE) $(REDO_EPISODES_ARG)" \
+		runtime
+
+.PHONY: gate2-analysis
+gate2-analysis:
+	$(COMPOSE) run --rm --no-deps \
+		-e SAPS_SCRIPT=/workspace/scripts/analyze_gate2_operator_pilot.py \
+		-e SAPS_RUNTIME_ARGS="--session-root $(GATE2_OUTPUT) --autonomous-root $(GATE2_AUTONOMOUS_RESULTS) --output-dir $(GATE2_ANALYSIS_OUTPUT)" \
 		runtime
 
 .PHONY: teleop
