@@ -3,15 +3,38 @@
 from __future__ import annotations
 
 import ast
+import importlib.util
 from pathlib import Path
 import re
 import shlex
 import subprocess
+import sys
+import tempfile
 import unittest
+
+from saps.human_input.spacemouse_profile import load_spacemouse_profile
+from saps.human_input.spacemouse_profile import save_spacemouse_profile
+
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
+DIAGNOSTIC_PATH = (
+    REPOSITORY_ROOT
+    / "tools"
+    / "diagnostics"
+    / "inspect_spacemouse_input.py"
+)
+DIAGNOSTIC_SPEC = importlib.util.spec_from_file_location(
+    "saps_spacemouse_diagnostic",
+    DIAGNOSTIC_PATH,
+)
+assert DIAGNOSTIC_SPEC is not None and DIAGNOSTIC_SPEC.loader is not None
+spacemouse_diagnostic = importlib.util.module_from_spec(DIAGNOSTIC_SPEC)
+sys.modules[DIAGNOSTIC_SPEC.name] = spacemouse_diagnostic
+DIAGNOSTIC_SPEC.loader.exec_module(spacemouse_diagnostic)
+
 
 class SpaceMouseDiagnosticContractTest(unittest.TestCase):
     def test_make_arguments_exist_in_diagnostic_parser(self) -> None:
-        repository_root = Path(__file__).resolve().parents[2]
         result = subprocess.run(
             [
                 "make",
@@ -23,7 +46,7 @@ class SpaceMouseDiagnosticContractTest(unittest.TestCase):
                     "event-joystick"
                 ),
             ],
-            cwd=repository_root,
+            cwd=REPOSITORY_ROOT,
             check=True,
             capture_output=True,
             text=True,
@@ -39,14 +62,8 @@ class SpaceMouseDiagnosticContractTest(unittest.TestCase):
             for token in tokens
             if token.startswith("--")
         }
-        diagnostic_path = (
-            repository_root
-            / "tools"
-            / "diagnostics"
-            / "inspect_spacemouse_input.py"
-        )
         module = ast.parse(
-            diagnostic_path.read_text(encoding="utf-8")
+            DIAGNOSTIC_PATH.read_text(encoding="utf-8")
         )
         args_class = next(
             node
@@ -64,21 +81,12 @@ class SpaceMouseDiagnosticContractTest(unittest.TestCase):
             passed_options,
             {
                 "device_path",
-                "translation_gain",
-                "rotation_gain",
-                "deadzone",
-                "axis_mapping",
-                "axis_signs",
-                "axis_maxima",
-                "stale_input_timeout_seconds",
-                "open_button",
-                "close_button",
+                "profile_path",
                 "refresh_frequency_hz",
             },
         )
 
     def test_calibration_make_arguments_exist_in_parser(self) -> None:
-        repository_root = Path(__file__).resolve().parents[2]
         device_path = (
             "/dev/input/by-id/"
             "usb-3Dconnexion_SpaceMouse_Wireless-event-joystick"
@@ -90,7 +98,7 @@ class SpaceMouseDiagnosticContractTest(unittest.TestCase):
                 "spacemouse-calibrate",
                 f"SPACEMOUSE_DEVICE={device_path}",
             ],
-            cwd=repository_root,
+            cwd=REPOSITORY_ROOT,
             check=True,
             capture_output=True,
             text=True,
@@ -107,7 +115,7 @@ class SpaceMouseDiagnosticContractTest(unittest.TestCase):
             if token.startswith("--")
         }
         calibration_path = (
-            repository_root
+            REPOSITORY_ROOT
             / "scripts"
             / "run_spacemouse_calibration.py"
         )
@@ -131,14 +139,31 @@ class SpaceMouseDiagnosticContractTest(unittest.TestCase):
             {
                 "device_path",
                 "profile_path",
-                "translation_gain",
-                "rotation_gain",
-                "deadzone",
-                "stale_input_timeout_seconds",
-                "open_button",
-                "close_button",
             },
         )
+
+    def test_diagnostic_profile_overrides_raw_fallback_values(self) -> None:
+        calibrated = load_spacemouse_profile(
+            REPOSITORY_ROOT / "configs" / "spacemouse_profile.json"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            profile_path = Path(directory) / "profile.json"
+            save_spacemouse_profile(profile_path, calibrated)
+            config = spacemouse_diagnostic.make_config(
+                spacemouse_diagnostic.Args(
+                    device_path="/dev/input/by-id/test-device",
+                    profile_path=str(profile_path),
+                    translation_gain=0.99,
+                    rotation_gain=0.99,
+                    axis_signs="1,1,1,1,1,1",
+                )
+            )
+
+        self.assertEqual(config.device_path, "/dev/input/by-id/test-device")
+        self.assertEqual(config.translation_gain, 0.3)
+        self.assertEqual(config.rotation_gain, 0.08)
+        self.assertEqual(config.axis_mapping, calibrated.axis_mapping)
+        self.assertEqual(config.axis_signs, calibrated.axis_signs)
 
 
 if __name__ == "__main__":

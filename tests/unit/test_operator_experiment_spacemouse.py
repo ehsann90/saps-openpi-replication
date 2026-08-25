@@ -322,7 +322,7 @@ class OperatorExperimentSpaceMouseTest(unittest.TestCase):
 
 
 class OperatorSessionMakeContractTest(unittest.TestCase):
-    def test_make_passes_profile_option_known_to_session_parser(self) -> None:
+    def test_make_defaults_profile_only_for_spacemouse_sessions(self) -> None:
         profile_path = "configs/spacemouse_profile.json"
         result = subprocess.run(
             [
@@ -330,7 +330,6 @@ class OperatorSessionMakeContractTest(unittest.TestCase):
                 "-n",
                 "operator-session",
                 "INPUT_SOURCE=spacemouse",
-                f"SPACEMOUSE_PROFILE={profile_path}",
                 "SPACEMOUSE_DEVICE=/dev/input/by-id/test-device",
             ],
             cwd=REPOSITORY_ROOT,
@@ -346,6 +345,29 @@ class OperatorSessionMakeContractTest(unittest.TestCase):
             command_value(tokens, "--spacemouse-profile-path"),
             profile_path,
         )
+
+        keyboard_result = subprocess.run(
+            [
+                "make",
+                "-n",
+                "operator-session",
+                "INPUT_SOURCE=keyboard",
+                "SPACEMOUSE_DEVICE=/dev/input/by-id/unused-device",
+            ],
+            cwd=REPOSITORY_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        keyboard_match = re.search(
+            r'SAPS_RUNTIME_ARGS="([^"]*)"',
+            keyboard_result.stdout,
+        )
+        self.assertIsNotNone(keyboard_match)
+        assert keyboard_match is not None
+        keyboard_tokens = shlex.split(keyboard_match.group(1))
+        self.assertNotIn("--spacemouse-profile-path", keyboard_tokens)
+        self.assertNotIn("--spacemouse-device-path", keyboard_tokens)
 
         module = ast.parse(
             (
@@ -366,6 +388,45 @@ class OperatorSessionMakeContractTest(unittest.TestCase):
             and isinstance(node.target, ast.Name)
         }
         self.assertIn("spacemouse_profile_path", parser_fields)
+
+    def test_make_application_targets_do_not_rebuild_profile(self) -> None:
+        for target in ("teleop", "takeover", "fixed-blend", "cosine-blend"):
+            with self.subTest(target=target):
+                result = subprocess.run(
+                    [
+                        "make",
+                        "-n",
+                        target,
+                        "INPUT_SOURCE=spacemouse",
+                    ],
+                    cwd=REPOSITORY_ROOT,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+                match = re.search(
+                    r'SAPS_RUNTIME_ARGS="([^"]*)"',
+                    result.stdout,
+                )
+                self.assertIsNotNone(match)
+                assert match is not None
+                tokens = shlex.split(match.group(1))
+                self.assertEqual(
+                    command_value(tokens, "--spacemouse-profile-path"),
+                    "configs/spacemouse_profile.json",
+                )
+                for raw_option in (
+                    "--translation-gain",
+                    "--rotation-gain",
+                    "--spacemouse-deadzone",
+                    "--spacemouse-axis-mapping",
+                    "--spacemouse-axis-signs",
+                    "--spacemouse-axis-maxima",
+                    "--spacemouse-stale-input-timeout-seconds",
+                    "--spacemouse-open-button",
+                    "--spacemouse-close-button",
+                ):
+                    self.assertNotIn(raw_option, tokens)
 
 
 if __name__ == "__main__":

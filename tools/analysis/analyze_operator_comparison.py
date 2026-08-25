@@ -47,9 +47,9 @@ class Args:
     autonomous_root: str = (
         "outputs/autonomous_deterministic_n20_state0_v1"
     )
-    teleoperation_root: str = "outputs/saps_libero_teleoperation_v1"
+    teleoperation_root: str = "outputs/saps_libero_teleoperation_v2"
     shared_autonomy_root: str = (
-        "outputs/saps_libero_shared_autonomy_v1"
+        "outputs/saps_libero_shared_autonomy_v2"
     )
     output_dir: str = "results/saps_libero_current"
     control_frequency_hz: float = 20.0

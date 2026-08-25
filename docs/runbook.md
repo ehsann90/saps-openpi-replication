@@ -42,6 +42,8 @@ Not required for:
 
 ```text
 make operator-smoke
+make spacemouse-diagnostic
+make spacemouse-calibrate
 make teleop
 ```
 
@@ -51,15 +53,9 @@ make teleop
 make help
 ```
 
-CLI-specific help:
-
-```bash
-make help-operator
-make help-probe
-make help-teleop
-make help-autonomous
-make help-shared-autonomy
-```
+The compact help lists the supported Make entry points and their common
+overrides. Python entry points also expose `--help` when invoked directly in the
+validated runtime container.
 
 ## 4. Automated checks
 
@@ -88,6 +84,13 @@ make scene-inspect
 make perturbation-preview DX=0.10 DY=0.08 LABEL=p02
 ```
 
+Both SpaceMouse targets load `configs/spacemouse_profile.json` by default. Set
+`SPACEMOUSE_PROFILE=<path>` to inspect or edit another validated profile. For
+the diagnostic only, `SPACEMOUSE_PROFILE=` intentionally selects the
+unprofiled raw/default settings. Fresh calibration without loading an existing
+profile is available from the Python runner's `--no-load-existing-profile`
+option.
+
 ## 6. Autonomous execution
 
 Single-condition smoke test:
@@ -113,23 +116,37 @@ Selected conditions:
 
 ```bash
 make autonomous-sweep \
-  CONDITION_IDS="p02 p03" \
+  CONDITION_IDS=p02,p03 \
   NUM_TRIALS=5 \
   AUTONOMOUS_OUTPUT=outputs/autonomous_selected
 ```
 
-## 7. Pure teleoperation
+## 7. Human input selection
+
+Keyboard is the default input. For SpaceMouse operation, add
+`INPUT_SOURCE=spacemouse` to the Make invocation. The optional
+`SPACEMOUSE_DEVICE=/dev/input/by-id/...-event-joystick` override selects a
+specific device when auto-discovery is not sufficient. All normal and formal
+Make targets automatically use the committed
+`configs/spacemouse_profile.json`; override `SPACEMOUSE_PROFILE` only when a
+different validated profile is intentionally required.
+
+## 8. Pure teleoperation
 
 Formal 20-trial operator schedule (280 steps, 14 simulated seconds):
 
 ```bash
-make teleoperation-session
+make teleoperation-session \
+  INPUT_SOURCE=spacemouse \
+  SPACEMOUSE_DEVICE=/dev/input/by-id/usb-3Dconnexion_SpaceMouse_Wireless-event-joystick
 ```
 
 Single-episode development run:
 
 ```bash
 make teleop \
+  INPUT_SOURCE=spacemouse \
+  SPACEMOUSE_DEVICE=/dev/input/by-id/usb-3Dconnexion_SpaceMouse_Wireless-event-joystick \
   CONDITION=nominal \
   TRIAL=0 \
   INITIAL_STATE=0 \
@@ -138,12 +155,16 @@ make teleop \
   TELEOP_OUTPUT=outputs/teleoperation_smoke
 ```
 
-## 8. Shared autonomy
+Omit the two SpaceMouse overrides to run with the keyboard.
+
+## 9. Shared autonomy
 
 Formal shared-autonomy schedule (280 steps, 14 simulated seconds):
 
 ```bash
-make shared-autonomy-session
+make shared-autonomy-session \
+  INPUT_SOURCE=spacemouse \
+  SPACEMOUSE_DEVICE=/dev/input/by-id/usb-3Dconnexion_SpaceMouse_Wireless-event-joystick
 ```
 
 Redo a completed attempt while preserving its history:
@@ -154,7 +175,8 @@ make shared-autonomy-session \
 ```
 
 The commands below are single-episode development runs and may use a longer
-horizon.
+horizon. They use keyboard input unless the SpaceMouse overrides from the
+previous section are supplied.
 
 Hard takeover:
 
@@ -195,7 +217,7 @@ The underlying shared-autonomy Python runner still accepts
 `--arbitration-mode autonomous` for programmatic experiment orchestration. For
 manual autonomous runs, use `make autonomous-smoke` or `make autonomous-sweep`.
 
-## 9. Browser controls
+## 10. Browser controls
 
 | Key | Command |
 |---|---|
@@ -212,7 +234,7 @@ manual autonomous runs, use `make autonomous-smoke` or `make autonomous-sweep`.
 Click **Arm controls** before using the keyboard. Losing browser focus clears
 pressed keys.
 
-## 10. Common variables
+## 11. Common variables
 
 | Variable | Default | Meaning |
 |---|---:|---|
@@ -222,14 +244,17 @@ pressed keys.
 | `INITIAL_STATE` | `0` | LIBERO initial-state index |
 | `ENVIRONMENT_SEED` | `7` | LIBERO environment seed |
 | `POLICY_BASE_SEED` | `20260724` | Deterministic policy seed base |
-| `SPEED_MODE` | `fine` | Initial operator gain profile |
+| `INPUT_SOURCE` | `keyboard` | `keyboard` or `spacemouse` |
+| `SPACEMOUSE_DEVICE` | empty | Optional stable runtime device path |
+| `SPACEMOUSE_PROFILE` | `configs/spacemouse_profile.json` | Validated calibration profile |
+| `SPEED_MODE` | `fine` | Initial keyboard gain profile |
 | `AUTONOMOUS_MAX_STEPS` | `280` | Autonomous horizon |
 | `TELEOP_MAX_STEPS` | `1800` | Teleoperation horizon |
 | `SHARED_MAX_STEPS` | `1200` | Shared-autonomy horizon |
 | `FIXED_AUTONOMY_WEIGHT` | `0.5` | Active-human fixed blend weight |
 | `COSINE_GAIN` | `6.0` | Logistic cosine gain |
 
-## 11. Current analysis tool
+## 12. Current analysis tool
 
 Analyze an autonomous sweep:
 
@@ -245,9 +270,13 @@ Analyze autonomous, teleoperation, and shared-autonomy results together:
 make analyze-comparison
 ```
 
+The default operator roots are the formal `saps_libero_teleoperation_v2` and
+`saps_libero_shared_autonomy_v2` session outputs. Override the result-root
+variables when analyzing another collection.
+
 See [`analysis.md`](analysis.md) for outputs and interpretation constraints.
 
-## 12. Output conventions
+## 13. Output conventions
 
 Generated data:
 
@@ -275,7 +304,18 @@ add their parameter component:
 
 Do not reuse a completed output directory during formal experiments.
 
-## 13. Commit checklist
+Manifest sessions add immutable provenance and attempt history under their
+session root:
+
+```text
+<session>/manifest.json
+<session>/schedule.json
+<session>/human_input.json
+<session>/repository_provenance.json
+<session>/attempts/<episode_id>/attempt_<number>/...
+```
+
+## 14. Commit checklist
 
 ```bash
 git status --short

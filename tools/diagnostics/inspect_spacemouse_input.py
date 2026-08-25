@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import dataclasses
 import logging
+from pathlib import Path
 import sys
 import time
 
@@ -18,11 +19,13 @@ from saps.human_input.spacemouse import parse_axis_signs
 from saps.human_input.spacemouse import SpaceMouseBackend
 from saps.human_input.spacemouse import SpaceMouseConfig
 from saps.human_input.spacemouse import SpaceMouseUnavailableError
+from saps.human_input.spacemouse_profile import load_spacemouse_profile
 
 
 @dataclasses.dataclass
 class Args:
     device_path: str = ""
+    profile_path: str = ""
     translation_gain: float = 0.14
     rotation_gain: float = 0.18
     deadzone: float = 0.08
@@ -40,6 +43,11 @@ class Args:
 
 def make_config(args: Args) -> SpaceMouseConfig:
     """Build the same processing configuration used by live runners."""
+
+    if args.profile_path:
+        return load_spacemouse_profile(Path(args.profile_path)).to_config(
+            device_path=args.device_path
+        )
 
     return SpaceMouseConfig(
         device_path=args.device_path,
@@ -75,6 +83,17 @@ def run(args: Args) -> int:
     print("SpaceMouse diagnostic (no LIBERO, policy, or robot)")
     print(f"Selected path: {info.path}")
     print(f"Selected name: {info.name}")
+    print(
+        "Processing profile: "
+        f"{args.profile_path or 'none (raw CLI settings)'}"
+    )
+    print(f"Axis mapping: {backend.config.axis_mapping}")
+    print(f"Axis signs: {backend.config.axis_signs}")
+    print(
+        "Gains: translation="
+        f"{backend.config.translation_gain} "
+        f"rotation={backend.config.rotation_gain}"
+    )
     print(f"Required axes: {', '.join(AXIS_NAMES)}")
     print(f"Reported ranges: {info.axis_ranges}")
     print("Exclusive access: acquired with EVIOCGRAB")
