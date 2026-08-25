@@ -47,6 +47,10 @@ REDO_EPISODES_ARG = $(if $(strip $(REDO_EPISODES)),--redo-episode-ids $(REDO_EPI
 MANIFEST ?= configs/operator_shared_autonomy_manifest.json
 SESSION_OUTPUT ?= outputs/operator_experiment
 REPOSITORY_COMMIT := $(shell git rev-parse HEAD)
+override GATE2_MANIFEST := configs/gate2_operator_pilot_manifest.json
+override GATE2_PROFILE := configs/spacemouse_profile.json
+override GATE2_OUTPUT := outputs/gate2_operator_pilot_v1
+override GATE2_EXPERIMENT_ID := saps_libero_gate2_operator_pilot_v1
 
 DX ?= 0.0
 DY ?= 0.0
@@ -68,6 +72,8 @@ help:
 	@echo "  make operator-session MANIFEST=<manifest.json>"
 	@echo "  make teleoperation-session"
 	@echo "  make shared-autonomy-session"
+	@echo "  make gate2-preflight SPACEMOUSE_DEVICE=/dev/input/by-id/..."
+	@echo "  make gate2-session SPACEMOUSE_DEVICE=/dev/input/by-id/..."
 	@echo
 	@echo "Tests:"
 	@echo "  make check"
@@ -136,6 +142,26 @@ shared-autonomy-session:
 	$(MAKE) operator-session \
 		MANIFEST=configs/operator_shared_autonomy_manifest.json \
 		SESSION_OUTPUT=outputs/saps_libero_shared_autonomy_v2
+
+.PHONY: gate2-preflight
+gate2-preflight:
+	@test -n "$(strip $(SPACEMOUSE_DEVICE))" || \
+		{ echo "Gate-2 requires SPACEMOUSE_DEVICE=/dev/input/by-id/..."; exit 2; }
+	$(COMPOSE) run --rm --no-deps \
+		-e SAPS_SCRIPT=/workspace/scripts/preflight_gate2_operator_pilot.py \
+		-e SAPS_RUNTIME_ARGS="--manifest-path $(GATE2_MANIFEST) --spacemouse-profile-path $(GATE2_PROFILE) --spacemouse-device-path $(SPACEMOUSE_DEVICE) --output-dir $(GATE2_OUTPUT)" \
+		runtime
+
+.PHONY: gate2-session
+gate2-session:
+	@test -n "$(strip $(SPACEMOUSE_DEVICE))" || \
+		{ echo "Gate-2 requires SPACEMOUSE_DEVICE=/dev/input/by-id/..."; exit 2; }
+	@test -z "$$(git status --porcelain)" || \
+		{ echo "Gate-2 collection requires a clean repository."; exit 1; }
+	$(COMPOSE) run --rm --no-deps \
+		-e SAPS_SCRIPT=/workspace/scripts/run_operator_experiment.py \
+		-e SAPS_RUNTIME_ARGS="--manifest-path $(GATE2_MANIFEST) --repository-commit $(REPOSITORY_COMMIT) --output-dir $(GATE2_OUTPUT) --required-protocol-id $(GATE2_EXPERIMENT_ID) --input-source spacemouse --spacemouse-device-path $(SPACEMOUSE_DEVICE) --spacemouse-profile-path $(GATE2_PROFILE) $(REDO_EPISODES_ARG)" \
+		runtime
 
 .PHONY: teleop
 teleop:

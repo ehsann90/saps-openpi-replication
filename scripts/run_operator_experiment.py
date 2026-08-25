@@ -15,10 +15,14 @@ from typing import Any
 import tyro
 
 from saps.evaluation.experiment_session import build_schedule
+from saps.evaluation.experiment_session import json_file_identity
 from saps.evaluation.experiment_session import load_manifest
 from saps.evaluation.experiment_session import manifest_sha256
+from saps.evaluation.experiment_session import validate_schedule_identity
 from saps.evaluation.experiment_session import validate_summary
 from saps.evaluation.experiment_session import write_json_atomic
+from saps.evaluation.gate2_protocol import GATE2_EXPERIMENT_ID
+from saps.evaluation.gate2_protocol import validate_gate2_protocol
 from saps.human_input.spacemouse import parse_axis_mapping
 from saps.human_input.spacemouse import parse_axis_maxima
 from saps.human_input.spacemouse import parse_axis_signs
@@ -32,6 +36,7 @@ class Args:
     manifest_path: str
     repository_commit: str
     output_dir: str = "outputs/operator_experiment"
+    required_protocol_id: str = ""
     dry_run: bool = False
     continue_on_invalid_attempt: bool = False
     redo_episode_ids: str = ""
@@ -107,20 +112,21 @@ def _initialize_experiment(
             f"Manifest contains unknown conditions: {sorted(unknown)}"
         )
 
+    expected_schedule = build_schedule(
+        manifest=manifest,
+        task_id=int(task_config["task_id"]),
+        output_root=output_root,
+    )
     if schedule_path.exists():
         with schedule_path.open("r", encoding="utf-8") as file:
             schedule = json.load(file)
 
-        if schedule.get("manifest_sha256") != identity:
-            raise ValueError(
-                "Stored schedule does not belong to this manifest."
-            )
-    else:
-        schedule = build_schedule(
-            manifest=manifest,
-            task_id=int(task_config["task_id"]),
-            output_root=output_root,
+        validate_schedule_identity(
+            stored=schedule,
+            expected=expected_schedule,
         )
+    else:
+        schedule = expected_schedule
         write_json_atomic(schedule_path, schedule)
 
     return manifest, schedule
@@ -368,6 +374,27 @@ def _write_session_summary(
 
 def main(args: Args) -> None:
     preview_manifest = load_manifest(Path(args.manifest_path))
+    required_protocol_id = args.required_protocol_id.strip()
+    if (
+        preview_manifest.experiment_id == GATE2_EXPERIMENT_ID
+        and required_protocol_id != GATE2_EXPERIMENT_ID
+    ):
+        raise ValueError(
+            "The Gate-2 manifest requires its explicit protocol guard. "
+            "Use make gate2-session."
+        )
+    if required_protocol_id:
+        if required_protocol_id != GATE2_EXPERIMENT_ID:
+            raise ValueError(
+                f"Unsupported required_protocol_id {required_protocol_id!r}."
+            )
+        validate_gate2_protocol(
+            manifest=preview_manifest,
+            input_source=args.input_source,
+            spacemouse_profile_path=args.spacemouse_profile_path,
+            spacemouse_device_path=args.spacemouse_device_path,
+            output_root=Path(args.output_dir),
+        )
     input_configuration = _human_input_configuration(
         args=args,
         manifest=preview_manifest,
@@ -378,6 +405,44 @@ def main(args: Args) -> None:
         manifest_path=Path(args.manifest_path),
         output_root=output_root,
     )
+    perturbation_configuration = json_file_identity(
+        Path(manifest.config_path)
+    )
+    perturbation_configuration_path = (
+        output_root / "perturbation_config.json"
+    )
+    if perturbation_configuration_path.exists():
+        with perturbation_configuration_path.open(
+            "r",
+            encoding="utf-8",
+        ) as file:
+            stored_perturbation_configuration = json.load(file)
+        if stored_perturbation_configuration != perturbation_configuration:
+            raise ValueError(
+                "The session output belongs to a different perturbation "
+                "configuration. Use a new output directory."
+            )
+    else:
+        write_json_atomic(
+            perturbation_configuration_path,
+            perturbation_configuration,
+        )
+
+    session_protocol = {
+        "required_protocol_id": required_protocol_id or None,
+    }
+    session_protocol_path = output_root / "session_protocol.json"
+    if session_protocol_path.exists():
+        with session_protocol_path.open("r", encoding="utf-8") as file:
+            stored_session_protocol = json.load(file)
+        if stored_session_protocol != session_protocol:
+            raise ValueError(
+                "The session output belongs to a different required "
+                "protocol. Use a new output directory."
+            )
+    else:
+        write_json_atomic(session_protocol_path, session_protocol)
+
     input_configuration_path = (
         output_root / "human_input.json"
     )

@@ -218,12 +218,34 @@ def load_manifest(path: Path) -> ExperimentManifest:
 def manifest_sha256(manifest: ExperimentManifest) -> str:
     """Return the canonical identity hash for a manifest."""
 
+    return canonical_json_sha256(manifest.as_dict())
+
+
+def canonical_json_sha256(payload: Any) -> str:
+    """Return a stable SHA-256 for one JSON-compatible value."""
+
     encoded = json.dumps(
-        manifest.as_dict(),
+        payload,
         sort_keys=True,
         separators=(",", ":"),
     ).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
+
+
+def json_file_identity(path: Path) -> dict[str, Any]:
+    """Load and identify a JSON object used by an experiment."""
+
+    with path.open("r", encoding="utf-8") as file:
+        contents = json.load(file)
+
+    if not isinstance(contents, dict):
+        raise ValueError(f"JSON root must be an object: {path}")
+
+    return {
+        "path": str(path),
+        "sha256": canonical_json_sha256(contents),
+        "contents": contents,
+    }
 
 
 def build_schedule(
@@ -291,6 +313,63 @@ def build_schedule(
         "policy_seed_protocol": SEED_PROTOCOL,
         "episodes": episodes,
     }
+
+
+def validate_schedule_identity(
+    *,
+    stored: dict[str, Any],
+    expected: dict[str, Any],
+) -> None:
+    """Reject changes to the immutable portion of a stored schedule."""
+
+    root_fields = (
+        "schema_version",
+        "experiment_id",
+        "manifest_sha256",
+        "seed_excludes_arbitration_mode",
+        "policy_seed_protocol",
+    )
+    for field in root_fields:
+        if stored.get(field) != expected.get(field):
+            raise ValueError(
+                f"Stored schedule field {field!r} does not match the "
+                "deterministically regenerated schedule."
+            )
+
+    stored_episodes = stored.get("episodes")
+    expected_episodes = expected.get("episodes")
+    if not isinstance(stored_episodes, list):
+        raise ValueError("Stored schedule episodes must be a list.")
+    if len(stored_episodes) != len(expected_episodes):
+        raise ValueError(
+            "Stored schedule episode count does not match the "
+            "deterministically regenerated schedule."
+        )
+
+    episode_fields = (
+        "episode_id",
+        "order_index",
+        "mode",
+        "condition_id",
+        "trial_index",
+        "initial_state_index",
+        "policy_episode_seed",
+        "policy_seed_protocol",
+        "output_directory",
+    )
+    for index, (stored_episode, expected_episode) in enumerate(
+        zip(stored_episodes, expected_episodes)
+    ):
+        if not isinstance(stored_episode, dict):
+            raise ValueError(
+                f"Stored schedule episode {index} must be an object."
+            )
+        for field in episode_fields:
+            if stored_episode.get(field) != expected_episode.get(field):
+                raise ValueError(
+                    "Stored schedule immutable field mismatch at "
+                    f"episode {index}, field {field!r}."
+                )
 
 
 def validate_summary(

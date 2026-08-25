@@ -1,5 +1,10 @@
 # Formal Arbitration Experiment Protocol
 
+The fixed 60-episode Gate-2 excluded pilot is implemented separately in
+[`gate2_operator_pilot.md`](gate2_operator_pilot.md). Gate 2 reuses the session
+infrastructure below but is not the final powered experiment described by this
+document and must remain labeled as pilot data.
+
 **Status:** implemented for teleoperation and shared-autonomy operator sessions.
 The autonomous condition continues to use the unattended autonomous sweep.
 
@@ -119,7 +124,11 @@ pure teleoperation and corrective shared autonomy impose different operator
 attention requirements. Commit any protocol changes before collection. The
 Make target rejects a dirty worktree, obtains the exact Git commit on the host,
 and records it alongside the frozen manifest in `repository_provenance.json`.
-Git is therefore not required in the runtime container.
+The session also freezes the perturbation configuration path, contents, and
+canonical hash in `perturbation_config.json`; `session_protocol.json` records
+any required versioned protocol guard. Git is therefore not required in the
+runtime container. On resume, the immutable schedule fields are checked against
+deterministic regeneration while attempt status and history are preserved.
 
 When `INPUT_SOURCE=spacemouse`, the Python session runner requires an explicit
 profile path. Make supplies `configs/spacemouse_profile.json` by default through

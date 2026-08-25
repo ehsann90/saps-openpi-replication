@@ -19,8 +19,8 @@ and reproducible experiment tooling.
 
 The functional replication stack includes action-level arbitration,
 manifest-driven operator sessions, calibrated SpaceMouse input, and unified
-comparison analysis. The next experimental gate is intentionally not described
-here until its protocol is finalized.
+comparison analysis. The fixed Gate-2 excluded-pilot protocol and preflight are
+implemented, but the 60 human-operated episodes have not been collected.
 
 | Component | Status |
 |---|---|
@@ -36,6 +36,7 @@ here until its protocol is finalized.
 | Cosine-similarity blending | Implemented and validated |
 | Manifest-driven operator experiment sessions | Implemented and validated |
 | Unified multi-mode analysis | Implemented and tested |
+| Gate-2 excluded operator-pilot infrastructure | Implemented; collection not run |
 
 The completed Phase 1 autonomous degradation study contains 200 episodes:
 20 trials for the nominal condition and each of nine perturbation conditions.
@@ -174,6 +175,7 @@ apply to takeover, fixed-blend, cosine-blend, and formal session targets. See
 - [Keyboard and SpaceMouse input](docs/human_input.md)
 - [Testing and validation](docs/testing.md)
 - [Gate 1 RTX 5080 AC/performance characterization](docs/gate1_rtx5080_ac_performance.md)
+- [Gate-2 excluded operator pilot](docs/gate2_operator_pilot.md)
 - [Shared-autonomy semantics and runtime](docs/shared_autonomy.md)
 - [Phase 1 perturbations and deterministic sampling](docs/phase1_libero_perturbations_and_determinism.md)
 - [Formal experiment protocol](docs/experiment_protocol.md)

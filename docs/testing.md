@@ -34,6 +34,9 @@ The unit suite covers:
   masks, safe live apply/reset/save behavior, and normal-runner defaults.
 - manifest-session profile propagation, immutable profile provenance, resume
   protection, and Make-to-runner argument contracts.
+- exact Gate-2 manifest and 60-cell coverage, deterministic counterbalancing,
+  historical autonomous-seed matching, protocol/profile rejection, immutable
+  resume state, and Gate-2 Make-to-CLI contracts.
 
 Do not rely on a hard-coded expected test count. New regression tests should
 increase the count while every test still reports `ok`.
@@ -87,6 +90,20 @@ that Apply/Reset/Save disarm, translation/rotation isolation works, resetting
 restores the nominal scene, and the saved profile matches the browser values.
 The same `SPACEMOUSE_PROFILE` variable selects the diagnostic, calibration, and
 runtime profile.
+
+## Gate-2 preflight
+
+Gate-2 preflight is non-interactive and does not launch an episode:
+
+```bash
+make gate2-preflight \
+  SPACEMOUSE_DEVICE=/dev/input/by-id/usb-3Dconnexion_SpaceMouse_Wireless-event-joystick
+```
+
+Inspect the reported manifest/profile/config hashes, exact counts, parameters,
+and 60-row schedule. This validates protocol wiring, not physical device access;
+run the SpaceMouse diagnostic separately. Do not invoke `gate2-session` as part
+of automated testing.
 
 ## 4. Deterministic policy probe
 

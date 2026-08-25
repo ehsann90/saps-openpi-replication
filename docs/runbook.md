@@ -12,6 +12,7 @@ Detailed explanations are in:
 - [`testing.md`](testing.md)
 - [`shared_autonomy.md`](shared_autonomy.md)
 - [`human_input.md`](human_input.md)
+- [`gate2_operator_pilot.md`](gate2_operator_pilot.md)
 - [`experiment_protocol.md`](experiment_protocol.md)
 - [`analysis.md`](analysis.md)
 
@@ -131,7 +132,30 @@ Make targets automatically use the committed
 `configs/spacemouse_profile.json`; override `SPACEMOUSE_PROFILE` only when a
 different validated profile is intentionally required.
 
-## 8. Pure teleoperation
+## 8. Gate-2 excluded operator pilot
+
+Validate the fixed 60-episode protocol without creating outputs or launching an
+episode:
+
+```bash
+make gate2-preflight \
+  SPACEMOUSE_DEVICE=/dev/input/by-id/usb-3Dconnexion_SpaceMouse_Wireless-event-joystick
+```
+
+After inspecting the printed schedule, start the policy server separately and
+launch or resume the unified session:
+
+```bash
+make gate2-session \
+  SPACEMOUSE_DEVICE=/dev/input/by-id/usb-3Dconnexion_SpaceMouse_Wireless-event-joystick
+```
+
+The session is fixed to `configs/gate2_operator_pilot_manifest.json`, the
+committed SpaceMouse profile, and `outputs/gate2_operator_pilot_v1`. See the
+[Gate-2 protocol](gate2_operator_pilot.md) for counterbalancing, provenance,
+redo, and scope restrictions.
+
+## 9. Pure teleoperation
 
 Formal 20-trial operator schedule (280 steps, 14 simulated seconds):
 
@@ -157,7 +181,7 @@ make teleop \
 
 Omit the two SpaceMouse overrides to run with the keyboard.
 
-## 9. Shared autonomy
+## 10. Shared autonomy
 
 Formal shared-autonomy schedule (280 steps, 14 simulated seconds):
 
@@ -217,7 +241,7 @@ The underlying shared-autonomy Python runner still accepts
 `--arbitration-mode autonomous` for programmatic experiment orchestration. For
 manual autonomous runs, use `make autonomous-smoke` or `make autonomous-sweep`.
 
-## 10. Browser controls
+## 11. Browser controls
 
 | Key | Command |
 |---|---|
@@ -234,7 +258,7 @@ manual autonomous runs, use `make autonomous-smoke` or `make autonomous-sweep`.
 Click **Arm controls** before using the keyboard. Losing browser focus clears
 pressed keys.
 
-## 11. Common variables
+## 12. Common variables
 
 | Variable | Default | Meaning |
 |---|---:|---|
@@ -254,7 +278,7 @@ pressed keys.
 | `FIXED_AUTONOMY_WEIGHT` | `0.5` | Active-human fixed blend weight |
 | `COSINE_GAIN` | `6.0` | Logistic cosine gain |
 
-## 12. Current analysis tool
+## 13. Current analysis tool
 
 Analyze an autonomous sweep:
 
@@ -276,7 +300,7 @@ variables when analyzing another collection.
 
 See [`analysis.md`](analysis.md) for outputs and interpretation constraints.
 
-## 13. Output conventions
+## 14. Output conventions
 
 Generated data:
 
@@ -311,11 +335,13 @@ session root:
 <session>/manifest.json
 <session>/schedule.json
 <session>/human_input.json
+<session>/perturbation_config.json
 <session>/repository_provenance.json
+<session>/session_protocol.json
 <session>/attempts/<episode_id>/attempt_<number>/...
 ```
 
-## 14. Commit checklist
+## 15. Commit checklist
 
 ```bash
 git status --short

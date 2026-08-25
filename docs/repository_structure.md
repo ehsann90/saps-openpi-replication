@@ -7,6 +7,7 @@ saps-openpi-replication/
 ├── README.md
 ├── compose.yml
 ├── configs/
+│   ├── gate2_operator_pilot_manifest.json
 │   ├── libero_cream_cheese_offsets.json
 │   ├── operator_shared_autonomy_manifest.json
 │   ├── operator_teleoperation_manifest.json
@@ -16,6 +17,7 @@ saps-openpi-replication/
 │   ├── environment-baseline.md
 │   ├── experiment_protocol.md
 │   ├── gate1_rtx5080_ac_performance.md
+│   ├── gate2_operator_pilot.md
 │   ├── human_input.md
 │   ├── phase1_libero_perturbations_and_determinism.md
 │   ├── repository_structure.md
@@ -27,6 +29,7 @@ saps-openpi-replication/
 │   ├── apply_openpi_patch.sh
 │   └── openpi-libero-python38-build.patch
 ├── scripts/
+│   ├── preflight_gate2_operator_pilot.py
 │   ├── run_autonomous_sweep.py
 │   ├── run_libero.py
 │   ├── run_operator_experiment.py
@@ -66,13 +69,16 @@ saps-openpi-replication/
 object names, and nominal plus perturbed planar offsets. Experiment scripts
 should read this configuration rather than duplicate the values.
 
-The operator manifests define immutable teleoperation and shared-autonomy
-schedules. `configs/spacemouse_profile.json` is the portable, physically
-validated SpaceMouse calibration; runtime device paths remain outside it.
+The operator manifests define immutable teleoperation, shared-autonomy, and
+Gate-2 excluded-pilot schedules. `configs/spacemouse_profile.json` is the
+portable, physically validated SpaceMouse calibration; runtime device paths
+remain outside it.
 
 ## Project scripts
 
 - `serve_seeded_policy.py`: deterministic OpenPI server wrapper.
+- `preflight_gate2_operator_pilot.py`: non-launching fixed-protocol validation
+  and deterministic Gate-2 schedule report.
 - `run_libero.py`: one autonomous episode.
 - `run_autonomous_sweep.py`: resumable autonomous condition sweep.
 - `run_operator_experiment.py`: manifest-driven, resumable operator sessions.

@@ -297,3 +297,8 @@ identical profile can resume the session; changed contents, path, or device
 selection are rejected. Each episode summary records the same compact profile
 path/schema/hash identity, which the session verifies before accepting the
 attempt. Profile contents are not duplicated into per-step records.
+
+The Gate-2 targets additionally fix this committed profile at the Make and
+protocol-validation layers. They reject keyboard input, another profile path,
+a changed calibration hash, or a missing runtime device argument. See
+[`gate2_operator_pilot.md`](gate2_operator_pilot.md).
