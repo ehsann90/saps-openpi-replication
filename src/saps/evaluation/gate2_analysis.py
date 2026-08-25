@@ -18,6 +18,7 @@ from saps.evaluation.gate2_protocol import GATE2_CONFIG_SHA256
 from saps.evaluation.gate2_protocol import GATE2_EXPERIMENT_ID
 from saps.evaluation.gate2_protocol import GATE2_MODES
 from saps.evaluation.gate2_protocol import GATE2_PROFILE_SHA256
+from saps.evaluation.gate2_protocol import validate_gate2_attempt_completion
 from saps.evaluation.gate2_protocol import validate_gate2_manifest
 from saps.evaluation.gate2_protocol import validate_gate2_schedule
 
@@ -652,6 +653,15 @@ def _episode_analysis(
             "does not match the frozen Gate-2 profile."
         )
     if identity_errors:
+        return row, None, None, _blank_wait(row)
+
+    try:
+        validate_gate2_attempt_completion(
+            summary_path=summary_path,
+            summary=summary,
+        )
+    except (OSError, ValueError) as error:
+        errors.append(f"{episode['episode_id']}: {error}")
         return row, None, None, _blank_wait(row)
 
     steps_path = summary_path.with_name("steps.jsonl")

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import Counter
 import itertools
+import json
 from pathlib import Path
 import random
 from typing import Any
@@ -35,6 +36,17 @@ GATE2_ORDERING_METHOD = "gate2_constrained_counterbalance_v1"
 GATE2_UNITS_PER_TRIAL = len(GATE2_CONDITIONS) * len(GATE2_MODES)
 GATE2_MODE_PAIRS = tuple(itertools.combinations(GATE2_MODES, 2))
 GATE2_MAX_ORDERING_ATTEMPTS = 10000
+GATE2_OPERATOR_MAX_STEPS = 280
+GATE2_VALID_TERMINATION_REASONS = ("success", "timeout")
+GATE2_REDO_REQUIRED_TERMINATION_REASONS = (
+    "operator_abort",
+    "operator_disconnected",
+    "operator_disarmed",
+    "input_device_disconnected",
+    "environment_terminated",
+    "initialization_error",
+    "runtime_error",
+)
 GATE2_EXPECTED_MANIFEST: dict[str, Any] = {
     "schema_version": 3,
     "experiment_id": GATE2_EXPERIMENT_ID,
@@ -48,7 +60,7 @@ GATE2_EXPECTED_MANIFEST: dict[str, Any] = {
     "fixed_autonomy_weight": 0.5,
     "cosine_gain": 6.0,
     "control_frequency_hz": 20.0,
-    "operator_max_steps": 280,
+    "operator_max_steps": GATE2_OPERATOR_MAX_STEPS,
     "fine_translation_gain": 0.25,
     "fine_rotation_gain": 0.1,
     "normal_translation_gain": 0.5,
@@ -74,6 +86,104 @@ def validate_gate2_manifest(manifest: ExperimentManifest) -> None:
             "Gate-2 manifest does not match the fixed "
             f"{GATE2_EXPERIMENT_ID} protocol."
         )
+
+
+def _read_gate2_jsonl(path: Path) -> list[dict[str, Any]]:
+    """Read one Gate-2 audit stream without accepting malformed rows."""
+
+    records: list[dict[str, Any]] = []
+    with path.open("r", encoding="utf-8") as file:
+        for line_number, line in enumerate(file, start=1):
+            if not line.strip():
+                continue
+            value = json.loads(line)
+            if not isinstance(value, dict):
+                raise ValueError(
+                    f"Gate-2 audit row {path}:{line_number} "
+                    "must be a JSON object."
+                )
+            records.append(value)
+    return records
+
+
+def validate_gate2_attempt_completion(
+    *,
+    summary_path: Path,
+    summary: dict[str, Any],
+) -> None:
+    """Require a complete outcome and uninterrupted operator authority."""
+
+    termination_reason = str(summary.get("termination_reason", ""))
+    if termination_reason not in GATE2_VALID_TERMINATION_REASONS:
+        raise ValueError(
+            "Gate-2 attempt requires redo after termination reason "
+            f"{termination_reason!r}; only success and timeout are valid."
+        )
+
+    success = summary.get("success")
+    control_steps = int(summary.get("control_steps", -1))
+    if termination_reason == "success":
+        if success is not True:
+            raise ValueError(
+                "Gate-2 success termination requires success=true."
+            )
+        if not 1 <= control_steps <= GATE2_OPERATOR_MAX_STEPS:
+            raise ValueError(
+                "Gate-2 success must occur within the "
+                f"{GATE2_OPERATOR_MAX_STEPS}-step horizon."
+            )
+    elif (
+        success is not False
+        or control_steps != GATE2_OPERATOR_MAX_STEPS
+    ):
+        raise ValueError(
+            "Gate-2 timeout requires success=false and all "
+            f"{GATE2_OPERATOR_MAX_STEPS} steps."
+        )
+
+    steps_path = summary_path.with_name("steps.jsonl")
+    steps = _read_gate2_jsonl(steps_path)
+    if len(steps) != control_steps:
+        raise ValueError(
+            "Gate-2 logged step count does not match summary control_steps."
+        )
+
+    records = [("step", index, record) for index, record in enumerate(steps)]
+    if summary.get("arbitration_mode") != "teleoperation":
+        waits_path = summary_path.with_name("scheduler_waits.jsonl")
+        if not waits_path.is_file():
+            raise ValueError(
+                "Gate-2 shared-autonomy attempt is missing "
+                "scheduler_waits.jsonl."
+            )
+        records.extend(
+            ("wait", index, record)
+            for index, record in enumerate(_read_gate2_jsonl(waits_path))
+        )
+
+    for stream, index, record in records:
+        human_input = record.get("human_input")
+        if not isinstance(human_input, dict):
+            raise ValueError(
+                f"Gate-2 {stream} row {index} is missing human_input."
+            )
+        if human_input.get("input_source") != "spacemouse":
+            raise ValueError(
+                f"Gate-2 {stream} row {index} is not SpaceMouse input."
+            )
+        if human_input.get("connected") is not True:
+            raise ValueError(
+                f"Gate-2 {stream} row {index} records operator_disconnected."
+            )
+        if human_input.get("physical_device_connected") is not True:
+            raise ValueError(
+                f"Gate-2 {stream} row {index} records "
+                "input_device_disconnected."
+            )
+        if human_input.get("armed") is not True:
+            raise ValueError(
+                f"Gate-2 {stream} row {index} records operator_disarmed."
+            )
 
 
 def _interleave_trial_round(

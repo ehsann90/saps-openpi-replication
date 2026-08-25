@@ -18,6 +18,7 @@ from unittest import mock
 from saps.evaluation.experiment_session import build_schedule
 from saps.evaluation.experiment_session import ExperimentManifest
 from saps.evaluation.experiment_session import load_manifest
+from saps.evaluation.experiment_session import validate_summary
 from saps.evaluation.experiment_session import write_json_atomic
 from saps.evaluation.gate2_protocol import GATE2_CONDITIONS
 from saps.evaluation.gate2_protocol import GATE2_EXPECTED_MANIFEST
@@ -27,10 +28,14 @@ from saps.evaluation.gate2_protocol import GATE2_ORDERING_METHOD
 from saps.evaluation.gate2_protocol import GATE2_MODES
 from saps.evaluation.gate2_protocol import GATE2_OUTPUT_ROOT
 from saps.evaluation.gate2_protocol import GATE2_PROFILE_PATH
+from saps.evaluation.gate2_protocol import (
+    GATE2_REDO_REQUIRED_TERMINATION_REASONS,
+)
 from saps.evaluation.gate2_protocol import GATE2_TRIALS
 from saps.evaluation.gate2_protocol import GATE2_UNITS_PER_TRIAL
 from saps.evaluation.gate2_protocol import build_gate2_schedule
 from saps.evaluation.gate2_protocol import gate2_ordering_metrics
+from saps.evaluation.gate2_protocol import validate_gate2_attempt_completion
 from saps.evaluation.gate2_protocol import validate_gate2_manifest
 from saps.evaluation.gate2_protocol import validate_gate2_protocol
 from saps.human_input.spacemouse_profile import load_spacemouse_profile
@@ -47,6 +52,60 @@ assert RUNNER_SPEC is not None and RUNNER_SPEC.loader is not None
 operator_runner = importlib.util.module_from_spec(RUNNER_SPEC)
 sys.modules[RUNNER_SPEC.name] = operator_runner
 RUNNER_SPEC.loader.exec_module(operator_runner)
+
+
+def gate2_human_input(
+    *,
+    connected: bool = True,
+    physical_device_connected: bool = True,
+    armed: bool = True,
+    stale_input: bool = False,
+) -> dict[str, object]:
+    """Return one synthetic SpaceMouse integrity record."""
+
+    return {
+        "input_source": "spacemouse",
+        "connected": connected,
+        "physical_device_connected": physical_device_connected,
+        "armed": armed,
+        "stale_input": stale_input,
+    }
+
+
+def write_gate2_attempt(
+    root: Path,
+    *,
+    termination_reason: str = "success",
+    success: bool = True,
+    control_steps: int = 1,
+    human_inputs: list[dict[str, object]] | None = None,
+    summary_values: dict[str, object] | None = None,
+) -> tuple[Path, dict[str, object]]:
+    """Write the raw files needed by Gate-2 completion validation."""
+
+    if human_inputs is None:
+        human_inputs = [gate2_human_input() for _ in range(control_steps)]
+    if len(human_inputs) != control_steps:
+        raise ValueError("human_inputs must match control_steps")
+    root.mkdir(parents=True, exist_ok=True)
+    summary: dict[str, object] = {
+        "arbitration_mode": "teleoperation",
+        "success": success,
+        "termination_reason": termination_reason,
+        "control_steps": control_steps,
+        **(summary_values or {}),
+    }
+    summary_path = root / "summary.json"
+    write_json_atomic(summary_path, summary)
+    (root / "steps.jsonl").write_text(
+        "".join(
+            json.dumps({"human_input": value}) + "\n"
+            for value in human_inputs
+        ),
+        encoding="utf-8",
+    )
+    return summary_path, summary
+
 
 def make_contract_args(target: str) -> list[str]:
     """Return parsed SAPS runtime arguments from a Make dry run."""
@@ -380,6 +439,194 @@ class Gate2ProtocolTest(unittest.TestCase):
         )
         with self.assertRaisesRegex(ValueError, "explicit protocol guard"):
             operator_runner.main(args)
+
+
+class Gate2AttemptCompletionTest(unittest.TestCase):
+    def validate_attempt(
+        self,
+        root: Path,
+        **values: object,
+    ) -> None:
+        summary_path, summary = write_gate2_attempt(root, **values)
+        validate_gate2_attempt_completion(
+            summary_path=summary_path,
+            summary=summary,
+        )
+
+    def test_success_is_accepted(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            self.validate_attempt(Path(directory))
+
+    def test_timeout_is_accepted(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            self.validate_attempt(
+                Path(directory),
+                termination_reason="timeout",
+                success=False,
+                control_steps=280,
+            )
+
+    def test_operator_abort_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(ValueError, "requires redo"):
+                self.validate_attempt(
+                    Path(directory),
+                    termination_reason="operator_abort",
+                    success=False,
+                )
+
+    def test_browser_disconnect_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            inputs = [gate2_human_input(connected=False)]
+            with self.assertRaisesRegex(ValueError, "operator_disconnected"):
+                self.validate_attempt(
+                    Path(directory),
+                    human_inputs=inputs,
+                )
+
+    def test_spacemouse_disconnect_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            inputs = [
+                gate2_human_input(physical_device_connected=False)
+            ]
+            with self.assertRaisesRegex(
+                ValueError,
+                "input_device_disconnected",
+            ):
+                self.validate_attempt(
+                    Path(directory),
+                    human_inputs=inputs,
+                )
+
+    def test_mid_episode_disarm_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            inputs = [
+                gate2_human_input(),
+                gate2_human_input(armed=False),
+            ]
+            with self.assertRaisesRegex(ValueError, "operator_disarmed"):
+                self.validate_attempt(
+                    Path(directory),
+                    control_steps=2,
+                    human_inputs=inputs,
+                )
+
+    def test_disarm_during_policy_wait_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            summary_path, summary = write_gate2_attempt(root)
+            summary["arbitration_mode"] = "fixed_blend"
+            write_json_atomic(summary_path, summary)
+            (root / "scheduler_waits.jsonl").write_text(
+                json.dumps(
+                    {
+                        "human_input": gate2_human_input(armed=False),
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(ValueError, "operator_disarmed"):
+                validate_gate2_attempt_completion(
+                    summary_path=summary_path,
+                    summary=summary,
+                )
+
+    def test_environment_termination_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(ValueError, "requires redo"):
+                self.validate_attempt(
+                    Path(directory),
+                    termination_reason="environment_terminated",
+                    success=False,
+                )
+
+    def test_neutral_stale_spacemouse_is_accepted(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            inputs = [gate2_human_input(stale_input=True)]
+            self.validate_attempt(
+                Path(directory),
+                human_inputs=inputs,
+            )
+
+    def test_all_predeclared_redo_reasons_are_rejected(self) -> None:
+        for reason in GATE2_REDO_REQUIRED_TERMINATION_REASONS:
+            with self.subTest(reason=reason):
+                with tempfile.TemporaryDirectory() as directory:
+                    with self.assertRaisesRegex(ValueError, "requires redo"):
+                        self.validate_attempt(
+                            Path(directory),
+                            termination_reason=reason,
+                            success=False,
+                        )
+
+    def test_invalid_redo_preserves_previous_valid_selection(self) -> None:
+        previous = {
+            "valid": True,
+            "selected_for_analysis": True,
+        }
+        invalid = {
+            "valid": False,
+            "selected_for_analysis": False,
+            "error": None,
+        }
+        episode = {
+            "status": "running",
+            "attempts": [previous, invalid],
+        }
+
+        operator_runner._mark_attempt_invalid(
+            episode=episode,
+            attempt=invalid,
+            redo_requested=True,
+            previous_selected_valid=True,
+            error=ValueError("operator_disarmed"),
+        )
+
+        self.assertEqual(episode["status"], "completed")
+        self.assertTrue(previous["selected_for_analysis"])
+        self.assertFalse(invalid["selected_for_analysis"])
+        self.assertEqual(invalid["error"], "operator_disarmed")
+
+    def test_legacy_summary_acceptance_remains_unchanged(self) -> None:
+        manifest = load_manifest(REPOSITORY_ROOT / GATE2_MANIFEST_PATH)
+        schedule = build_schedule(
+            manifest=manifest,
+            task_id=1,
+            output_root=Path("outputs/legacy-test"),
+        )
+        episode = schedule["episodes"][0]
+        with tempfile.TemporaryDirectory() as directory:
+            summary_path, _ = write_gate2_attempt(
+                Path(directory),
+                termination_reason="operator_abort",
+                success=False,
+                summary_values={
+                    "arbitration_mode": episode["mode"],
+                    "condition_id": episode["condition_id"],
+                    "trial_index": episode["trial_index"],
+                    "initial_state_index": episode["initial_state_index"],
+                    "policy_episode_seed": episode["policy_episode_seed"],
+                    "policy_seed_protocol": episode[
+                        "policy_seed_protocol"
+                    ],
+                },
+            )
+
+            summary = validate_summary(
+                summary_path=summary_path,
+                episode=episode,
+            )
+            self.assertEqual(
+                summary["termination_reason"],
+                "operator_abort",
+            )
+            with self.assertRaisesRegex(ValueError, "requires redo"):
+                validate_gate2_attempt_completion(
+                    summary_path=summary_path,
+                    summary=summary,
+                )
 
 
 class Gate2ResumeAndMakeContractTest(unittest.TestCase):

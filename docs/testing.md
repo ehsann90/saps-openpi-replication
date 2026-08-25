@@ -38,8 +38,12 @@ The unit suite covers:
   counterbalancing, mode-independent matched-seed derivation, trial-round and
   ordering constraints, unchanged legacy scheduling, protocol/profile
   rejection, immutable resume state, and Gate-2 Make-to-CLI contracts.
+- Gate-2 completion validity for success/timeout, termination and operator-input
+  integrity failures, neutral stale input, redo selection preservation, and
+  unchanged legacy acceptance semantics.
 - Gate-2 analysis with incomplete schedules, failed and timeout outcomes,
-  selected redos, seed/profile mismatch rejection, fixed/cosine diagnostics,
+  invalid-attempt audit exclusion, selected redos, seed/profile mismatch
+  rejection, fixed/cosine diagnostics,
   policy-wait timing and human overlap, and exact autonomous pairing.
 
 Do not rely on a hard-coded expected test count. New regression tests should

@@ -23,6 +23,7 @@ from saps.evaluation.experiment_session import validate_summary
 from saps.evaluation.experiment_session import write_json_atomic
 from saps.evaluation.gate2_protocol import GATE2_EXPERIMENT_ID
 from saps.evaluation.gate2_protocol import build_gate2_schedule
+from saps.evaluation.gate2_protocol import validate_gate2_attempt_completion
 from saps.evaluation.gate2_protocol import validate_gate2_protocol
 from saps.human_input.spacemouse import parse_axis_mapping
 from saps.human_input.spacemouse import parse_axis_maxima
@@ -379,6 +380,24 @@ def _write_session_summary(
     )
 
 
+def _mark_attempt_invalid(
+    *,
+    episode: dict[str, Any],
+    attempt: dict[str, Any],
+    redo_requested: bool,
+    previous_selected_valid: bool,
+    error: Exception,
+) -> None:
+    """Retain one invalid attempt without changing prior selection."""
+
+    attempt["error"] = str(error)
+    episode["status"] = (
+        "completed"
+        if redo_requested and previous_selected_valid
+        else "invalid"
+    )
+
+
 def main(args: Args) -> None:
     preview_manifest = load_manifest(Path(args.manifest_path))
     required_protocol_id = args.required_protocol_id.strip()
@@ -610,6 +629,8 @@ def main(args: Args) -> None:
                 )
 
             summary_path = _find_summary(attempt_root)
+            if required_protocol_id == GATE2_EXPERIMENT_ID:
+                attempt["summary_path"] = str(summary_path)
             summary = validate_summary(
                 summary_path=summary_path,
                 episode=episode,
@@ -618,6 +639,11 @@ def main(args: Args) -> None:
                 summary=summary,
                 input_configuration=input_configuration,
             )
+            if required_protocol_id == GATE2_EXPERIMENT_ID:
+                validate_gate2_attempt_completion(
+                    summary_path=summary_path,
+                    summary=summary,
+                )
             attempt["summary_path"] = str(summary_path)
             attempt["valid"] = True
             attempt["selected_for_analysis"] = True
@@ -632,11 +658,12 @@ def main(args: Args) -> None:
             ]
             episode["success"] = bool(summary["success"])
         except (OSError, ValueError, RuntimeError) as error:
-            attempt["error"] = str(error)
-            episode["status"] = (
-                "completed"
-                if redo_requested and previous_selected_valid
-                else "invalid"
+            _mark_attempt_invalid(
+                episode=episode,
+                attempt=attempt,
+                redo_requested=redo_requested,
+                previous_selected_valid=previous_selected_valid,
+                error=error,
             )
             logging.error(
                 "Invalid attempt for %s: %s",

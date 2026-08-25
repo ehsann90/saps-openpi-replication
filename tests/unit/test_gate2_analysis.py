@@ -164,6 +164,22 @@ class Gate2AnalysisFixture:
         return summary_path
 
     @staticmethod
+    def human_input(
+        *,
+        connected: bool = True,
+        physical_device_connected: bool = True,
+        armed: bool = True,
+        stale_input: bool = False,
+    ) -> dict[str, object]:
+        return {
+            "input_source": "spacemouse",
+            "connected": connected,
+            "physical_device_connected": physical_device_connected,
+            "armed": armed,
+            "stale_input": stale_input,
+        }
+
+    @staticmethod
     def step(
         *,
         mode: str,
@@ -181,6 +197,7 @@ class Gate2AnalysisFixture:
             "effective_autonomy_weight": weight,
             "cosine_similarity": 0.0 if weight is not None else None,
             "inference_latency_seconds": inference_latency,
+            "human_input": Gate2AnalysisFixture.human_input(),
         }
 
     def add_autonomous(
@@ -293,12 +310,17 @@ class Gate2AnalysisTest(unittest.TestCase):
             fixture = Gate2AnalysisFixture(Path(directory))
             episode = fixture.episode("teleoperation")
             fixture.add_attempt(episode, attempt_number=1, selected=False)
+            steps = [
+                fixture.step(mode="teleoperation", control_step=index)
+                for index in range(280)
+            ]
             fixture.add_attempt(
                 episode,
                 attempt_number=2,
                 selected=True,
                 success=False,
-                termination_reason="operator_abort",
+                termination_reason="timeout",
+                steps=steps,
             )
             report = fixture.analyze()
 
@@ -313,6 +335,33 @@ class Gate2AnalysisTest(unittest.TestCase):
             )
             self.assertEqual(row["selected_attempt_number"], "2")
             self.assertEqual(row["success"], "0")
+
+    def test_invalid_selected_attempt_is_audit_history_only(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            fixture = Gate2AnalysisFixture(Path(directory))
+            episode = fixture.episode("teleoperation")
+            fixture.add_attempt(
+                episode,
+                success=False,
+                termination_reason="operator_abort",
+            )
+            report = fixture.analyze()
+
+            self.assertFalse(report["analysis_valid"])
+            self.assertEqual(report["selected_analyzable_episode_count"], 0)
+            row = next(
+                row
+                for row in read_csv(fixture.output / "episode_metrics.csv")
+                if row["episode_id"] == episode["episode_id"]
+            )
+            self.assertEqual(row["metrics_available"], "0")
+            mode = next(
+                row
+                for row in read_csv(fixture.output / "mode_summary.csv")
+                if row["mode"] == "teleoperation"
+            )
+            self.assertEqual(mode["n_selected_valid"], "0")
+            self.assertEqual(mode["n_failure"], "0")
 
     def test_seed_mismatch_is_blocking(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -410,6 +459,7 @@ class Gate2AnalysisTest(unittest.TestCase):
                     "human_active": True,
                     "wall_time_unix_seconds": 10.00,
                     "inference_latency_seconds": None,
+                    "human_input": fixture.human_input(),
                 },
                 {
                     "scheduler_tick": 1,
@@ -418,6 +468,7 @@ class Gate2AnalysisTest(unittest.TestCase):
                     "human_active": False,
                     "wall_time_unix_seconds": 10.05,
                     "inference_latency_seconds": None,
+                    "human_input": fixture.human_input(),
                 },
                 {
                     "scheduler_tick": 4,
@@ -426,6 +477,7 @@ class Gate2AnalysisTest(unittest.TestCase):
                     "human_active": False,
                     "wall_time_unix_seconds": 10.20,
                     "inference_latency_seconds": 0.5,
+                    "human_input": fixture.human_input(),
                 },
             ]
             fixture.add_attempt(episode, steps=steps, waits=waits)

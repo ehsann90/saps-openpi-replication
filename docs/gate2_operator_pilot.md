@@ -112,6 +112,26 @@ make gate2-session \
 Only the newest valid redo remains selected for later analysis. Earlier valid,
 failed, or aborted attempts remain in the attempt history.
 
+### Valid attempts and required redos
+
+Gate 2 accepts only `success` and `timeout` as protocol-complete termination
+reasons. A timeout must contain the full 280 control steps. The following
+outcomes require an explicit redo and can never become valid or selected for
+analysis: `operator_abort`, `operator_disconnected`, `operator_disarmed`,
+`input_device_disconnected`, `environment_terminated`, and initialization or
+runtime errors.
+
+After control begins, every executed step and shared-autonomy policy-wait tick
+must show that the browser remains connected, the physical SpaceMouse remains
+connected, and the operator remains armed. The parent session runner audits the
+raw logs before selecting an attempt. Normal `stale_input=true` while the
+SpaceMouse is neutral is not a disconnect and does not invalidate an attempt.
+
+An invalid attempt remains in attempt history, does not replace a previously
+selected valid attempt, and stops collection by default for inspection. It can
+then be rerun with `REDO_EPISODES`. Invalid attempts are audit records and never
+count toward the 60 valid collected episodes.
+
 ## Frozen provenance
 
 The session root records:
@@ -152,8 +172,9 @@ The analyzer always retains all 60 scheduled Gate-2 episodes in
 `episode_metrics.csv`, including rows without a selected valid attempt. Mode and
 condition-mode summaries distinguish scheduled coverage, observed failures, and
 not-yet-analyzable episodes. Failed selected episodes remain in observed success
-denominators. A timeout is assigned the complete `280 / 20 = 14.0` seconds of
-simulated duration.
+denominators. Protocol-invalid attempts remain audit history and are not
+observed failures. A timeout is assigned the complete `280 / 20 = 14.0` seconds
+of simulated duration.
 
 Human-active duration and correction segments use executed control steps whose
 six-dimensional human-motion norm exceeds the existing SAPS activity threshold
@@ -196,8 +217,9 @@ ratio, and human-active wait overlap remain separate fields.
 
 `validation_report.json` blocks readiness for schedule/summary seed drift,
 multiple selected attempts, profile mismatch, malformed actions, missing wait
-logs, fixed-weight deviations, and duplicate autonomous identities. Incomplete
-coverage is reported as a warning rather than silently converted into failure.
+logs, invalid termination or operator-input integrity, fixed-weight deviations,
+and duplicate autonomous identities. Incomplete coverage is reported as a
+warning rather than silently converted into failure.
 
 Gate 2 has only five repetitions per mode-condition. Its report is descriptive
 pilot evidence and does not center significance testing.
