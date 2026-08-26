@@ -26,7 +26,7 @@ GATE2_CONFIG_SHA256 = (
     "43c88fe649362303ec599c6397155380d0de1ece84dbdcf614a2a952829447c5"
 )
 GATE2_PROFILE_SHA256 = (
-    "cb69a38dfd23f2528a356e91b4aa2a14620803ce7385e0035a8c6e1da5fb84d0"
+    "3bae6c547e2eec8d33c68a860d65eea4c0b1c39c7fb993dd2f033323b0994afc"
 )
 GATE2_CONDITIONS = ("nominal", "p02", "p06", "p09")
 GATE2_MODES = ("teleoperation", "fixed_blend", "cosine_blend")

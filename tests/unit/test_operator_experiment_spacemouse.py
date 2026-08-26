@@ -127,7 +127,7 @@ class OperatorExperimentSpaceMouseTest(unittest.TestCase):
             configuration["spacemouse_profile"]["contents"][
                 "translation_gain"
             ],
-            0.3,
+            0.4,
         )
 
     def test_profile_path_reaches_all_child_modes(self) -> None:
@@ -162,7 +162,7 @@ class OperatorExperimentSpaceMouseTest(unittest.TestCase):
                 )
                 loaded = load_spacemouse_profile(Path(passed_path))
                 self.assertEqual(passed_path, profile_path)
-                self.assertEqual(loaded.translation_gain, 0.3)
+                self.assertEqual(loaded.translation_gain, 0.4)
                 self.assertEqual(loaded.rotation_gain, 0.08)
                 for reconstructed_option in (
                     "--spacemouse-deadzone",
@@ -193,7 +193,7 @@ class OperatorExperimentSpaceMouseTest(unittest.TestCase):
 
         self.assertIsNotNone(operator._spacemouse)
         assert operator._spacemouse is not None
-        self.assertEqual(operator._spacemouse.config.translation_gain, 0.3)
+        self.assertEqual(operator._spacemouse.config.translation_gain, 0.4)
         self.assertEqual(operator._spacemouse.config.rotation_gain, 0.08)
         self.assertNotEqual(
             operator._spacemouse.config.translation_gain,

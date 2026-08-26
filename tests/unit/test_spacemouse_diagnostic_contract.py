@@ -160,7 +160,7 @@ class SpaceMouseDiagnosticContractTest(unittest.TestCase):
             )
 
         self.assertEqual(config.device_path, "/dev/input/by-id/test-device")
-        self.assertEqual(config.translation_gain, 0.3)
+        self.assertEqual(config.translation_gain, 0.4)
         self.assertEqual(config.rotation_gain, 0.08)
         self.assertEqual(config.axis_mapping, calibrated.axis_mapping)
         self.assertEqual(config.axis_signs, calibrated.axis_signs)

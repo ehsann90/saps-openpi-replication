@@ -121,19 +121,24 @@ signs but enables translation only for a safe staged shakedown. Direct-runner
 defaults remain unchanged when no profile is supplied. Make targets
 automatically supply the committed profile whenever `INPUT_SOURCE=spacemouse`.
 
-The calibrated translation gain is `0.30`, raised from `0.14`
-after physical testing found both single-axis and mechanically coupled diagonal
-motion too slow. This does not change the direct-runner fallback or the analog
-processing equation. Multi-axis SpaceMouse gestures commonly divide the puck's
-physical deflection among axes, so increasing the linear gain compensates
-without normalizing or otherwise reshaping the command vector.
+The calibrated translation gain is `0.40`. It was first raised from `0.14` to
+`0.30` after physical testing found both single-axis and mechanically coupled
+diagonal motion too slow. Before Gate-2 collection, matched shakedown logs then
+showed that active SpaceMouse translation remained systematically smaller than
+policy translation, so it was conservatively raised from `0.30` to `0.40`.
+This does not change the direct-runner fallback or the analog processing
+equation. Multi-axis SpaceMouse gestures commonly divide the puck's physical
+deflection among axes, so increasing the linear gain compensates without
+normalizing or otherwise reshaping the command vector.
 
-The calibrated rotation gain is `0.08`, reduced from `0.18`
-after combined 6-DoF testing found that incidental puck tilt produced too much
-gripper rotation during intended translation. This reduces both intentional and
-incidental rotation proportionally; it does not introduce dominant-axis
-suppression, filtering, or a different activation rule. The value remains
-adjustable live while disarmed.
+The calibrated rotation gain remains `0.08`, reduced from `0.18` after combined
+6-DoF testing found that incidental puck tilt produced too much gripper rotation
+during intended translation. The pre-collection action-scale diagnosis found
+rotation approximately comparable to policy rotation on rotation-active steps,
+so it did not support raising this gain alongside translation. The lower value
+reduces both intentional and incidental rotation proportionally; it does not
+introduce dominant-axis suppression, filtering, or a different activation rule.
+The value remains adjustable live while disarmed.
 
 ## Safety and gripper behavior
 
@@ -224,7 +229,7 @@ The versioned profile format is:
   "axis_mapping": ["ABS_Y", "ABS_X", "ABS_Z", "ABS_RY", "ABS_RX", "ABS_RZ"],
   "axis_signs": [-1.0, 1.0, -1.0, -1.0, 1.0, 1.0],
   "axis_maxima": [350.0, 350.0, 350.0, 350.0, 350.0, 350.0],
-  "translation_gain": 0.3,
+  "translation_gain": 0.4,
   "rotation_gain": 0.08,
   "axis_scales": [1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
   "axis_enabled": [true, true, true, true, true, true],

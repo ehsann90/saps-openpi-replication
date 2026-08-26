@@ -192,7 +192,7 @@ make teleop \
 ```
 
 The summary must contain the calibrated profile identity. Every step must log
-the SpaceMouse source, selected device, `0.30/0.08` gains, calibrated
+the SpaceMouse source, selected device, `0.40/0.08` gains, calibrated
 mapping/signs, and finite seven-dimensional actions. Stale neutral samples are
 expected when the puck is idle, but their six motion dimensions must be zero.
 

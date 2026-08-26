@@ -11,7 +11,7 @@
   ],
   "axis_signs": [-1.0, 1.0, -1.0, -1.0, 1.0, 1.0],
   "axis_maxima": [350.0, 350.0, 350.0, 350.0, 350.0, 350.0],
-  "translation_gain": 0.3,
+  "translation_gain": 0.4,
   "rotation_gain": 0.08,
   "axis_scales": [1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
   "axis_enabled": [true, true, true, true, true, true],

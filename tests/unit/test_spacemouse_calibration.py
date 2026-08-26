@@ -239,7 +239,7 @@ class NormalRunnerDefaultsTest(unittest.TestCase):
             profile.axis_signs,
             (-1.0, 1.0, -1.0, -1.0, 1.0, 1.0),
         )
-        self.assertEqual(profile.translation_gain, 0.30)
+        self.assertEqual(profile.translation_gain, 0.40)
         self.assertEqual(profile.rotation_gain, 0.08)
         self.assertEqual(profile.deadzone, 0.08)
         self.assertEqual(profile.axis_enabled, (True,) * 6)

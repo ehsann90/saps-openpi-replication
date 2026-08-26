@@ -24,11 +24,15 @@ The single source of schedule parameters is
 | Control frequency | `20.0 Hz` |
 | Collection horizon | `280` control steps |
 | Ordering seed | `20260825` |
-| SpaceMouse profile | `configs/spacemouse_profile.json` |
+| SpaceMouse profile | `configs/spacemouse_profile.json` (`0.40` translation, `0.08` rotation) |
 | Output root | `outputs/gate2_operator_pilot_v1` |
 
 The keyboard-gain fields retained by the schema do not configure Gate-2
-SpaceMouse motion. The validated SpaceMouse profile is authoritative.
+SpaceMouse motion. The validated SpaceMouse profile is authoritative. Its
+translation gain was conservatively retuned from `0.30` to `0.40` after the
+pre-collection shakedown; no formal Gate-2 episode had been collected. Rotation
+gain remains `0.08`, and the retune does not change arbitration or any schedule,
+seed, condition, perturbation, analysis, or horizon setting.
 
 ## Unified counterbalanced schedule
 
