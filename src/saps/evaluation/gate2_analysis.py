@@ -642,6 +642,7 @@ def _episode_analysis(
     manifest: Any,
     expected_profile_sha256: str,
     errors: list[str],
+    require_submitted_latency_equality: bool = True,
 ) -> tuple[dict[str, Any], dict[str, Any] | None, dict[str, Any] | None, dict[str, Any]]:
     row = _base_episode_row(episode)
     summary = _read_json(summary_path)
@@ -745,6 +746,7 @@ def _episode_analysis(
     replan_count = summary.get("policy_replan_count")
     if (
         mode != "teleoperation"
+        and require_submitted_latency_equality
         and replan_count is not None
         and int(replan_count) != latency["inference_count"]
     ):

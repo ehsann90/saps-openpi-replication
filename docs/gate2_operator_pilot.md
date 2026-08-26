@@ -179,9 +179,31 @@ matched_triplets.csv
 fixed_blend_diagnostics.csv
 cosine_blend_diagnostics.csv
 policy_wait_summary.csv
+policy_accounting_diagnostics.csv
 validation_report.json
 REPORT.md
 ```
+
+`policy_accounting_diagnostics.csv` preserves the runtime distinction between
+submitted requests and completed/logged results. For shared asynchronous modes,
+`summary.policy_replan_count` is the number of requests submitted to the worker;
+latency statistics include only results returned through `poll()` and written to
+an episode log. Completed results must have a one-to-one measured-latency count.
+Submitted minus completed must be zero, except that one final contiguous request
+is accepted when the terminal step records that exact request as still pending.
+The accepted terminal request remains explicit in
+`terminal_unobserved_request_count` and has no fabricated latency. Autonomous
+episodes use separate synchronous replan accounting and require exact equality
+between submitted replans, logged replans, and measured latencies.
+
+Historical shared scheduler-wait records contain worker state and latency but
+not request/result replan-index fields. Therefore
+`logged_request_submission_count` counts explicit step-record submission events;
+the initial request (normally index `0`) is evidenced by its contiguous logged
+result. Validation reconstructs the request sequence from the summary submitted
+count plus the deduplicated step/wait evidence, while still rejecting duplicate
+results, non-contiguous results, unexplained gaps, or executed actions without a
+logged result.
 
 Fixed blending is audited at alpha `0.5` with absolute tolerance `1e-9`.
 Cosine diagnostic thresholds remain predeclared: near zero `alpha <= 0.10`,

@@ -82,6 +82,331 @@ TRIPLET_FIELDS = (
     "fixed_blend_summary_path",
     "cosine_blend_summary_path",
 )
+POLICY_ACCOUNTING_FIELDS = (
+    "episode_id",
+    "mode",
+    "condition_id",
+    "trial_index",
+    "success",
+    "termination_reason",
+    "control_steps",
+    "accounting_model",
+    "accounting_status",
+    "summary_policy_replan_count",
+    "policy_requests_submitted",
+    "logged_request_submission_count",
+    "unique_submitted_replan_indices",
+    "policy_results_completed_and_logged",
+    "logged_policy_result_count",
+    "unique_result_replan_indices",
+    "inference_latency_count",
+    "non_null_inference_latency_count",
+    "last_submitted_replan_index",
+    "last_result_replan_index",
+    "last_logged_policy_worker_pending",
+    "submitted_minus_result_count",
+    "submitted_minus_latency_count",
+    "terminal_unobserved_request_count",
+    "terminal_unobserved_replan_index",
+)
+
+
+def _ordered_records(
+    steps: list[dict[str, Any]],
+    waits: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Return scheduler records in collection order."""
+
+    records = [*steps, *waits]
+    return sorted(
+        records,
+        key=lambda record: int(record.get("scheduler_tick", -1)),
+    )
+
+
+def _indices(
+    records: list[dict[str, Any]],
+    field: str,
+) -> tuple[list[int], list[int]]:
+    values = [
+        int(record[field])
+        for record in records
+        if record.get(field) is not None
+    ]
+    return values, sorted(set(values))
+
+
+def _accounting_identity(
+    *,
+    episode_id: str,
+    mode: str,
+    condition_id: str,
+    trial_index: int,
+    success: bool,
+    termination_reason: str,
+    control_steps: int,
+) -> dict[str, Any]:
+    return {
+        "episode_id": episode_id,
+        "mode": mode,
+        "condition_id": condition_id,
+        "trial_index": trial_index,
+        "success": int(success),
+        "termination_reason": termination_reason,
+        "control_steps": control_steps,
+    }
+
+
+def _blank_policy_accounting(
+    row: dict[str, Any],
+    *,
+    accounting_model: str,
+) -> dict[str, Any]:
+    return {
+        "episode_id": row["episode_id"],
+        "mode": row["mode"],
+        "condition_id": row["condition_id"],
+        "trial_index": row["trial_index"],
+        "success": None,
+        "termination_reason": None,
+        "control_steps": None,
+        "accounting_model": accounting_model,
+        "accounting_status": "not_available",
+        "summary_policy_replan_count": None,
+        "policy_requests_submitted": None,
+        "logged_request_submission_count": None,
+        "unique_submitted_replan_indices": None,
+        "policy_results_completed_and_logged": None,
+        "logged_policy_result_count": None,
+        "unique_result_replan_indices": None,
+        "inference_latency_count": None,
+        "non_null_inference_latency_count": None,
+        "last_submitted_replan_index": None,
+        "last_result_replan_index": None,
+        "last_logged_policy_worker_pending": None,
+        "submitted_minus_result_count": None,
+        "submitted_minus_latency_count": None,
+        "terminal_unobserved_request_count": None,
+        "terminal_unobserved_replan_index": None,
+    }
+
+
+def _shared_policy_accounting(
+    *,
+    episode_id: str,
+    summary: dict[str, Any],
+    steps: list[dict[str, Any]],
+    waits: list[dict[str, Any]],
+    errors: list[str],
+) -> dict[str, Any]:
+    """Validate submitted versus observed asynchronous policy requests."""
+
+    records = _ordered_records(steps, waits)
+    submitted_values, submitted_indices = _indices(
+        records,
+        "policy_request_replan_index",
+    )
+    result_values, result_indices = _indices(
+        records,
+        "policy_result_replan_index",
+    )
+    latency_count = sum(
+        record.get("inference_latency_seconds") is not None
+        for record in records
+    )
+    submitted_count = int(summary["policy_replan_count"])
+    completed_count = len(result_indices)
+    submitted_minus_result = submitted_count - completed_count
+    submitted_minus_latency = submitted_count - latency_count
+    expected_indices = list(range(submitted_count))
+    terminal_index = submitted_count - 1
+    final_step = steps[-1]
+    terminal_outstanding = (
+        submitted_minus_result == 1
+        and result_indices == expected_indices[:-1]
+        and final_step.get("policy_request_replan_index") == terminal_index
+        and final_step.get("policy_worker_pending") is True
+    )
+
+    accounting_errors: list[str] = []
+    if len(submitted_values) != len(submitted_indices):
+        accounting_errors.append("duplicate submitted replan indices")
+    if len(result_values) != completed_count:
+        accounting_errors.append("duplicate completed replan indices")
+    if completed_count != latency_count:
+        accounting_errors.append(
+            "completed policy-result count does not match inference-latency "
+            "count"
+        )
+    if submitted_minus_result < 0 or submitted_minus_result > 1:
+        accounting_errors.append(
+            "submitted-minus-completed policy request count is outside [0, 1]"
+        )
+    if submitted_minus_latency != submitted_minus_result:
+        accounting_errors.append(
+            "submitted-minus-latency count does not match "
+            "submitted-minus-completed count"
+        )
+    if result_indices != expected_indices[:completed_count]:
+        accounting_errors.append(
+            "completed replan indices are not a contiguous prefix"
+        )
+    if sorted(set(submitted_indices).union(result_indices)) != expected_indices:
+        accounting_errors.append(
+            "submitted requests cannot be reconstructed as contiguous indices"
+        )
+    if submitted_minus_result == 1 and not terminal_outstanding:
+        accounting_errors.append(
+            "single outstanding request is not demonstrably terminal/in-flight"
+        )
+    action_indices = {
+        int(step["policy_replan_index"])
+        for step in steps
+        if step.get("policy_replan_index") is not None
+    }
+    unexplained_action_indices = sorted(action_indices.difference(result_indices))
+    if unexplained_action_indices:
+        accounting_errors.append(
+            "executed action references unlogged policy results "
+            f"{unexplained_action_indices}"
+        )
+    errors.extend(
+        f"{episode_id}: policy accounting: {message}."
+        for message in accounting_errors
+    )
+
+    last_record = records[-1]
+    status = (
+        "invalid"
+        if accounting_errors
+        else (
+            "terminal_request_unobserved"
+            if terminal_outstanding
+            else "complete"
+        )
+    )
+    return {
+        **_accounting_identity(
+            episode_id=episode_id,
+            mode=str(summary["arbitration_mode"]),
+            condition_id=str(summary["condition_id"]),
+            trial_index=int(summary["trial_index"]),
+            success=bool(summary["success"]),
+            termination_reason=str(summary["termination_reason"]),
+            control_steps=int(summary["control_steps"]),
+        ),
+        "accounting_model": "shared_asynchronous",
+        "accounting_status": status,
+        "summary_policy_replan_count": submitted_count,
+        "policy_requests_submitted": submitted_count,
+        "logged_request_submission_count": len(submitted_indices),
+        "unique_submitted_replan_indices": json.dumps(submitted_indices),
+        "policy_results_completed_and_logged": completed_count,
+        "logged_policy_result_count": completed_count,
+        "unique_result_replan_indices": json.dumps(result_indices),
+        "inference_latency_count": latency_count,
+        "non_null_inference_latency_count": latency_count,
+        "last_submitted_replan_index": (
+            submitted_indices[-1] if submitted_indices else None
+        ),
+        "last_result_replan_index": (
+            result_indices[-1] if result_indices else None
+        ),
+        "last_logged_policy_worker_pending": bool(
+            last_record.get("policy_worker_pending", False)
+        ),
+        "submitted_minus_result_count": submitted_minus_result,
+        "submitted_minus_latency_count": submitted_minus_latency,
+        "terminal_unobserved_request_count": int(terminal_outstanding),
+        "terminal_unobserved_replan_index": (
+            terminal_index if terminal_outstanding else None
+        ),
+    }
+
+
+def _autonomous_policy_accounting(
+    *,
+    episode_id: str,
+    summary: dict[str, Any],
+    steps: list[dict[str, Any]],
+    errors: list[str],
+) -> dict[str, Any]:
+    """Validate synchronous autonomous replans and measured latencies."""
+
+    replan_records = [step for step in steps if bool(step.get("replanned"))]
+    replan_values = [
+        int(step["policy_replan_index"])
+        for step in replan_records
+        if step.get("policy_replan_index") is not None
+    ]
+    replan_indices = sorted(set(replan_values))
+    latency_count = sum(
+        step.get("inference_latency_seconds") is not None for step in steps
+    )
+    submitted_count = int(summary["policy_replan_count"])
+    accounting_errors: list[str] = []
+    if len(replan_values) != len(replan_records):
+        accounting_errors.append("a synchronous replan lacks a replan index")
+    if len(replan_values) != len(replan_indices):
+        accounting_errors.append("duplicate synchronous replan indices")
+    if replan_indices != list(range(submitted_count)):
+        accounting_errors.append(
+            "synchronous replan indices do not match submitted requests"
+        )
+    if len(replan_records) != latency_count:
+        accounting_errors.append(
+            "synchronous replan count does not match inference-latency count"
+        )
+    action_mismatches = [
+        int(step.get("control_step", index))
+        for index, step in enumerate(steps)
+        if step.get("executed_action") is not None
+        and step.get("policy_action") is not None
+        and step["executed_action"] != step["policy_action"]
+    ]
+    if action_mismatches:
+        accounting_errors.append(
+            "autonomous executed actions differ from logged policy actions at "
+            f"steps {action_mismatches}"
+        )
+    errors.extend(
+        f"{episode_id}: policy accounting: {message}."
+        for message in accounting_errors
+    )
+    completed_count = len(replan_records)
+    return {
+        **_accounting_identity(
+            episode_id=episode_id,
+            mode="autonomous",
+            condition_id=str(summary["condition_id"]),
+            trial_index=int(summary["trial_index"]),
+            success=bool(summary["success"]),
+            termination_reason=("success" if summary["success"] else "timeout"),
+            control_steps=int(summary["control_steps"]),
+        ),
+        "accounting_model": "autonomous_synchronous",
+        "accounting_status": "invalid" if accounting_errors else "complete",
+        "summary_policy_replan_count": submitted_count,
+        "policy_requests_submitted": submitted_count,
+        "logged_request_submission_count": len(replan_indices),
+        "unique_submitted_replan_indices": json.dumps(replan_indices),
+        "policy_results_completed_and_logged": completed_count,
+        "logged_policy_result_count": completed_count,
+        "unique_result_replan_indices": json.dumps(replan_indices),
+        "inference_latency_count": latency_count,
+        "non_null_inference_latency_count": latency_count,
+        "last_submitted_replan_index": (
+            replan_indices[-1] if replan_indices else None
+        ),
+        "last_result_replan_index": (
+            replan_indices[-1] if replan_indices else None
+        ),
+        "last_logged_policy_worker_pending": False,
+        "submitted_minus_result_count": submitted_count - completed_count,
+        "submitted_minus_latency_count": submitted_count - latency_count,
+        "terminal_unobserved_request_count": 0,
+        "terminal_unobserved_replan_index": None,
+    }
 
 
 def _write_csv(
@@ -194,11 +519,13 @@ def _shared_rows(
     list[dict[str, Any]],
     list[dict[str, Any]],
     list[dict[str, Any]],
+    list[dict[str, Any]],
 ]:
     episode_rows: list[dict[str, Any]] = []
     fixed_rows: list[dict[str, Any]] = []
     cosine_rows: list[dict[str, Any]] = []
     wait_rows: list[dict[str, Any]] = []
+    accounting_rows: list[dict[str, Any]] = []
     root_started = (session_root / "schedule.json").is_file()
     for episode in schedule["episodes"]:
         row = _base_episode_row(episode)
@@ -215,6 +542,12 @@ def _shared_rows(
                 )
             episode_rows.append(row)
             wait_rows.append(_blank_wait(row))
+            accounting_rows.append(
+                _blank_policy_accounting(
+                    row,
+                    accounting_model="shared_asynchronous",
+                )
+            )
             if episode["mode"] == "fixed_blend":
                 fixed_rows.append(
                     _blank_fixed(row, manifest.fixed_autonomy_weight)
@@ -223,12 +556,26 @@ def _shared_rows(
                 cosine_rows.append(_blank_cosine(row))
             continue
         attempt = selected[0]
+        summary_path = Path(str(attempt["summary_path"]))
         try:
             analyzed, fixed, cosine, wait = _episode_analysis(
                 episode=episode,
-                summary_path=Path(str(attempt["summary_path"])),
+                summary_path=summary_path,
                 manifest=manifest,
                 expected_profile_sha256=GATE2_V2_PROFILE_SHA256,
+                errors=errors,
+                require_submitted_latency_equality=False,
+            )
+            summary = _read_json(summary_path)
+            steps = _read_jsonl(summary_path.with_name("steps.jsonl"))
+            waits = _read_jsonl(
+                summary_path.with_name("scheduler_waits.jsonl")
+            )
+            accounting = _shared_policy_accounting(
+                episode_id=str(episode["episode_id"]),
+                summary=summary,
+                steps=steps,
+                waits=waits,
                 errors=errors,
             )
             analyzed["selected_attempt_number"] = int(
@@ -241,15 +588,26 @@ def _shared_rows(
             fixed = None
             cosine = None
             wait = _blank_wait(row)
+            accounting = _blank_policy_accounting(
+                row,
+                accounting_model="shared_asynchronous",
+            )
         episode_rows.append(analyzed)
         wait_rows.append(wait)
+        accounting_rows.append(accounting)
         if episode["mode"] == "fixed_blend":
             fixed_rows.append(
                 fixed or _blank_fixed(row, manifest.fixed_autonomy_weight)
             )
         else:
             cosine_rows.append(cosine or _blank_cosine(row))
-    return episode_rows, fixed_rows, cosine_rows, wait_rows
+    return (
+        episode_rows,
+        fixed_rows,
+        cosine_rows,
+        wait_rows,
+        accounting_rows,
+    )
 
 
 def _autonomous_summary_path(root: Path, episode: dict[str, Any]) -> Path:
@@ -268,7 +626,7 @@ def _autonomous_row(
     episode: dict[str, Any],
     summary_path: Path,
     errors: list[str],
-) -> dict[str, Any]:
+) -> tuple[dict[str, Any], dict[str, Any]]:
     row = _base_episode_row(
         {
             **episode,
@@ -297,27 +655,48 @@ def _autonomous_row(
             f"{row['episode_id']}: autonomous summary identity mismatch "
             f"in {mismatch}."
         )
-        return row
+        return row, _blank_policy_accounting(
+            row,
+            accounting_model="autonomous_synchronous",
+        )
     control_steps = int(summary["control_steps"])
     success = bool(summary["success"])
     if not 1 <= control_steps <= GATE2_V2_MAX_STEPS:
         errors.append(f"{row['episode_id']}: invalid autonomous step count.")
-        return row
+        return row, _blank_policy_accounting(
+            row,
+            accounting_model="autonomous_synchronous",
+        )
     if not success and control_steps != GATE2_V2_MAX_STEPS:
         errors.append(
             f"{row['episode_id']}: autonomous failure is not a full timeout."
         )
-        return row
+        return row, _blank_policy_accounting(
+            row,
+            accounting_model="autonomous_synchronous",
+        )
     steps_path = summary_path.with_name("steps.jsonl")
     if not steps_path.is_file():
         errors.append(f"{row['episode_id']}: autonomous steps.jsonl is missing.")
-        return row
+        return row, _blank_policy_accounting(
+            row,
+            accounting_model="autonomous_synchronous",
+        )
     steps = _read_jsonl(steps_path)
     if len(steps) != control_steps:
         errors.append(
             f"{row['episode_id']}: autonomous logged steps do not match."
         )
-        return row
+        return row, _blank_policy_accounting(
+            row,
+            accounting_model="autonomous_synchronous",
+        )
+    accounting = _autonomous_policy_accounting(
+        episode_id=str(row["episode_id"]),
+        summary=summary,
+        steps=steps,
+        errors=errors,
+    )
     latency = _latency_metrics(steps, [])
     simulated = control_steps / GATE2_V2_CONTROL_FREQUENCY_HZ
     wall_control = _finite_float(summary["control_elapsed_seconds"])
@@ -358,7 +737,7 @@ def _autonomous_row(
             "summary_path": str(summary_path),
         }
     )
-    return row
+    return row, accounting
 
 
 def _validate_autonomous_root(
@@ -472,6 +851,30 @@ def _write_report(path: Path, report: dict[str, Any]) -> None:
             "increase simulated-step count. Autonomous inference latency is "
             "reported from replan step logs and contributes to wall time."
         ),
+        "",
+        "## Policy accounting",
+        "",
+        (
+            "Shared `policy_replan_count` counts submitted asynchronous "
+            "requests. Completed/logged results must equal measured latency "
+            "samples. A difference of one is accepted only for a contiguous "
+            "final request logged as pending on the terminal step."
+        ),
+        "",
+        (
+            "- Shared complete accounting: "
+            f"`{report['policy_accounting']['shared_async_complete_episode_count']}`"
+        ),
+        (
+            "- Shared terminal-unobserved requests: "
+            "`"
+            f"{report['policy_accounting']['shared_async_terminal_unobserved_episode_count']}"
+            "`"
+        ),
+        (
+            "- Autonomous synchronous complete accounting: "
+            f"`{report['policy_accounting']['autonomous_sync_complete_episode_count']}`"
+        ),
     ]
     if report["blocking_errors"]:
         lines.extend(["", "## Blocking errors", ""])
@@ -504,7 +907,13 @@ def analyze_gate2_v2_collection(
         manifest=manifest,
         errors=errors,
     )
-    shared_rows, fixed_rows, cosine_rows, wait_rows = _shared_rows(
+    (
+        shared_rows,
+        fixed_rows,
+        cosine_rows,
+        wait_rows,
+        shared_accounting_rows,
+    ) = _shared_rows(
         session_root=session_root,
         manifest=manifest,
         schedule=shared_schedule,
@@ -529,11 +938,12 @@ def analyze_gate2_v2_collection(
         warnings=warnings,
     )
     autonomous_rows = []
+    autonomous_accounting_rows = []
     for episode in autonomous_schedule["episodes"]:
         summary_path = _autonomous_summary_path(autonomous_root, episode)
         if summary_path.is_file():
             try:
-                row = _autonomous_row(
+                row, accounting = _autonomous_row(
                     episode=episode,
                     summary_path=summary_path,
                     errors=errors,
@@ -551,6 +961,10 @@ def analyze_gate2_v2_collection(
                     }
                 )
                 errors.append(f"{row['episode_id']}: {error}")
+                accounting = _blank_policy_accounting(
+                    row,
+                    accounting_model="autonomous_synchronous",
+                )
         else:
             row = _base_episode_row(
                 {
@@ -562,7 +976,12 @@ def analyze_gate2_v2_collection(
                     "status": "pending",
                 }
             )
+            accounting = _blank_policy_accounting(
+                row,
+                accounting_model="autonomous_synchronous",
+            )
         autonomous_rows.append(row)
+        autonomous_accounting_rows.append(accounting)
 
     all_rows = [*autonomous_rows, *shared_rows]
     mode_summary = _aggregate(
@@ -599,6 +1018,20 @@ def analyze_gate2_v2_collection(
             "Fixed-blend alpha differs from 0.5 in: "
             + ", ".join(fixed_deviations)
         )
+    accounting_rows = [
+        *autonomous_accounting_rows,
+        *shared_accounting_rows,
+    ]
+    shared_terminal_outstanding = sum(
+        int(row["terminal_unobserved_request_count"] or 0)
+        for row in shared_accounting_rows
+    )
+    if shared_terminal_outstanding:
+        warnings.append(
+            f"{shared_terminal_outstanding} shared episodes ended with one "
+            "terminal policy request still in flight; those requests have no "
+            "logged latency and are excluded from latency statistics."
+        )
     report = {
         "schema_version": 1,
         "shared_experiment_id": GATE2_V2_SHARED_EXPERIMENT_ID,
@@ -625,6 +1058,27 @@ def analyze_gate2_v2_collection(
             "autonomous_inference_contributes_to_wall_time": True,
         },
         "fixed_blend_deviation_episode_ids": fixed_deviations,
+        "policy_accounting": {
+            "shared_async_complete_episode_count": sum(
+                row["accounting_status"] == "complete"
+                for row in shared_accounting_rows
+            ),
+            "shared_async_terminal_unobserved_episode_count": (
+                shared_terminal_outstanding
+            ),
+            "shared_async_invalid_episode_count": sum(
+                row["accounting_status"] == "invalid"
+                for row in shared_accounting_rows
+            ),
+            "autonomous_sync_complete_episode_count": sum(
+                row["accounting_status"] == "complete"
+                for row in autonomous_accounting_rows
+            ),
+            "autonomous_sync_invalid_episode_count": sum(
+                row["accounting_status"] == "invalid"
+                for row in autonomous_accounting_rows
+            ),
+        },
         "blocking_errors": errors,
         "warnings": warnings,
     }
@@ -651,6 +1105,11 @@ def analyze_gate2_v2_collection(
         ],
     )
     _write_csv(output_dir / "policy_wait_summary.csv", wait_rows)
+    _write_csv(
+        output_dir / "policy_accounting_diagnostics.csv",
+        accounting_rows,
+        fieldnames=POLICY_ACCOUNTING_FIELDS,
+    )
     (output_dir / "validation_report.json").write_text(
         json.dumps(report, indent=2) + "\n",
         encoding="utf-8",

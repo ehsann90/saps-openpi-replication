@@ -8,6 +8,7 @@ import tempfile
 import unittest
 
 from saps.evaluation.experiment_session import json_file_identity
+from saps.evaluation.gate2_v2_analysis import _shared_policy_accounting
 from saps.evaluation.gate2_v2_analysis import analyze_gate2_v2_collection
 from saps.evaluation.gate2_v2_protocol import (
     build_gate2_v2_autonomous_schedule,
@@ -99,9 +100,184 @@ class Gate2V2AnalysisTest(unittest.TestCase):
         }
         write_json(episode_root / "summary.json", summary)
         (episode_root / "steps.jsonl").write_text(
-            json.dumps({"inference_latency_seconds": 0.35}) + "\n",
+            json.dumps(
+                {
+                    "replanned": True,
+                    "policy_replan_index": 0,
+                    "inference_latency_seconds": 0.35,
+                }
+            )
+            + "\n",
             encoding="utf-8",
         )
+
+    @staticmethod
+    def shared_summary(policy_replan_count: int) -> dict[str, object]:
+        return {
+            "arbitration_mode": "fixed_blend",
+            "condition_id": "nominal",
+            "trial_index": 0,
+            "success": True,
+            "termination_reason": "success",
+            "control_steps": policy_replan_count,
+            "policy_replan_count": policy_replan_count,
+        }
+
+    @staticmethod
+    def shared_record(
+        *,
+        scheduler_tick: int,
+        submitted: int | None = None,
+        result: int | None = None,
+        latency: float | None = None,
+        pending: bool = False,
+        action_replan_index: int | None = None,
+    ) -> dict[str, object]:
+        return {
+            "scheduler_tick": scheduler_tick,
+            "policy_request_replan_index": submitted,
+            "policy_result_replan_index": result,
+            "inference_latency_seconds": latency,
+            "policy_worker_pending": pending,
+            "policy_replan_index": action_replan_index,
+        }
+
+    def account_shared(
+        self,
+        *,
+        submitted_count: int,
+        steps: list[dict[str, object]],
+    ) -> tuple[dict[str, object], list[str]]:
+        errors: list[str] = []
+        diagnostic = _shared_policy_accounting(
+            episode_id="synthetic",
+            summary=self.shared_summary(submitted_count),
+            steps=steps,
+            waits=[],
+            errors=errors,
+        )
+        return diagnostic, errors
+
+    def test_complete_shared_policy_accounting_is_valid(self) -> None:
+        steps = [
+            self.shared_record(
+                scheduler_tick=index,
+                submitted=index + 1 if index < 2 else None,
+                result=index,
+                latency=0.1,
+                action_replan_index=index,
+            )
+            for index in range(3)
+        ]
+        diagnostic, errors = self.account_shared(
+            submitted_count=3,
+            steps=steps,
+        )
+
+        self.assertEqual(errors, [])
+        self.assertEqual(diagnostic["accounting_status"], "complete")
+        self.assertEqual(diagnostic["policy_requests_submitted"], 3)
+        self.assertEqual(diagnostic["policy_results_completed_and_logged"], 3)
+        self.assertEqual(diagnostic["inference_latency_count"], 3)
+
+    def test_terminal_outstanding_shared_request_is_valid(self) -> None:
+        steps = [
+            self.shared_record(
+                scheduler_tick=0,
+                submitted=1,
+                result=0,
+                latency=0.1,
+                action_replan_index=0,
+            ),
+            self.shared_record(
+                scheduler_tick=1,
+                submitted=2,
+                result=1,
+                latency=0.1,
+                pending=True,
+                action_replan_index=1,
+            ),
+        ]
+        diagnostic, errors = self.account_shared(
+            submitted_count=3,
+            steps=steps,
+        )
+
+        self.assertEqual(errors, [])
+        self.assertEqual(
+            diagnostic["accounting_status"],
+            "terminal_request_unobserved",
+        )
+        self.assertEqual(diagnostic["terminal_unobserved_request_count"], 1)
+        self.assertEqual(diagnostic["terminal_unobserved_replan_index"], 2)
+
+    def test_missing_shared_latency_is_invalid(self) -> None:
+        steps = [
+            self.shared_record(
+                scheduler_tick=index,
+                submitted=index + 1 if index < 2 else None,
+                result=index,
+                latency=0.1 if index < 2 else None,
+                action_replan_index=index,
+            )
+            for index in range(3)
+        ]
+        diagnostic, errors = self.account_shared(
+            submitted_count=3,
+            steps=steps,
+        )
+
+        self.assertEqual(diagnostic["accounting_status"], "invalid")
+        self.assertTrue(any("latency" in error for error in errors))
+
+    def test_middle_shared_result_gap_is_invalid(self) -> None:
+        steps = [
+            self.shared_record(
+                scheduler_tick=0,
+                submitted=1,
+                result=0,
+                latency=0.1,
+                action_replan_index=0,
+            ),
+            self.shared_record(
+                scheduler_tick=1,
+                submitted=2,
+                result=2,
+                latency=0.1,
+                action_replan_index=2,
+            ),
+        ]
+        diagnostic, errors = self.account_shared(
+            submitted_count=3,
+            steps=steps,
+        )
+
+        self.assertEqual(diagnostic["accounting_status"], "invalid")
+        self.assertTrue(any("contiguous prefix" in error for error in errors))
+
+    def test_more_than_one_outstanding_shared_request_is_invalid(self) -> None:
+        steps = [
+            self.shared_record(
+                scheduler_tick=0,
+                submitted=1,
+                result=0,
+                latency=0.1,
+                action_replan_index=0,
+            ),
+            self.shared_record(
+                scheduler_tick=1,
+                submitted=2,
+                pending=True,
+                action_replan_index=0,
+            ),
+        ]
+        diagnostic, errors = self.account_shared(
+            submitted_count=3,
+            steps=steps,
+        )
+
+        self.assertEqual(diagnostic["accounting_status"], "invalid")
+        self.assertTrue(any("outside [0, 1]" in error for error in errors))
 
     def test_analysis_handles_both_collections_not_started(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
