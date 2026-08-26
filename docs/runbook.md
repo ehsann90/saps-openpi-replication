@@ -132,10 +132,10 @@ Make targets automatically use the committed
 `configs/spacemouse_profile.json`; override `SPACEMOUSE_PROFILE` only when a
 different validated profile is intentionally required.
 
-## 8. Gate-2 excluded operator pilot
+## 8. Gate-2 v2 matched pilot
 
-Validate the fixed 60-episode protocol without creating outputs or launching an
-episode:
+Validate the 40 shared rows and intended 20 autonomous identities without
+creating outputs or launching an episode:
 
 ```bash
 make gate2-preflight \
@@ -150,8 +150,16 @@ make gate2-session \
   SPACEMOUSE_DEVICE=/dev/input/by-id/usb-3Dconnexion_SpaceMouse_Wireless-event-joystick
 ```
 
-The session is fixed to `configs/gate2_operator_pilot_manifest.json`, the
-committed SpaceMouse profile, and `outputs/gate2_operator_pilot_v1`. See the
+The session is fixed to `configs/gate2_shared_autonomy_pilot_manifest.json`, the
+committed SpaceMouse profile, and `outputs/gate2_shared_autonomy_pilot_v2`.
+After shared collection, validate and collect the frozen autonomous baseline:
+
+```bash
+make gate2-autonomous-preflight
+make gate2-autonomous
+```
+
+See the
 [Gate-2 protocol](gate2_operator_pilot.md) for counterbalancing, provenance,
 redo, and scope restrictions.
 

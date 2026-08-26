@@ -124,6 +124,7 @@ class SharedEpisodeLoopSchedulerTest(unittest.TestCase):
 
         self.assertEqual(result.termination_reason, "operator_abort")
         self.assertEqual(result.control_steps, 0)
+        self.assertEqual(result.simulation_steps, 0)
         self.assertEqual(len(worker.requests), 1)
         self.assertEqual(worker.requests[0]["reason"], "periodic")
         self.assertEqual(
@@ -186,6 +187,7 @@ class SharedEpisodeLoopSchedulerTest(unittest.TestCase):
 
         self.assertEqual(result.termination_reason, "operator_abort")
         self.assertEqual(result.control_steps, 0)
+        self.assertEqual(result.simulation_steps, 0)
         self.assertEqual(len(worker.requests), 1)
         self.assertEqual(worker.requests[0]["reason"], "periodic")
         self.assertEqual(len(waits), 1)

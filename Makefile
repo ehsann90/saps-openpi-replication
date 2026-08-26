@@ -39,8 +39,8 @@ SCENE_OUTPUT ?= outputs/scene_inspection
 PREVIEW_OUTPUT ?= outputs/perturbation_preview
 ANALYSIS_OUTPUT ?= results/analysis
 COMPARISON_OUTPUT ?= results/saps_libero_current
-GATE2_ANALYSIS_OUTPUT ?= results/gate2_operator_pilot_v1
-GATE2_AUTONOMOUS_RESULTS ?= outputs/autonomous_deterministic_n20_state0_v1
+GATE2_ANALYSIS_OUTPUT ?= results/gate2_shared_autonomy_pilot_v2
+GATE2_AUTONOMOUS_RESULTS ?= outputs/gate2_autonomous_pilot_v2
 AUTONOMOUS_RESULTS ?= outputs/autonomous_deterministic_n20_state0_v1
 TELEOP_RESULTS ?= outputs/saps_libero_teleoperation_v2
 SHARED_RESULTS ?= outputs/saps_libero_shared_autonomy_v2
@@ -49,10 +49,13 @@ REDO_EPISODES_ARG = $(if $(strip $(REDO_EPISODES)),--redo-episode-ids $(REDO_EPI
 MANIFEST ?= configs/operator_shared_autonomy_manifest.json
 SESSION_OUTPUT ?= outputs/operator_experiment
 REPOSITORY_COMMIT := $(shell git rev-parse HEAD)
-override GATE2_MANIFEST := configs/gate2_operator_pilot_manifest.json
+override GATE2_MANIFEST := configs/gate2_shared_autonomy_pilot_manifest.json
+override GATE2_AUTONOMOUS_PROTOCOL := configs/gate2_autonomous_pilot_protocol.json
 override GATE2_PROFILE := configs/spacemouse_profile.json
-override GATE2_OUTPUT := outputs/gate2_operator_pilot_v1
-override GATE2_EXPERIMENT_ID := saps_libero_gate2_operator_pilot_v1
+override GATE2_OUTPUT := outputs/gate2_shared_autonomy_pilot_v2
+override GATE2_AUTONOMOUS_OUTPUT := outputs/gate2_autonomous_pilot_v2
+override GATE2_EXPERIMENT_ID := saps_libero_gate2_shared_autonomy_pilot_v2
+override GATE2_AUTONOMOUS_EXPERIMENT_ID := saps_libero_gate2_autonomous_pilot_v2
 
 DX ?= 0.0
 DY ?= 0.0
@@ -76,6 +79,8 @@ help:
 	@echo "  make shared-autonomy-session"
 	@echo "  make gate2-preflight SPACEMOUSE_DEVICE=/dev/input/by-id/..."
 	@echo "  make gate2-session SPACEMOUSE_DEVICE=/dev/input/by-id/..."
+	@echo "  make gate2-autonomous-preflight"
+	@echo "  make gate2-autonomous"
 	@echo "  make gate2-analysis"
 	@echo
 	@echo "Tests:"
@@ -153,7 +158,23 @@ gate2-preflight:
 		{ echo "Gate-2 requires SPACEMOUSE_DEVICE=/dev/input/by-id/..."; exit 2; }
 	$(COMPOSE) run --rm --no-deps \
 		-e SAPS_SCRIPT=/workspace/scripts/preflight_gate2_operator_pilot.py \
-		-e SAPS_RUNTIME_ARGS="--manifest-path $(GATE2_MANIFEST) --spacemouse-profile-path $(GATE2_PROFILE) --spacemouse-device-path $(SPACEMOUSE_DEVICE) --output-dir $(GATE2_OUTPUT)" \
+		-e SAPS_RUNTIME_ARGS="--manifest-path $(GATE2_MANIFEST) --spacemouse-profile-path $(GATE2_PROFILE) --spacemouse-device-path $(SPACEMOUSE_DEVICE) --autonomous-protocol-path $(GATE2_AUTONOMOUS_PROTOCOL) --output-dir $(GATE2_OUTPUT)" \
+		runtime
+
+.PHONY: gate2-autonomous-preflight
+gate2-autonomous-preflight:
+	$(COMPOSE) run --rm --no-deps \
+		-e SAPS_SCRIPT=/workspace/scripts/preflight_gate2_autonomous_pilot.py \
+		-e SAPS_RUNTIME_ARGS="--protocol-path $(GATE2_AUTONOMOUS_PROTOCOL)" \
+		runtime
+
+.PHONY: gate2-autonomous
+gate2-autonomous:
+	@test -z "$$(git status --porcelain)" || \
+		{ echo "Gate-2 collection requires a clean repository."; exit 1; }
+	$(COMPOSE) run --rm --no-deps \
+		-e SAPS_SCRIPT=/workspace/scripts/run_autonomous_sweep.py \
+		-e SAPS_RUNTIME_ARGS="--config-path configs/libero_cream_cheese_offsets.json --condition-ids nominal,p02,p06,p09 --num-trials 5 --initial-state-index 0 --resume --deterministic-policy --policy-base-seed 20260724 --seed 7 --resolution 256 --resize-size 224 --replan-steps 5 --num-steps-wait 10 --max-steps 280 --control-frequency-hz 20.0 --video-fps 10 --output-dir $(GATE2_AUTONOMOUS_OUTPUT) --required-protocol-id $(GATE2_AUTONOMOUS_EXPERIMENT_ID) --protocol-path $(GATE2_AUTONOMOUS_PROTOCOL) --repository-commit $(REPOSITORY_COMMIT)" \
 		runtime
 
 .PHONY: gate2-session

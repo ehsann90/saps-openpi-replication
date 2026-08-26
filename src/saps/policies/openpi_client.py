@@ -30,6 +30,36 @@ class OpenPiLiberoPolicy:
         self._resize_size = resize_size
         self.last_sampling_metadata: dict[str, Any] | None = None
 
+    @property
+    def server_metadata(self) -> dict[str, Any]:
+        """Return a copy of the policy-server handshake metadata."""
+
+        return dict(self._client.get_server_metadata())
+
+    def validate_policy_identity(
+        self,
+        *,
+        config_name: str,
+        checkpoint: str,
+    ) -> None:
+        """Require an explicitly identified seeded policy server."""
+
+        seeded = self.server_metadata.get("saps_seeded_sampling")
+        if not isinstance(seeded, dict):
+            raise RuntimeError(
+                "Policy server does not advertise seeded-policy identity."
+            )
+        actual = (
+            seeded.get("policy_config_name"),
+            seeded.get("policy_checkpoint"),
+        )
+        expected = (config_name, checkpoint)
+        if actual != expected:
+            raise RuntimeError(
+                "Policy server identity does not match the frozen protocol: "
+                f"expected {expected!r}, received {actual!r}."
+            )
+
     def prepare_observation(
         self,
         obs: dict[str, Any],

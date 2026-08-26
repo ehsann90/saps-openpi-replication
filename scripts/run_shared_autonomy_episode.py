@@ -86,6 +86,8 @@ class Args:
     policy_port: int = 8000
     resize_size: int = 224
     replan_steps: int = 5
+    required_policy_config_name: str = ""
+    required_policy_checkpoint: str = ""
 
     # LIBERO
     resolution: int = 256
@@ -485,6 +487,19 @@ def main(args: Args) -> None:
             port=args.policy_port,
             resize_size=args.resize_size,
         )
+
+        if bool(args.required_policy_config_name) != bool(
+            args.required_policy_checkpoint
+        ):
+            raise ValueError(
+                "required_policy_config_name and "
+                "required_policy_checkpoint must be supplied together."
+            )
+        if args.required_policy_config_name:
+            policy.validate_policy_identity(
+                config_name=args.required_policy_config_name,
+                checkpoint=args.required_policy_checkpoint,
+            )
 
         policy_worker = AsyncPolicyWorker(
             policy=policy,

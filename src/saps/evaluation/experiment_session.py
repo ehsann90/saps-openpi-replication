@@ -13,7 +13,8 @@ from saps.policies.seeding import make_policy_episode_seed
 from saps.policies.seeding import SEED_PROTOCOL
 
 
-MANIFEST_SCHEMA_VERSION = 3
+MANIFEST_SCHEMA_VERSION = 4
+LEGACY_MANIFEST_SCHEMA_VERSION = 3
 SCHEDULE_SCHEMA_VERSION = 1
 OPERATOR_MODES = (
     "teleoperation",
@@ -48,6 +49,8 @@ class ExperimentManifest:
     fast_rotation_gain: float
     default_speed_mode: str
     ordering_seed: int
+    keyboard_translation_gain: float | None = None
+    keyboard_rotation_gain: float | None = None
 
     @classmethod
     def from_dict(
@@ -56,19 +59,67 @@ class ExperimentManifest:
     ) -> "ExperimentManifest":
         """Validate and construct a manifest from JSON data."""
 
-        required = {
+        schema_version = int(data["schema_version"])
+        common_required = {
             field.name
             for field in dataclasses.fields(cls)
-        }
+        }.difference(
+            {"keyboard_translation_gain", "keyboard_rotation_gain"}
+        )
+        if schema_version == MANIFEST_SCHEMA_VERSION:
+            legacy_gain_fields = {
+                "fine_translation_gain",
+                "fine_rotation_gain",
+                "normal_translation_gain",
+                "normal_rotation_gain",
+                "fast_translation_gain",
+                "fast_rotation_gain",
+                "default_speed_mode",
+            }
+            required = common_required.difference(legacy_gain_fields).union(
+                {"keyboard_translation_gain", "keyboard_rotation_gain"}
+            )
+        else:
+            required = common_required
         missing = required.difference(data)
 
         if missing:
             raise ValueError(
                 f"Manifest is missing fields: {sorted(missing)}"
             )
+        if schema_version == MANIFEST_SCHEMA_VERSION:
+            unknown = set(data).difference(required)
+            if unknown:
+                raise ValueError(
+                    "Schema-v4 manifest contains unsupported fields: "
+                    f"{sorted(unknown)}"
+                )
+
+        if schema_version == MANIFEST_SCHEMA_VERSION:
+            keyboard_translation_gain = float(
+                data["keyboard_translation_gain"]
+            )
+            keyboard_rotation_gain = float(data["keyboard_rotation_gain"])
+            fine_translation_gain = keyboard_translation_gain
+            fine_rotation_gain = keyboard_rotation_gain
+            normal_translation_gain = keyboard_translation_gain
+            normal_rotation_gain = keyboard_rotation_gain
+            fast_translation_gain = keyboard_translation_gain
+            fast_rotation_gain = keyboard_rotation_gain
+            default_speed_mode = "normal"
+        else:
+            keyboard_translation_gain = None
+            keyboard_rotation_gain = None
+            fine_translation_gain = float(data["fine_translation_gain"])
+            fine_rotation_gain = float(data["fine_rotation_gain"])
+            normal_translation_gain = float(data["normal_translation_gain"])
+            normal_rotation_gain = float(data["normal_rotation_gain"])
+            fast_translation_gain = float(data["fast_translation_gain"])
+            fast_rotation_gain = float(data["fast_rotation_gain"])
+            default_speed_mode = str(data["default_speed_mode"])
 
         manifest = cls(
-            schema_version=int(data["schema_version"]),
+            schema_version=schema_version,
             experiment_id=str(data["experiment_id"]),
             config_path=str(data["config_path"]),
             conditions=tuple(
@@ -93,14 +144,16 @@ class ExperimentManifest:
                 data["control_frequency_hz"]
             ),
             operator_max_steps=int(data["operator_max_steps"]),
-            fine_translation_gain=float(data["fine_translation_gain"]),
-            fine_rotation_gain=float(data["fine_rotation_gain"]),
-            normal_translation_gain=float(data["normal_translation_gain"]),
-            normal_rotation_gain=float(data["normal_rotation_gain"]),
-            fast_translation_gain=float(data["fast_translation_gain"]),
-            fast_rotation_gain=float(data["fast_rotation_gain"]),
-            default_speed_mode=str(data["default_speed_mode"]),
+            fine_translation_gain=fine_translation_gain,
+            fine_rotation_gain=fine_rotation_gain,
+            normal_translation_gain=normal_translation_gain,
+            normal_rotation_gain=normal_rotation_gain,
+            fast_translation_gain=fast_translation_gain,
+            fast_rotation_gain=fast_rotation_gain,
+            default_speed_mode=default_speed_mode,
             ordering_seed=int(data["ordering_seed"]),
+            keyboard_translation_gain=keyboard_translation_gain,
+            keyboard_rotation_gain=keyboard_rotation_gain,
         )
         manifest.validate()
         return manifest
@@ -108,7 +161,10 @@ class ExperimentManifest:
     def validate(self) -> None:
         """Reject ambiguous or protocol-incompatible values."""
 
-        if self.schema_version != MANIFEST_SCHEMA_VERSION:
+        if self.schema_version not in {
+            LEGACY_MANIFEST_SCHEMA_VERSION,
+            MANIFEST_SCHEMA_VERSION,
+        }:
             raise ValueError(
                 "Unsupported manifest schema_version "
                 f"{self.schema_version}."
@@ -194,10 +250,52 @@ class ExperimentManifest:
         if self.default_speed_mode not in {"fine", "normal", "fast"}:
             raise ValueError("default_speed_mode is invalid.")
 
+        if self.schema_version == MANIFEST_SCHEMA_VERSION:
+            if (
+                self.keyboard_translation_gain is None
+                or self.keyboard_rotation_gain is None
+            ):
+                raise ValueError(
+                    "Schema-v4 manifests require one keyboard translation "
+                    "gain and one keyboard rotation gain."
+                )
+            if any(
+                gain != self.keyboard_translation_gain
+                for gain in (
+                    self.fine_translation_gain,
+                    self.normal_translation_gain,
+                    self.fast_translation_gain,
+                )
+            ) or any(
+                gain != self.keyboard_rotation_gain
+                for gain in (
+                    self.fine_rotation_gain,
+                    self.normal_rotation_gain,
+                    self.fast_rotation_gain,
+                )
+            ):
+                raise ValueError(
+                    "Schema-v4 keyboard gains must not vary by speed mode."
+                )
+
     def as_dict(self) -> dict[str, Any]:
         """Return a canonical JSON-compatible representation."""
 
         data = dataclasses.asdict(self)
+        if self.schema_version == MANIFEST_SCHEMA_VERSION:
+            for field in (
+                "fine_translation_gain",
+                "fine_rotation_gain",
+                "normal_translation_gain",
+                "normal_rotation_gain",
+                "fast_translation_gain",
+                "fast_rotation_gain",
+                "default_speed_mode",
+            ):
+                data.pop(field)
+        else:
+            data.pop("keyboard_translation_gain")
+            data.pop("keyboard_rotation_gain")
         data["conditions"] = list(self.conditions)
         data["modes"] = list(self.modes)
         return data

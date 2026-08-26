@@ -1,9 +1,11 @@
 # Formal Arbitration Experiment Protocol
 
-The fixed 60-episode Gate-2 excluded pilot is implemented separately in
-[`gate2_operator_pilot.md`](gate2_operator_pilot.md). Gate 2 reuses the session
-infrastructure below but is not the final powered experiment described by this
-document and must remain labeled as pilot data.
+The fixed 60-outcome Gate-2 v2 matched pilot is implemented separately in
+[`gate2_operator_pilot.md`](gate2_operator_pilot.md). Its operator scheduler
+contains 40 Fixed/Cosine episodes and its dedicated autonomous sweep contains
+20 matched episodes. Gate 2 reuses the infrastructure below but is not the
+final powered experiment described by this document and must remain labeled as
+pilot data.
 
 **Status:** implemented for teleoperation and shared-autonomy operator sessions.
 The autonomous condition continues to use the unattended autonomous sweep.

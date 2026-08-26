@@ -296,6 +296,7 @@ def _base_episode_row(episode: dict[str, Any]) -> dict[str, Any]:
         "trial_index": int(episode["trial_index"]),
         "initial_state_index": int(episode["initial_state_index"]),
         "policy_episode_seed": int(episode["policy_episode_seed"]),
+        "policy_seed_protocol": str(episode["policy_seed_protocol"]),
         "schedule_status": str(episode["status"]),
         "selected_attempt_number": None,
         "selected_attempt_valid": 0,
@@ -679,6 +680,16 @@ def _episode_analysis(
 
     mode = str(episode["mode"])
     frequency = _finite_float(summary["control_frequency_hz"])
+    if not math.isclose(
+        frequency,
+        float(manifest.control_frequency_hz),
+        rel_tol=0.0,
+        abs_tol=1e-12,
+    ):
+        errors.append(
+            f"{episode['episode_id']}: control frequency does not match "
+            "the frozen manifest."
+        )
     control_steps = int(summary["control_steps"])
     if len(steps) != control_steps:
         errors.append(
@@ -688,6 +699,17 @@ def _episode_analysis(
     raw_simulated = _finite_float(
         summary.get("simulated_control_seconds", control_steps / frequency)
     )
+    calculated_simulated = control_steps / frequency
+    if not math.isclose(
+        raw_simulated,
+        calculated_simulated,
+        rel_tol=0.0,
+        abs_tol=1e-9,
+    ):
+        errors.append(
+            f"{episode['episode_id']}: simulated time is not control_steps "
+            "divided by control frequency."
+        )
     termination = str(summary["termination_reason"])
     success = bool(summary["success"])
     if success != (termination == "success"):
@@ -700,9 +722,7 @@ def _episode_analysis(
             f"{episode['episode_id']}: timeout does not contain the fixed "
             f"{manifest.operator_max_steps}-step horizon."
         )
-    simulated = (
-        GATE2_TIMEOUT_SECONDS if termination == "timeout" else raw_simulated
-    )
+    simulated = calculated_simulated
     wall_control = _finite_float(summary["control_elapsed_seconds"])
     wall_total = _finite_float(summary["total_elapsed_seconds"])
 

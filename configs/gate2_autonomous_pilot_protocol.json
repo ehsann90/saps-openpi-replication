@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "experiment_id": "saps_libero_gate2_autonomous_pilot_v2",
+  "config_path": "configs/libero_cream_cheese_offsets.json",
+  "conditions": ["nominal", "p02", "p06", "p09"],
+  "trials": [0, 1, 2, 3, 4],
+  "task_suite_name": "libero_object",
+  "task_id": 1,
+  "initial_state_index": 0,
+  "environment_seed": 7,
+  "policy_base_seed": 20260724,
+  "policy_config_name": "pi05_libero",
+  "policy_checkpoint": "gs://openpi-assets/checkpoints/pi05_libero",
+  "resolution": 256,
+  "resize_size": 224,
+  "replan_steps": 5,
+  "settle_steps": 10,
+  "max_steps": 280,
+  "control_frequency_hz": 20.0,
+  "video_fps": 10,
+  "output_root": "outputs/gate2_autonomous_pilot_v2"
+}

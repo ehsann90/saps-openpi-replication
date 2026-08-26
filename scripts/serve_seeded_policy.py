@@ -43,6 +43,8 @@ class SeededWebsocketPolicyServer:
         policy: Any,
         host: str,
         port: int,
+        config_name: str,
+        checkpoint_dir: str,
     ) -> None:
         self._policy = policy
         self._host = host
@@ -63,6 +65,8 @@ class SeededWebsocketPolicyServer:
             "protocol_version": SAPS_PROTOCOL_VERSION,
             "action_horizon": self._action_horizon,
             "latent_action_dim": self._action_dim,
+            "policy_config_name": config_name,
+            "policy_checkpoint": checkpoint_dir,
         }
 
     def serve_forever(self) -> None:
@@ -267,6 +271,8 @@ def main(args: Args) -> None:
         policy=policy,
         host=args.host,
         port=args.port,
+        config_name=args.config_name,
+        checkpoint_dir=args.checkpoint_dir,
     )
     server.serve_forever()
 

@@ -126,10 +126,10 @@ The analyzer should fail loudly or produce a blocking validation report for:
 
 ## 8. Gate-2 pilot analyzer
 
-Gate 2 uses a dedicated read-only analyzer because it requires frozen 60-row
-denominators, selected-redo semantics, fixed/cosine arbitration diagnostics,
-policy-wait reconstruction, SpaceMouse-profile validation, and exact autonomous
-pairing:
+Gate 2 v2 uses a dedicated read-only analyzer because it requires frozen
+60-outcome denominators, selected-redo semantics, fixed/cosine arbitration
+diagnostics, separate simulated and wall timing, policy-wait reconstruction,
+SpaceMouse-profile validation, and exact three-mode triplets:
 
 ```bash
 make gate2-analysis

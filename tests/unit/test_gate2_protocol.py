@@ -747,10 +747,20 @@ class Gate2ResumeAndMakeContractTest(unittest.TestCase):
                 operator_runner.main(args)
 
     def test_gate2_make_targets_are_fixed_and_profile_backed(self) -> None:
+        from saps.evaluation.gate2_v2_protocol import (
+            GATE2_V2_MANIFEST_PATH,
+        )
+        from saps.evaluation.gate2_v2_protocol import (
+            GATE2_V2_SHARED_EXPERIMENT_ID,
+        )
+        from saps.evaluation.gate2_v2_protocol import (
+            GATE2_V2_SHARED_OUTPUT_ROOT,
+        )
+
         preflight = make_contract_args("gate2-preflight")
         self.assertEqual(
             command_value(preflight, "--manifest-path"),
-            GATE2_MANIFEST_PATH,
+            GATE2_V2_MANIFEST_PATH,
         )
         self.assertEqual(
             command_value(preflight, "--spacemouse-profile-path"),
@@ -758,17 +768,17 @@ class Gate2ResumeAndMakeContractTest(unittest.TestCase):
         )
         self.assertEqual(
             command_value(preflight, "--output-dir"),
-            GATE2_OUTPUT_ROOT,
+            GATE2_V2_SHARED_OUTPUT_ROOT,
         )
 
         session = make_contract_args("gate2-session")
         self.assertEqual(
             command_value(session, "--manifest-path"),
-            GATE2_MANIFEST_PATH,
+            GATE2_V2_MANIFEST_PATH,
         )
         self.assertEqual(
             command_value(session, "--required-protocol-id"),
-            GATE2_EXPERIMENT_ID,
+            GATE2_V2_SHARED_EXPERIMENT_ID,
         )
         self.assertEqual(command_value(session, "--input-source"), "spacemouse")
         self.assertEqual(
@@ -781,7 +791,7 @@ class Gate2ResumeAndMakeContractTest(unittest.TestCase):
         )
         self.assertEqual(
             command_value(session, "--output-dir"),
-            GATE2_OUTPUT_ROOT,
+            GATE2_V2_SHARED_OUTPUT_ROOT,
         )
 
     def test_gate2_make_targets_require_device_path_before_docker(self) -> None:

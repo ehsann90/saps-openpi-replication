@@ -8,6 +8,8 @@ saps-openpi-replication/
 ├── compose.yml
 ├── configs/
 │   ├── gate2_operator_pilot_manifest.json
+│   ├── gate2_shared_autonomy_pilot_manifest.json
+│   ├── gate2_autonomous_pilot_protocol.json
 │   ├── libero_cream_cheese_offsets.json
 │   ├── operator_shared_autonomy_manifest.json
 │   ├── operator_teleoperation_manifest.json
@@ -30,6 +32,7 @@ saps-openpi-replication/
 │   └── openpi-libero-python38-build.patch
 ├── scripts/
 │   ├── preflight_gate2_operator_pilot.py
+│   ├── preflight_gate2_autonomous_pilot.py
 │   ├── run_autonomous_sweep.py
 │   ├── run_libero.py
 │   ├── run_operator_experiment.py
@@ -69,8 +72,9 @@ saps-openpi-replication/
 object names, and nominal plus perturbed planar offsets. Experiment scripts
 should read this configuration rather than duplicate the values.
 
-The operator manifests define immutable teleoperation, shared-autonomy, and
-Gate-2 excluded-pilot schedules. `configs/spacemouse_profile.json` is the
+The operator manifests define immutable teleoperation and shared-autonomy
+schedules. Gate-2 v2 has separate shared and autonomous protocol files; the old
+Gate-2 v1 manifest is superseded history. `configs/spacemouse_profile.json` is the
 portable, physically validated SpaceMouse calibration; runtime device paths
 remain outside it.
 
@@ -78,7 +82,9 @@ remain outside it.
 
 - `serve_seeded_policy.py`: deterministic OpenPI server wrapper.
 - `preflight_gate2_operator_pilot.py`: non-launching fixed-protocol validation
-  and deterministic Gate-2 schedule report.
+  and deterministic Gate-2 v2 shared/matched-design report.
+- `preflight_gate2_autonomous_pilot.py`: non-launching 20-row autonomous
+  protocol report.
 - `run_libero.py`: one autonomous episode.
 - `run_autonomous_sweep.py`: resumable autonomous condition sweep.
 - `run_operator_experiment.py`: manifest-driven, resumable operator sessions.

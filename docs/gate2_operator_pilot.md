@@ -1,111 +1,141 @@
-# Gate-2 Excluded Operator Pilot
+# Gate-2 v2 Matched Shared-Autonomy Pilot
 
-Gate 2 is a 60-episode excluded pilot for validating the SAPS-style operator
-baseline before physical-robot work. It is not a powered experiment, and its
-outputs must not be presented as formal statistical evidence.
+Gate 2 v2 is an excluded pilot/readiness experiment comparing autonomous,
+fixed blending, and cosine blending. It is descriptive evidence with five
+repetitions per condition-mode cell, not a powered final study. Pure
+teleoperation remains supported by the generic runners but is outside this
+protocol and needs a separately designed horizon before later evaluation.
 
-## Fixed protocol
+The earlier `saps_libero_gate2_operator_pilot_v1` design and
+`configs/gate2_operator_pilot_manifest.json` are retained only as superseded
+history. No v1 outcome or autonomous result collected on another machine is a
+formal v2 input.
 
-The single source of schedule parameters is
-`configs/gate2_operator_pilot_manifest.json`.
+## Frozen identities and design
 
-| Parameter | Fixed value |
-|---|---|
-| Experiment ID | `saps_libero_gate2_operator_pilot_v1` |
-| Conditions | `nominal`, `p02`, `p06`, `p09` |
-| Modes | `teleoperation`, `fixed_blend`, `cosine_blend` |
-| Trials per mode-condition | `5`, with indices `0` through `4` |
-| Total episodes | `60` |
-| Initial state | `0` |
-| Environment seed | `7` |
-| Policy base seed | `20260724` |
-| Fixed autonomy weight | `0.5` |
-| Cosine gain | `6.0` |
-| Control frequency | `20.0 Hz` |
-| Collection horizon | `280` control steps |
-| Ordering seed | `20260825` |
-| SpaceMouse profile | `configs/spacemouse_profile.json` (`0.40` translation, `0.08` rotation) |
-| Output root | `outputs/gate2_operator_pilot_v1` |
+| Collection | Experiment ID | Output root | Episodes |
+|---|---|---|---:|
+| Shared | `saps_libero_gate2_shared_autonomy_pilot_v2` | `outputs/gate2_shared_autonomy_pilot_v2` | 40 |
+| Autonomous | `saps_libero_gate2_autonomous_pilot_v2` | `outputs/gate2_autonomous_pilot_v2` | 20 |
 
-The keyboard-gain fields retained by the schema do not configure Gate-2
-SpaceMouse motion. The validated SpaceMouse profile is authoritative. Its
-translation gain was conservatively retuned from `0.30` to `0.40` after the
-pre-collection shakedown; no formal Gate-2 episode had been collected. Rotation
-gain remains `0.08`, and the retune does not change arbitration or any schedule,
-seed, condition, perturbation, analysis, or horizon setting.
+The shared manifest is
+`configs/gate2_shared_autonomy_pilot_manifest.json`. The autonomous parameters
+are independently frozen before shared collection in
+`configs/gate2_autonomous_pilot_protocol.json`.
 
-## Unified counterbalanced schedule
+Both collections use exactly:
 
-Gate 2 uses the dedicated ordering method
-`gate2_constrained_counterbalance_v1`; generic and earlier experiment schedules
-retain their existing cyclic behavior. For each condition, the Gate-2 generator
-shuffles all six permutations of the three modes and assigns five distinct
-permutations to the five trial rounds. Taking five of all six permutations
-guarantees that each pair of modes occurs in either direction two or three
-times. A deterministic backtracking search then interleaves the four condition
-queues within each round while preserving those mode orders.
+- conditions `nominal`, `p02`, `p06`, and `p09`;
+- trials `0` through `4`, initial state `0`, and environment seed `7`;
+- policy base seed `20260724` and `saps-policy-seed-v1` derivation;
+- LIBERO `libero_object` task 1 and the committed perturbation configuration;
+- policy configuration `pi05_libero` and checkpoint
+  `gs://openpi-assets/checkpoints/pi05_libero`;
+- 5-step replanning, 10 settling steps, 20 Hz LIBERO control semantics, and a
+  280 environment/control-step horizon.
 
-Every 12-episode round contains all mode-condition units exactly once. Across
-the complete 60-episode schedule:
+Shared execution additionally freezes fixed autonomy weight `0.5`, cosine gain
+`6.0`, ordering seed `20260825`, and ordering method
+`gate2_v2_two_mode_counterbalance_v1`.
 
-- every pairwise mode precedence count is `2/5` or `3/5` per condition;
-- consecutive episodes never use the same condition;
-- a same-mode run contains at most two episodes; and
-- the three modes for one condition/trial have at least one intervening
-  episode between consecutive occurrences.
+The v2 manifest has one keyboard translation gain and one keyboard rotation
+gain. It does not contain fine/normal/fast alternatives. Gate-2 uses the
+SpaceMouse, so these keyboard values are not applied. SpaceMouse motion comes
+directly from `configs/spacemouse_profile.json`: translation `0.40`, rotation
+`0.08`, profile SHA-256
+`3bae6c547e2eec8d33c68a860d65eea4c0b1c39c7fb993dd2f033323b0994afc`.
+The profile does not multiply manifest keyboard gains.
 
-The ordering seed initializes both permutation selection and interleaving.
-Recreating the schedule from the same manifest, repository code, and ordering
-seed therefore produces the same order, episode IDs, and policy seeds. The
-ordering-method identifier is stored in `schedule.json` and is immutable on
-resume.
+## Shared counterbalancing
 
-Policy seeds use `saps-policy-seed-v1` and depend only on the policy base seed,
-task ID, initial-state index, condition, and trial. Arbitration mode is excluded.
-Teleoperation retains this seed as matching metadata; fixed and cosine modes
-execute with the same seed for a given condition/trial identity. This matching
-does not depend on the current RTX 5080 autonomous outputs. Autonomous episodes
-rerun on the test system can use the same protocol identity and seed derivation
-when cross-dataset matching is required.
+The shared schedule is five consecutive eight-episode trial rounds. Every
+round contains each Fixed/Cosine by condition cell exactly once. Across the
+five trials, Fixed precedes Cosine two or three times independently for every
+condition. The deterministic backtracking interleaver also enforces:
 
-## Preflight
+- no consecutive episodes from the same condition;
+- no run longer than two episodes from the same mode;
+- at least one intervening episode between Fixed and Cosine for the same
+  condition/trial; and
+- exact regeneration from the ordering seed.
 
-Run preflight from a clean checkout of the intended collection commit:
+Policy seed derivation excludes arbitration mode. The combined preflight
+validator constructs 20 autonomous identities without reading autonomous
+outputs and proves that Autonomous, Fixed, and Cosine form exactly 20 triplets
+matched on condition, trial, initial state, policy episode seed, and seed
+protocol.
+
+## Environment-step and wall-clock semantics
+
+The autonomous and shared runners use the same `create_libero_task` path. The
+pinned LIBERO environment defaults to a 20 Hz control frequency. Both runners
+reset, restore the same saved initial state, apply the same planar perturbation,
+and execute 10 dummy settling steps before control. Both use 5-step policy
+chunks, and one recorded control step means exactly one `env.step` call. Their
+task horizon is therefore the same 280 environment/control steps.
+
+Autonomous policy inference is synchronous: inference completes before its
+next environment step. Shared policy inference is asynchronous, but scheduler
+wait ticks do not call `env.step`; simulated progression pauses until a fresh
+policy action is available. The shared 20 Hz scheduler also paces operator wall
+time. Autonomous is not given artificial sleeps. Consequently the modes have
+matched simulated-step semantics but can have different human-observed wall
+durations.
+
+Analysis keeps these quantities separate:
+
+- environment/simulated execution time: `control_steps / 20 Hz`;
+- wall-control and total wall time: measured elapsed runtime;
+- shared waiting: wait ticks, reconstructed events, nominal wait duration,
+  wait wall duration, wait fraction, inference latency, and human activity
+  during waits; and
+- autonomous inference: per-replan inference latency from step logs and its
+  contribution to autonomous wall time.
+
+Shared wait ticks never count as simulated steps or simulated task time.
+
+## Non-launching preflights
+
+Run the shared preflight with the intended stable device path:
 
 ```bash
 make gate2-preflight \
   SPACEMOUSE_DEVICE=/dev/input/by-id/usb-3Dconnexion_SpaceMouse_Wireless-event-joystick
 ```
 
-Preflight validates the exact manifest, perturbation-config identity, committed
-calibration profile and hash, device argument, output namespace, schedule
-coverage, uniqueness, deterministic regeneration, matched policy seeds, and all
-ordering constraints. It reports maximum mode and condition runs, minimum
-matched condition/trial separation, and every per-condition pairwise precedence
-count. It then prints all 60 rows as schedule index, mode, condition, trial, and
-policy seed. It does not open the SpaceMouse, create a session output, contact
-the policy server, or launch an episode.
+It validates all immutable identities and ordering rules, prints all 40 shared
+rows and each matched autonomous seed, and reports the complete 60-outcome
+design. It does not open the device, create outputs, or contact the policy
+server.
 
-Device access and physical behavior must still be checked separately with
-`make spacemouse-diagnostic` before collection.
+Run the separate autonomous preflight:
+
+```bash
+make gate2-autonomous-preflight
+```
+
+It prints all 20 condition/trial/initial-state/seed rows and verifies task,
+perturbation, environment, seed, replan, settling, frequency, and horizon
+settings. It does not depend on an autonomous output directory.
 
 ## Collection and resume
 
-Start the policy server in a separate terminal, then run:
+Commit the complete protocol first and start the seeded policy server in a
+separate terminal. The server handshake advertises its policy configuration and
+checkpoint; both collectors reject a server that differs from the v2 protocol.
+
+Collect or resume the 40 operator episodes:
 
 ```bash
 make gate2-session \
   SPACEMOUSE_DEVICE=/dev/input/by-id/usb-3Dconnexion_SpaceMouse_Wireless-event-joystick
 ```
 
-The target requires a clean repository and fixes the manifest, output root,
-input source, profile, and Gate-2 protocol identifier. It does not invoke
-preflight or start the policy server automatically. The session runner displays
-the next mode, condition, trial, and matched seed, then waits for explicit
-operator confirmation before every episode. Enter `q` at the prompt to stop;
-rerunning the same command resumes the frozen schedule.
-
-Request a redo without deleting the earlier attempt:
+The session runner waits for confirmation before every episode. Enter `q` to
+stop. Rerunning the same command resumes the immutable schedule. Gate-2 accepts
+only a success within 280 steps or a complete 280-step timeout. Disconnect,
+disarm, abort, environment termination, or invalid runtime output requires an
+explicit retained redo:
 
 ```bash
 make gate2-session \
@@ -113,120 +143,47 @@ make gate2-session \
   REDO_EPISODES=trial_000__condition_p02__mode_fixed_blend
 ```
 
-Only the newest valid redo remains selected for later analysis. Earlier valid,
-failed, or aborted attempts remain in the attempt history.
+After all shared episodes, collect or resume the dedicated autonomous sweep:
 
-### Valid attempts and required redos
-
-Gate 2 accepts only `success` and `timeout` as protocol-complete termination
-reasons. A timeout must contain the full 280 control steps. The following
-outcomes require an explicit redo and can never become valid or selected for
-analysis: `operator_abort`, `operator_disconnected`, `operator_disarmed`,
-`input_device_disconnected`, `environment_terminated`, and initialization or
-runtime errors.
-
-After control begins, every executed step and shared-autonomy policy-wait tick
-must show that the browser remains connected, the physical SpaceMouse remains
-connected, and the operator remains armed. The parent session runner audits the
-raw logs before selecting an attempt. Normal `stale_input=true` while the
-SpaceMouse is neutral is not a disconnect and does not invalidate an attempt.
-
-An invalid attempt remains in attempt history, does not replace a previously
-selected valid attempt, and stops collection by default for inspection. It can
-then be rerun with `REDO_EPISODES`. Invalid attempts are audit records and never
-count toward the 60 valid collected episodes.
-
-## Frozen provenance
-
-The session root records:
-
-```text
-manifest.json
-schedule.json
-human_input.json
-perturbation_config.json
-repository_provenance.json
-session_protocol.json
-session_events.jsonl
-session_summary.json
-attempts/
+```bash
+make gate2-autonomous
 ```
 
-These files freeze the manifest and canonical hash, deterministic schedule,
-repository commit, perturbation configuration path/contents/hash, SpaceMouse
-profile path/contents/hash, runtime device path, and required protocol. The
-manifest itself freezes the blending parameters, frequency, horizon, seeds,
-ordering seed, and ordering-method identifier. Resume rejects immutable
-schedule drift or changed provenance instead of mixing runs.
+The target fixes all 20 cells and rejects condition overrides, protocol drift,
+or a non-clean checkout. It freezes the protocol, perturbation config, exact
+schedule, and repository commit before creating an environment. Compatible
+completed summaries are skipped. An existing incompatible completed summary is
+an error and is never silently overwritten.
 
-## Descriptive analysis and readiness
+## Partial and final analysis
 
-After collection has started, generate the dedicated Gate-2 artifacts with:
+Run analysis at any point:
 
 ```bash
 make gate2-analysis
 ```
 
-Override `GATE2_AUTONOMOUS_RESULTS` to point at the autonomous collection that
-should be considered for exact matching, and `GATE2_ANALYSIS_OUTPUT` to select a
-different derived-output directory. The command reads raw session outputs but
-does not modify them or launch an episode.
+The analyzer retains all 60 planned rows and works when either collection is
+partial or not yet started. It reports observed coverage independently by mode.
+`matched_triplets.csv` contains only identities with all three valid outcomes;
+missing episodes are never fabricated or replaced by near matches. A seed or
+identity mismatch is blocking.
 
-The analyzer always retains all 60 scheduled Gate-2 episodes in
-`episode_metrics.csv`, including rows without a selected valid attempt. Mode and
-condition-mode summaries distinguish scheduled coverage, observed failures, and
-not-yet-analyzable episodes. Failed selected episodes remain in observed success
-denominators. Protocol-invalid attempts remain audit history and are not
-observed failures. A timeout is assigned the complete `280 / 20 = 14.0` seconds
-of simulated duration.
-
-Human-active duration and correction segments use executed control steps whose
-six-dimensional human-motion norm exceeds the existing SAPS activity threshold
-of `1e-3`. Duration is therefore simulated active-step time; activity observed
-while simulation is paused for policy inference is reported separately as
-policy-wait overlap.
-
-The generated artifacts are:
+Outputs under `results/gate2_shared_autonomy_pilot_v2` include:
 
 ```text
 episode_metrics.csv
 mode_summary.csv
 condition_mode_summary.csv
-matched_autonomous_comparisons.csv
+matched_triplets.csv
 fixed_blend_diagnostics.csv
 cosine_blend_diagnostics.csv
 policy_wait_summary.csv
 validation_report.json
 REPORT.md
-plots/
 ```
 
-Autonomous comparison requires an exact match on condition, trial, initial
-state, and policy episode seed. Near matches are not substituted. Recovery for
-`p06` and `p09` is reported as descriptive matched counts without defining an
-arbitrary success threshold.
-
-The cosine-weight thresholds were fixed before Gate-2 collection: near zero is
-`alpha <= 0.10`, near one is `alpha >= 0.90`, intermediate is the open interval
-between them, and a consecutive human-active weight change is material when
-`|delta alpha| >= 0.05`. The diagnostic reports count, undefined count, mean,
-median, sample SD, range, p10/p25/p75/p90, all three region fractions, and the
-material-change fraction. Fixed blending is checked against `alpha = 0.5` with
-an absolute tolerance of `1e-9`.
-
-Policy-wait duration is reported both as logged wait ticks divided by 20 Hz and
-from wait-event wall timestamps. Wait fraction is wait ticks divided by wait
-plus executed scheduler ticks. Event count, inference latency, wall/simulation
-ratio, and human-active wait overlap remain separate fields.
-
-`validation_report.json` blocks readiness for schedule/summary seed drift,
-multiple selected attempts, profile mismatch, malformed actions, missing wait
-logs, invalid termination or operator-input integrity, fixed-weight deviations,
-and duplicate autonomous identities. Incomplete coverage is reported as a
-warning rather than silently converted into failure.
-
-Gate 2 has only five repetitions per mode-condition. Its report is descriptive
-pilot evidence and does not center significance testing.
-
-Do not commit generated Gate-2 outputs. Gate-2 analysis is intentionally outside
-the raw collection protocol and must remain reproducible from frozen outputs.
+Fixed blending is audited at alpha `0.5` with absolute tolerance `1e-9`.
+Cosine diagnostic thresholds remain predeclared: near zero `alpha <= 0.10`,
+near one `alpha >= 0.90`, and material consecutive change
+`|delta alpha| >= 0.05`. Results remain descriptive pilot evidence.

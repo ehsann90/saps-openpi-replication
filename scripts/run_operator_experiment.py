@@ -25,6 +25,16 @@ from saps.evaluation.gate2_protocol import GATE2_EXPERIMENT_ID
 from saps.evaluation.gate2_protocol import build_gate2_schedule
 from saps.evaluation.gate2_protocol import validate_gate2_attempt_completion
 from saps.evaluation.gate2_protocol import validate_gate2_protocol
+from saps.evaluation.gate2_v2_protocol import (
+    build_gate2_v2_shared_schedule,
+)
+from saps.evaluation.gate2_v2_protocol import (
+    GATE2_V2_AUTONOMOUS_PROTOCOL_PATH,
+)
+from saps.evaluation.gate2_v2_protocol import GATE2_V2_SHARED_EXPERIMENT_ID
+from saps.evaluation.gate2_v2_protocol import (
+    validate_gate2_v2_shared_protocol,
+)
 from saps.human_input.spacemouse import parse_axis_mapping
 from saps.human_input.spacemouse import parse_axis_maxima
 from saps.human_input.spacemouse import parse_axis_signs
@@ -115,11 +125,12 @@ def _initialize_experiment(
             f"Manifest contains unknown conditions: {sorted(unknown)}"
         )
 
-    schedule_builder = (
-        build_gate2_schedule
-        if required_protocol_id == GATE2_EXPERIMENT_ID
-        else build_schedule
-    )
+    if required_protocol_id == GATE2_EXPERIMENT_ID:
+        schedule_builder = build_gate2_schedule
+    elif required_protocol_id == GATE2_V2_SHARED_EXPERIMENT_ID:
+        schedule_builder = build_gate2_v2_shared_schedule
+    else:
+        schedule_builder = build_schedule
     expected_schedule = schedule_builder(
         manifest=manifest,
         task_id=int(task_config["task_id"]),
@@ -236,6 +247,16 @@ def _episode_command(
         str(manifest.cosine_gain),
         "--replan-steps",
         "5",
+        *(
+            [
+                "--required-policy-config-name",
+                "pi05_libero",
+                "--required-policy-checkpoint",
+                "gs://openpi-assets/checkpoints/pi05_libero",
+            ]
+            if manifest.experiment_id == GATE2_V2_SHARED_EXPERIMENT_ID
+            else []
+        ),
         *common,
     ]
 
@@ -401,26 +422,42 @@ def _mark_attempt_invalid(
 def main(args: Args) -> None:
     preview_manifest = load_manifest(Path(args.manifest_path))
     required_protocol_id = args.required_protocol_id.strip()
+    protected_protocol_ids = {
+        GATE2_EXPERIMENT_ID,
+        GATE2_V2_SHARED_EXPERIMENT_ID,
+    }
     if (
-        preview_manifest.experiment_id == GATE2_EXPERIMENT_ID
-        and required_protocol_id != GATE2_EXPERIMENT_ID
+        preview_manifest.experiment_id in protected_protocol_ids
+        and required_protocol_id != preview_manifest.experiment_id
     ):
         raise ValueError(
             "The Gate-2 manifest requires its explicit protocol guard. "
             "Use make gate2-session."
         )
     if required_protocol_id:
-        if required_protocol_id != GATE2_EXPERIMENT_ID:
+        if required_protocol_id not in protected_protocol_ids:
             raise ValueError(
                 f"Unsupported required_protocol_id {required_protocol_id!r}."
             )
-        validate_gate2_protocol(
-            manifest=preview_manifest,
-            input_source=args.input_source,
-            spacemouse_profile_path=args.spacemouse_profile_path,
-            spacemouse_device_path=args.spacemouse_device_path,
-            output_root=Path(args.output_dir),
-        )
+        if required_protocol_id == GATE2_EXPERIMENT_ID:
+            validate_gate2_protocol(
+                manifest=preview_manifest,
+                input_source=args.input_source,
+                spacemouse_profile_path=args.spacemouse_profile_path,
+                spacemouse_device_path=args.spacemouse_device_path,
+                output_root=Path(args.output_dir),
+            )
+        else:
+            validate_gate2_v2_shared_protocol(
+                manifest=preview_manifest,
+                input_source=args.input_source,
+                spacemouse_profile_path=args.spacemouse_profile_path,
+                spacemouse_device_path=args.spacemouse_device_path,
+                output_root=Path(args.output_dir),
+                autonomous_protocol_path=Path(
+                    GATE2_V2_AUTONOMOUS_PROTOCOL_PATH
+                ),
+            )
     input_configuration = _human_input_configuration(
         args=args,
         manifest=preview_manifest,
@@ -455,9 +492,13 @@ def main(args: Args) -> None:
             perturbation_configuration,
         )
 
-    session_protocol = {
+    session_protocol: dict[str, Any] = {
         "required_protocol_id": required_protocol_id or None,
     }
+    if required_protocol_id == GATE2_V2_SHARED_EXPERIMENT_ID:
+        session_protocol["matched_autonomous_protocol"] = (
+            json_file_identity(Path(GATE2_V2_AUTONOMOUS_PROTOCOL_PATH))
+        )
     session_protocol_path = output_root / "session_protocol.json"
     if session_protocol_path.exists():
         with session_protocol_path.open("r", encoding="utf-8") as file:
@@ -629,7 +670,7 @@ def main(args: Args) -> None:
                 )
 
             summary_path = _find_summary(attempt_root)
-            if required_protocol_id == GATE2_EXPERIMENT_ID:
+            if required_protocol_id in protected_protocol_ids:
                 attempt["summary_path"] = str(summary_path)
             summary = validate_summary(
                 summary_path=summary_path,
@@ -639,7 +680,7 @@ def main(args: Args) -> None:
                 summary=summary,
                 input_configuration=input_configuration,
             )
-            if required_protocol_id == GATE2_EXPERIMENT_ID:
+            if required_protocol_id in protected_protocol_ids:
                 validate_gate2_attempt_completion(
                     summary_path=summary_path,
                     summary=summary,

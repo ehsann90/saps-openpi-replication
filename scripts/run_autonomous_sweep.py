@@ -14,6 +14,21 @@ import numpy as np
 import tyro
 
 from saps.environments.libero_env import create_libero_task
+from saps.evaluation.experiment_session import json_file_identity
+from saps.evaluation.gate2_v2_protocol import (
+    build_gate2_v2_autonomous_schedule,
+)
+from saps.evaluation.gate2_v2_protocol import GATE2_V2_CONFIG_SHA256
+from saps.evaluation.gate2_v2_protocol import (
+    GATE2_V2_AUTONOMOUS_EXPERIMENT_ID,
+)
+from saps.evaluation.gate2_v2_protocol import (
+    GATE2_V2_AUTONOMOUS_PROTOCOL_PATH,
+)
+from saps.evaluation.gate2_v2_protocol import GATE2_V2_AUTONOMOUS_OUTPUT_ROOT
+from saps.evaluation.gate2_v2_protocol import (
+    load_gate2_v2_autonomous_protocol,
+)
 from saps.evaluation.runner import EpisodeResult
 from saps.evaluation.runner import run_episode
 from saps.policies.openpi_client import OpenPiLiberoPolicy
@@ -31,6 +46,9 @@ class Args:
     num_trials: int = 1
     initial_state_index: int = 0
     resume: bool = True
+    required_protocol_id: str = ""
+    protocol_path: str = GATE2_V2_AUTONOMOUS_PROTOCOL_PATH
+    repository_commit: str = ""
 
     # Matched policy-sampling configuration
     deterministic_policy: bool = True
@@ -74,6 +92,108 @@ def write_json_atomic(
         file.write("\n")
 
     temporary_path.replace(path)
+
+
+def freeze_json(path: Path, payload: dict[str, Any]) -> None:
+    """Write immutable protocol metadata or verify the stored copy."""
+
+    if path.exists():
+        with path.open("r", encoding="utf-8") as file:
+            stored = json.load(file)
+        if stored != payload:
+            raise ValueError(
+                f"Frozen autonomous provenance differs at {path}. "
+                "Use a new output directory."
+            )
+        return
+    write_json_atomic(path, payload)
+
+
+def validate_gate2_v2_args(
+    *,
+    args: Args,
+    protocol: dict[str, Any],
+) -> None:
+    """Require every collection argument fixed by Gate-2 v2."""
+
+    expected = {
+        "config_path": protocol["config_path"],
+        "condition_ids": ",".join(protocol["conditions"]),
+        "num_trials": len(protocol["trials"]),
+        "initial_state_index": protocol["initial_state_index"],
+        "resume": True,
+        "deterministic_policy": True,
+        "policy_base_seed": protocol["policy_base_seed"],
+        "seed": protocol["environment_seed"],
+        "resolution": protocol["resolution"],
+        "resize_size": protocol["resize_size"],
+        "replan_steps": protocol["replan_steps"],
+        "num_steps_wait": protocol["settle_steps"],
+        "max_steps": protocol["max_steps"],
+        "control_frequency_hz": protocol["control_frequency_hz"],
+        "video_fps": protocol["video_fps"],
+        "output_dir": protocol["output_root"],
+    }
+    actual = dataclasses.asdict(args)
+    drift = {
+        name: (actual[name], value)
+        for name, value in expected.items()
+        if actual[name] != value
+    }
+    if drift:
+        raise ValueError(f"Gate-2 v2 autonomous arguments drifted: {drift}")
+    commit = args.repository_commit.strip().lower()
+    if len(commit) != 40 or any(
+        character not in "0123456789abcdef" for character in commit
+    ):
+        raise ValueError(
+            "Gate-2 v2 repository_commit must be a full Git hash."
+        )
+
+
+def freeze_gate2_v2_provenance(
+    *,
+    args: Args,
+    protocol: dict[str, Any],
+    output_root: Path,
+) -> None:
+    """Freeze protocol, config, schedule, and repository identity."""
+
+    protocol_identity = json_file_identity(Path(args.protocol_path))
+    config_identity = json_file_identity(Path(args.config_path))
+    if config_identity["sha256"] != GATE2_V2_CONFIG_SHA256:
+        raise ValueError("Gate-2 v2 perturbation configuration drifted.")
+    freeze_json(output_root / "protocol.json", protocol)
+    freeze_json(output_root / "perturbation_config.json", config_identity)
+    freeze_json(
+        output_root / "repository_provenance.json",
+        {
+            "repository_commit": args.repository_commit.strip().lower(),
+            "protocol_path": protocol_identity["path"],
+            "protocol_sha256": protocol_identity["sha256"],
+        },
+    )
+    schedule = build_gate2_v2_autonomous_schedule(protocol)
+    freeze_json(output_root / "schedule.json", schedule)
+    expected_summaries = {
+        episode_summary_path(
+            output_root=output_root,
+            condition_id=str(episode["condition_id"]),
+            task_id=int(protocol["task_id"]),
+            initial_state_index=int(episode["initial_state_index"]),
+            trial_index=int(episode["trial_index"]),
+        )
+        for episode in schedule["episodes"]
+    }
+    unexpected_summaries = set(output_root.rglob("summary.json")).difference(
+        expected_summaries
+    )
+    if unexpected_summaries:
+        raise ValueError(
+            "Gate-2 autonomous output contains summaries outside the "
+            "frozen 20 cells: "
+            + ", ".join(str(path) for path in sorted(unexpected_summaries))
+        )
 
 
 def load_config(path: Path) -> dict[str, Any]:
@@ -321,6 +441,50 @@ def load_completed_result(
             error,
         )
         return None
+
+
+def validate_gate2_v2_completed_result(
+    *,
+    result: EpisodeResult,
+    summary_path: Path,
+    protocol: dict[str, Any],
+) -> None:
+    """Require a complete, internally consistent result before resuming."""
+
+    if result.arbitration_mode != "autonomous":
+        raise ValueError("Gate-2 autonomous result has another mode.")
+    if not 1 <= result.control_steps <= int(protocol["max_steps"]):
+        raise ValueError("Gate-2 autonomous result has an invalid step count.")
+    if not result.success and result.control_steps != int(
+        protocol["max_steps"]
+    ):
+        raise ValueError(
+            "Gate-2 autonomous failure is not a complete 280-step timeout."
+        )
+    if result.simulation_steps != (
+        int(protocol["settle_steps"]) + result.control_steps
+    ):
+        raise ValueError(
+            "Gate-2 autonomous simulation-step count is inconsistent."
+        )
+    expected_replans = math.ceil(
+        result.control_steps / int(protocol["replan_steps"])
+    )
+    if result.policy_replan_count != expected_replans:
+        raise ValueError("Gate-2 autonomous replan count is inconsistent.")
+    steps_path = summary_path.with_name("steps.jsonl")
+    if not steps_path.is_file():
+        raise ValueError("Gate-2 autonomous steps.jsonl is missing.")
+    with steps_path.open("r", encoding="utf-8") as file:
+        steps = [json.loads(line) for line in file if line.strip()]
+    if len(steps) != result.control_steps:
+        raise ValueError("Gate-2 autonomous logged step count is inconsistent.")
+    if any(
+        int(step.get("policy_episode_seed", -1))
+        != result.policy_episode_seed
+        for step in steps
+    ):
+        raise ValueError("Gate-2 autonomous step seed is inconsistent.")
 
 
 def summarize_condition(
@@ -599,6 +763,18 @@ def write_schedule(
 
 
 def main(args: Args) -> None:
+    required_protocol_id = args.required_protocol_id.strip()
+    protocol: dict[str, Any] | None = None
+    if required_protocol_id:
+        if required_protocol_id != GATE2_V2_AUTONOMOUS_EXPERIMENT_ID:
+            raise ValueError(
+                f"Unsupported required_protocol_id {required_protocol_id!r}."
+            )
+        protocol = load_gate2_v2_autonomous_protocol(Path(args.protocol_path))
+        validate_gate2_v2_args(args=args, protocol=protocol)
+    elif Path(args.output_dir).as_posix() == GATE2_V2_AUTONOMOUS_OUTPUT_ROOT:
+        raise ValueError("Gate-2 v2 autonomous output requires its guard.")
+
     if args.num_trials <= 0:
         raise ValueError(
             "num_trials must be greater than zero."
@@ -648,12 +824,19 @@ def main(args: Args) -> None:
         exist_ok=True,
     )
 
-    write_schedule(
-        output_root=output_root,
-        args=args,
-        conditions=conditions,
-        task_id=task_id,
-    )
+    if protocol is not None:
+        freeze_gate2_v2_provenance(
+            args=args,
+            protocol=protocol,
+            output_root=output_root,
+        )
+    else:
+        write_schedule(
+            output_root=output_root,
+            args=args,
+            conditions=conditions,
+            task_id=task_id,
+        )
 
     results_by_condition: dict[
         str,
@@ -811,7 +994,24 @@ def main(args: Args) -> None:
                         )
                     )
 
+                if (
+                    protocol is not None
+                    and summary_path.exists()
+                    and completed_result is None
+                ):
+                    raise ValueError(
+                        "Existing Gate-2 autonomous summary is incomplete "
+                        f"or incompatible and will not be overwritten: "
+                        f"{summary_path}"
+                    )
+
                 if completed_result is not None:
+                    if protocol is not None:
+                        validate_gate2_v2_completed_result(
+                            result=completed_result,
+                            summary_path=summary_path,
+                            protocol=protocol,
+                        )
                     results_by_condition[
                         condition_id
                     ].append(completed_result)
@@ -848,6 +1048,11 @@ def main(args: Args) -> None:
                             args.resize_size
                         ),
                     )
+                    if protocol is not None:
+                        policy.validate_policy_identity(
+                            config_name=protocol["policy_config_name"],
+                            checkpoint=protocol["policy_checkpoint"],
+                        )
 
                 logging.info(
                     "Running condition=%s, trial=%d, "

@@ -34,14 +34,14 @@ The unit suite covers:
   masks, safe live apply/reset/save behavior, and normal-runner defaults.
 - manifest-session profile propagation, immutable profile provenance, resume
   protection, and Make-to-runner argument contracts.
-- exact Gate-2 manifest and 60-cell coverage, constrained deterministic
-  counterbalancing, mode-independent matched-seed derivation, trial-round and
-  ordering constraints, unchanged legacy scheduling, protocol/profile
-  rejection, immutable resume state, and Gate-2 Make-to-CLI contracts.
+- exact Gate-2 v2 40-row shared and 20-row autonomous coverage, deterministic
+  two-mode counterbalancing, 20 mode-independent matched triplets, unchanged
+  legacy scheduling, protocol/profile rejection, immutable resume state, and
+  Gate-2 Make-to-CLI contracts.
 - Gate-2 completion validity for success/timeout, termination and operator-input
   integrity failures, neutral stale input, redo selection preservation, and
   unchanged legacy acceptance semantics.
-- Gate-2 analysis with incomplete schedules, failed and timeout outcomes,
+- Gate-2 analysis with independently incomplete collections, failed and timeout outcomes,
   invalid-attempt audit exclusion, selected redos, seed/profile mismatch
   rejection, fixed/cosine diagnostics,
   policy-wait timing and human overlap, and exact autonomous pairing.
@@ -109,9 +109,15 @@ make gate2-preflight \
 ```
 
 Inspect the reported manifest/profile/config hashes, exact counts, parameters,
-and 60-row schedule. This validates protocol wiring, not physical device access;
+and 40-row shared schedule plus 20 intended matched autonomous identities. This validates protocol wiring, not physical device access;
 run the SpaceMouse diagnostic separately. Do not invoke `gate2-session` as part
 of automated testing.
+
+The autonomous preflight is also non-launching and output-independent:
+
+```bash
+make gate2-autonomous-preflight
+```
 
 ## 4. Deterministic policy probe
 
