@@ -1,23 +1,22 @@
-# Formal Arbitration Experiment Protocol
+# Reusable Simulation Operator-Session Protocol
 
-The fixed 60-outcome Gate-2 v2 matched pilot is implemented separately in
-[`gate2_operator_pilot.md`](gate2_operator_pilot.md). Its operator scheduler
-contains 40 Fixed/Cosine episodes and its dedicated autonomous sweep contains
-20 matched episodes. Gate 2 reuses the infrastructure below but is not the
-final powered experiment described by this document and must remain labeled as
-pilot data.
+This document describes the reusable manifest/session infrastructure from which
+the completed 60-outcome matched pilot was built. The canonical completed-stage
+record is [`simulation_saps_baseline.md`](simulation_saps_baseline.md), while
+[`gate2_operator_pilot.md`](gate2_operator_pilot.md) preserves its frozen
+historical protocol. Generic session outputs must not be mixed with that pilot.
 
-**Status:** implemented for teleoperation and shared-autonomy operator sessions.
-The autonomous condition continues to use the unattended autonomous sweep.
+**Status:** infrastructure implemented; the matched simulation pilot is complete.
+Generic autonomous conditions continue to use the unattended autonomous sweep.
 
 ## 1. Purpose
 
-The formal study will compare autonomous execution, pure teleoperation, hard
-takeover, equal/fixed blending, and cosine-similarity blending under the
+The reusable infrastructure supports autonomous execution, pure teleoperation,
+hard takeover, equal/fixed blending, and cosine-similarity blending under the
 controlled LIBERO cream-cheese perturbations.
 
-Functional pilot episodes are not part of the formal dataset. Formal collection
-must use an immutable experiment manifest and a recorded repository commit.
+Smoke and calibration episodes are not part of the completed matched dataset.
+Reusable collections use an immutable manifest and recorded repository commit.
 
 ## 2. Experimental unit
 
@@ -62,7 +61,7 @@ the intervention protocol consistently.
 
 ## 5. Hardware and latency
 
-Formal operator-assisted collection must run on hardware that satisfies the
+Any future operator-assisted collection must run on hardware that satisfies the
 validated latency requirements in
 [`gate1_rtx5080_ac_performance.md`](gate1_rtx5080_ac_performance.md). The runtime
 records inference latency and scheduler wait ticks, so residual latency can be
@@ -199,7 +198,8 @@ for acknowledgement before every episode. Completed valid episodes are skipped
 on resume. Every attempt receives a unique directory; invalid attempts are
 retained and never overwritten.
 
-Formal autonomous and operator experiments share a 280-step horizon at 20 Hz,
+The reusable matched autonomous and operator protocols share a 280-step horizon
+at 20 Hz,
 equal to 14 simulated seconds. The earlier `v1` operator pilot used a 1200-step
 horizon. Pilot episodes that completed by step 280 are dynamically unaffected
 by that larger ceiling, but later completions are not directly comparable.
@@ -251,7 +251,8 @@ Before a collection session:
 7. calibrate the operator and document the intervention instruction;
 8. start or resume the immutable schedule.
 
-The intervention policy must be written before formal data collection. Examples
+The intervention policy must be written before any separately designed data
+collection. Examples
 include intervening only when predicted failure is apparent or continuously
 steering toward task success. Mixing strategies within one experiment would
 confound arbitration-mode comparisons.
@@ -292,7 +293,7 @@ file order.
 
 ## 11. Data handling
 
-`outputs/` and `results/` are intentionally ignored by Git. Archive formal data
+Raw `outputs/` and generated `results/` are ignored by default. Archive study data
 with:
 
 - manifest and generated schedule;

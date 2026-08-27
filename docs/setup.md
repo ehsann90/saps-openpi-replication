@@ -4,6 +4,11 @@ This guide describes the supported Docker workflow for the SAPS–OpenPI
 replication. It also records the earlier OpenPI-first path from which the
 replication environment was developed.
 
+The validated environment supports the completed LIBERO simulation baseline.
+The next fixed-robot baseline is specified in
+[`simulation_saps_baseline.md`](simulation_saps_baseline.md), but no physical
+robot interface is implemented yet.
+
 ## 1. Recommended installation path
 
 Clone the outer replication repository with its pinned OpenPI submodule:

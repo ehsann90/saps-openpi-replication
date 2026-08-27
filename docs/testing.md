@@ -1,8 +1,8 @@
 # Testing and Validation
 
 This document separates fast automated checks, interactive smoke tests, and
-formal experiments. A successful smoke test demonstrates functional behavior;
-it is not a statistical result.
+live hardware/experiment checks. A successful smoke test demonstrates
+functional behavior; it is not a statistical result.
 
 ## 1. Automated regression checks
 
@@ -99,9 +99,19 @@ restores the nominal scene, and the saved profile matches the browser values.
 The same `SPACEMOUSE_PROFILE` variable selects the diagnostic, calibration, and
 runtime profile.
 
-## Gate-2 preflight
+## Archived matched-pilot validation
 
-Gate-2 preflight is non-interactive and does not launch an episode:
+Regenerate and validate the completed derived archive without launching an
+episode:
+
+```bash
+make gate2-analysis
+```
+
+Expected final status is 60/60 analyzable outcomes, 20/20 exact triplets,
+`collection_complete = true`, `analysis_valid = true`, and no blocking errors.
+
+The historical preflight is also non-interactive:
 
 ```bash
 make gate2-preflight \
@@ -109,9 +119,10 @@ make gate2-preflight \
 ```
 
 Inspect the reported manifest/profile/config hashes, exact counts, parameters,
-and 40-row shared schedule plus 20 intended matched autonomous identities. This validates protocol wiring, not physical device access;
-run the SpaceMouse diagnostic separately. Do not invoke `gate2-session` as part
-of automated testing.
+and 40-row shared schedule plus 20 intended matched autonomous identities. This
+validates protocol wiring, not physical device access; run the SpaceMouse
+diagnostic separately. Do not invoke `gate2-session` as part of automated
+testing or reuse the completed raw roots.
 
 The autonomous preflight is also non-launching and output-independent:
 

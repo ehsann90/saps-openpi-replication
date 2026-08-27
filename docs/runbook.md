@@ -12,6 +12,7 @@ Detailed explanations are in:
 - [`testing.md`](testing.md)
 - [`shared_autonomy.md`](shared_autonomy.md)
 - [`human_input.md`](human_input.md)
+- [`simulation_saps_baseline.md`](simulation_saps_baseline.md)
 - [`gate2_operator_pilot.md`](gate2_operator_pilot.md)
 - [`experiment_protocol.md`](experiment_protocol.md)
 - [`analysis.md`](analysis.md)
@@ -127,12 +128,24 @@ make autonomous-sweep \
 Keyboard is the default input. For SpaceMouse operation, add
 `INPUT_SOURCE=spacemouse` to the Make invocation. The optional
 `SPACEMOUSE_DEVICE=/dev/input/by-id/...-event-joystick` override selects a
-specific device when auto-discovery is not sufficient. All normal and formal
+specific device when auto-discovery is not sufficient. All normal and manifest-driven
 Make targets automatically use the committed
 `configs/spacemouse_profile.json`; override `SPACEMOUSE_PROFILE` only when a
 different validated profile is intentionally required.
 
-## 8. Gate-2 v2 matched pilot
+## 8. Archived matched simulation pilot
+
+The matched pilot is complete. Its raw roots and historical experiment IDs are
+frozen; do not launch or resume collection against them. Regenerate and validate
+the lightweight derived archive read-only with:
+
+```bash
+make gate2-analysis
+```
+
+The historical preflight and collection entry points remain available to make
+the frozen protocol auditable. The commands below describe the original
+workflow and must not be used to overwrite or extend the completed roots.
 
 Validate the 40 shared rows and intended 20 autonomous identities without
 creating outputs or launching an episode:
@@ -142,8 +155,7 @@ make gate2-preflight \
   SPACEMOUSE_DEVICE=/dev/input/by-id/usb-3Dconnexion_SpaceMouse_Wireless-event-joystick
 ```
 
-After inspecting the printed schedule, start the policy server separately and
-launch or resume the unified session:
+The original shared collection command was:
 
 ```bash
 make gate2-session \
@@ -151,8 +163,8 @@ make gate2-session \
 ```
 
 The session is fixed to `configs/gate2_shared_autonomy_pilot_manifest.json`, the
-committed SpaceMouse profile, and `outputs/gate2_shared_autonomy_pilot_v2`.
-After shared collection, validate and collect the frozen autonomous baseline:
+committed SpaceMouse profile, and the now-immutable
+`outputs/gate2_shared_autonomy_pilot_v2`. The autonomous protocol commands were:
 
 ```bash
 make gate2-autonomous-preflight
@@ -165,7 +177,7 @@ redo, and scope restrictions.
 
 ## 9. Pure teleoperation
 
-Formal 20-trial operator schedule (280 steps, 14 simulated seconds):
+Manifest-driven 20-trial operator schedule (280 steps, 14 simulated seconds):
 
 ```bash
 make teleoperation-session \
@@ -191,7 +203,7 @@ Omit the two SpaceMouse overrides to run with the keyboard.
 
 ## 10. Shared autonomy
 
-Formal shared-autonomy schedule (280 steps, 14 simulated seconds):
+Manifest-driven shared-autonomy schedule (280 steps, 14 simulated seconds):
 
 ```bash
 make shared-autonomy-session \
@@ -286,7 +298,7 @@ pressed keys.
 | `FIXED_AUTONOMY_WEIGHT` | `0.5` | Active-human fixed blend weight |
 | `COSINE_GAIN` | `6.0` | Logistic cosine gain |
 
-## 13. Current analysis tool
+## 13. Analysis tools
 
 Analyze an autonomous sweep:
 
@@ -302,7 +314,7 @@ Analyze autonomous, teleoperation, and shared-autonomy results together:
 make analyze-comparison
 ```
 
-The default operator roots are the formal `saps_libero_teleoperation_v2` and
+The default operator roots are the versioned `saps_libero_teleoperation_v2` and
 `saps_libero_shared_autonomy_v2` session outputs. Override the result-root
 variables when analyzing another collection.
 
@@ -319,6 +331,10 @@ results/
 
 Both are ignored by Git.
 
+The exception is the small validated derived archive at
+`results/gate2_shared_autonomy_pilot_v2`, which is intentionally tracked. The
+completed raw roots under `outputs/` remain ignored and immutable.
+
 Autonomous and teleoperation episodes use:
 
 ```text
@@ -334,7 +350,7 @@ add their parameter component:
 <root>/cosine_blend/k_6p000/<condition>/...
 ```
 
-Do not reuse a completed output directory during formal experiments.
+Do not reuse a completed output directory during versioned experiments.
 
 Manifest sessions add immutable provenance and attempt history under their
 session root:

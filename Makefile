@@ -77,11 +77,15 @@ help:
 	@echo "  make operator-session MANIFEST=<manifest.json>"
 	@echo "  make teleoperation-session"
 	@echo "  make shared-autonomy-session"
-	@echo "  make gate2-preflight SPACEMOUSE_DEVICE=/dev/input/by-id/..."
-	@echo "  make gate2-session SPACEMOUSE_DEVICE=/dev/input/by-id/..."
-	@echo "  make gate2-autonomous-preflight"
-	@echo "  make gate2-autonomous"
+	@echo
+	@echo "Completed simulation archive (read-only analysis):"
 	@echo "  make gate2-analysis"
+	@echo "  make gate2-preflight SPACEMOUSE_DEVICE=/dev/input/by-id/..."
+	@echo "  make gate2-autonomous-preflight"
+	@echo
+	@echo "Historical frozen collection targets (do not reuse completed roots):"
+	@echo "  make gate2-session SPACEMOUSE_DEVICE=/dev/input/by-id/..."
+	@echo "  make gate2-autonomous"
 	@echo
 	@echo "Tests:"
 	@echo "  make check"

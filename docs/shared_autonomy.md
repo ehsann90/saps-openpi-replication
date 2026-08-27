@@ -128,6 +128,13 @@ include visible waits even though simulated time is paused. Formal
 operator-assisted experiments should use hardware where this latency is small,
 while still retaining the logged latency and wait metrics.
 
+This pause is specific to simulated progression. In a conventional physical
+chunked-VLA deployment, the robot can hold its commanded state or stop motion
+while waiting for the next action chunk, but wall clock and the external
+physical environment continue evolving. Stop/replan/continue is a valid
+physical baseline for π0.5. A continuous-execution extension such as real-time
+chunking may reduce pauses later; it is not part of the current baseline.
+
 ## 5. Shared-control states
 
 | State | Meaning |
@@ -251,5 +258,5 @@ The completed implementation has passed:
   cosine-blend smoke runs with matching profile identities.
 
 These checks establish functional correctness. They do not replace the formal,
-manifest-driven multi-condition experiment described in
-[`experiment_protocol.md`](experiment_protocol.md).
+manifest-driven evidence in the completed
+[`simulation_saps_baseline.md`](simulation_saps_baseline.md).

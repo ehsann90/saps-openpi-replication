@@ -1,9 +1,11 @@
-# Phase 1: LIBERO Perturbations, Autonomous Baseline, and Deterministic Policy Sampling
+# Autonomous LIBERO Perturbations and Deterministic Policy Sampling
 
 **Status:** Complete  
-**Implementation branch:** `phase1-libero-perturbations`  
-**Target integration branch:** `main`  
 **Completed:** July 2026
+
+The filename retains the historical Phase-1 label for existing links. In the
+current project narrative, this is the autonomous robustness and deterministic
+sampling foundation of the completed simulation SAPS baseline.
 
 ## 1. Purpose
 
@@ -348,9 +350,9 @@ The `outputs/` directory is intentionally excluded from Git.
 
 ---
 
-## 9. Phase 1 Conclusions
+## 9. Autonomous-baseline conclusions
 
-Phase 1 established that:
+This stage established that:
 
 1. the SAPS cream-cheese perturbations can be reproduced in the pinned LIBERO environment;
 2. π0.5 performs reliably near the nominal object pose but degrades substantially for larger or directionally difficult offsets;
@@ -360,10 +362,9 @@ Phase 1 established that:
 
 ---
 
-## 10. Subsequent Phases
+## 10. Subsequent simulation work
 
-Phase 2 completed the human-input and action-arbitration stack that Phase 1 had
-prepared for:
+The next simulation work completed the human-input and action-arbitration stack:
 
 1. browser keyboard input and seven-dimensional LIBERO action mapping;
 2. pure teleoperation;
@@ -375,7 +376,7 @@ prepared for:
 8. asynchronous policy inference with explicit non-stepping scheduler waits;
 9. step-level human, policy, executed-action, weight, and latency logging.
 
-The Phase 3 reproducibility infrastructure is now implemented:
+The reproducibility infrastructure then added:
 
 1. an immutable experiment manifest;
 2. deterministic and counterbalanced episode schedules;
@@ -384,9 +385,10 @@ The Phase 3 reproducibility infrastructure is now implemented:
 5. unified paired analysis across modes and perturbations;
 6. latency characterization on the intended operator-experiment hardware.
 
-Formal multi-condition operator collection remains separate from these
-implementation milestones. Pilot and smoke episodes must not be relabeled as
-formal results.
+The later matched multi-condition operator collection is complete and archived
+in [`simulation_saps_baseline.md`](simulation_saps_baseline.md). The earlier
+200-episode sweep, smoke episodes, and calibration runs retain their own
+identities and must not be relabeled as matched-pilot results.
 
 See:
 

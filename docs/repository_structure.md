@@ -16,6 +16,7 @@ saps-openpi-replication/
 │   └── spacemouse_profile.json
 ├── docs/
 │   ├── analysis.md
+│   ├── branch_inventory.md
 │   ├── environment-baseline.md
 │   ├── experiment_protocol.md
 │   ├── gate1_rtx5080_ac_performance.md
@@ -26,6 +27,7 @@ saps-openpi-replication/
 │   ├── runbook.md
 │   ├── setup.md
 │   ├── shared_autonomy.md
+│   ├── simulation_saps_baseline.md
 │   └── testing.md
 ├── patches/
 │   ├── apply_openpi_patch.sh
@@ -51,6 +53,8 @@ saps-openpi-replication/
 │   └── unit/
 ├── third_party/
 │   └── openpi/                 # pinned Git submodule
+├── results/
+│   └── gate2_shared_autonomy_pilot_v2/  # derived archive
 └── tools/
     ├── analysis/
     ├── diagnostics/
@@ -73,10 +77,10 @@ object names, and nominal plus perturbed planar offsets. Experiment scripts
 should read this configuration rather than duplicate the values.
 
 The operator manifests define immutable teleoperation and shared-autonomy
-schedules. Gate-2 v2 has separate shared and autonomous protocol files; the old
-Gate-2 v1 manifest is superseded history. `configs/spacemouse_profile.json` is the
-portable, physically validated SpaceMouse calibration; runtime device paths
-remain outside it.
+schedules. The completed matched pilot has separate shared and autonomous
+protocol files whose historical Gate-2 names remain frozen; its v1 manifest is
+superseded history. `configs/spacemouse_profile.json` is the portable, physically
+validated SpaceMouse calibration; runtime device paths remain outside it.
 
 ## Project scripts
 
@@ -125,8 +129,7 @@ asynchronous policy worker.
 - `tests/unit/`: non-interactive regression and integration tests.
 - `tests/manual/`: interactive browser/operator smoke tests.
 
-Formal experiment episodes are not unit tests and do not belong in the Git
-history.
+Experiment episodes are not unit tests and do not belong in the Git history.
 
 ## Tools
 
@@ -143,5 +146,12 @@ outputs/   # episodes, videos, schedules, manifests
 results/   # tables, validation reports, plots
 ```
 
-Both directories are ignored by Git. Formal datasets should be archived with
-checksums and provenance outside the working clone.
+`outputs/` is ignored by Git. Raw completed pilot data remain external and
+immutable at `outputs/gate2_shared_autonomy_pilot_v2` and
+`outputs/gate2_autonomous_pilot_v2`; frozen metadata and hashes identify them.
+
+Generated `results/` content is ignored by default. The deliberate exception is
+the small validated archive at `results/gate2_shared_autonomy_pilot_v2`, whose
+report, CSV summaries, and validation JSON are tracked for reviewable
+reproducibility. This exception does not authorize committing raw trajectories,
+media, or bulk generated data.

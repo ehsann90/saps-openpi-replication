@@ -1,198 +1,206 @@
 # SAPS–OpenPI Replication
 
-An independent, research-oriented replication of **SAPS: Shared Autonomy for
-Policy Steering by Blending Teleoperation with a Pretrained VLA** using the
-OpenPI `pi05_libero` policy, LIBERO, Robosuite, and MuJoCo.
+This repository provides a reproducible reference implementation of **SAPS:
+Shared Autonomy for Policy Steering by Blending Teleoperation with a Pretrained
+VLA** using OpenPI π0.5, LIBERO, Robosuite, MuJoCo, and a SpaceMouse operator
+interface.
 
-> Crystal Zhou, Jehan Yang, Douglas J. Weber, and Zackory Erickson,
-> “SAPS: Shared Autonomy for Policy Steering by Blending Teleoperation with a
-> Pretrained VLA,” arXiv:2606.15568, 2026.
->
-> Paper: https://arxiv.org/abs/2606.15568
+It is not an official implementation from the SAPS or OpenPI authors. Its role
+is to establish transparent shared-autonomy behavior and deployment
+infrastructure: deterministic policy sampling, controlled perturbations,
+explicit arbitration, responsive operator input, latency-aware execution,
+separate policy/operator/executed-action logs, and reproducible analysis.
 
-This repository is not an official implementation from the SAPS or OpenPI
-authors. It focuses on methodological transparency, deterministic policy
-sampling, controlled LIBERO perturbations, operator-visible shared autonomy,
-and reproducible experiment tooling.
+The completed LIBERO work is a simulation baseline for physical deployment. It
+is not presented as a full numerical reproduction of SAPS or as an independent,
+powered comparison of arbitration methods.
 
-## Current status
+## Project status
 
-The functional replication stack includes action-level arbitration,
-manifest-driven operator sessions, calibrated SpaceMouse input, and unified
-comparison analysis. The matched Gate-2 v2 excluded-pilot protocols and preflights are
-implemented, but the 60 human-operated episodes have not been collected.
-
-| Component | Status |
+| Stage | Status |
 |---|---|
-| Pinned OpenPI and LIBERO environment | Implemented and validated |
-| `pi05_libero` policy server | Implemented and validated |
-| SAPS cream-cheese perturbations | Implemented and validated |
-| Deterministic per-episode and per-replan sampling | Implemented and validated |
-| Autonomous baseline and resumable sweeps | Implemented |
-| Browser keyboard and SpaceMouse input paths | Implemented and physically validated |
-| Disposable SpaceMouse graphical calibration | Implemented and physically validated |
-| Hard takeover | Implemented and validated |
-| Fixed/equal action blending | Implemented and validated |
-| Cosine-similarity blending | Implemented and validated |
-| Manifest-driven operator experiment sessions | Implemented and validated |
-| Unified multi-mode analysis | Implemented and tested |
-| Gate-2 v2 matched pilot infrastructure | Implemented; collection not run |
+| π0.5/OpenPI deterministic LIBERO baseline | Complete and validated |
+| Autonomous perturbation and runtime characterization | Complete |
+| Keyboard and calibrated SpaceMouse input | Complete and physically validated |
+| Hard takeover, Fixed, and Cosine arbitration | Complete and validated |
+| Matched LIBERO shared-autonomy pilot | Complete: 60/60 outcomes, 20/20 exact triplets, analysis valid |
+| Fixed physical-robot SAPS baseline | Next implementation stage; not yet implemented |
+| Risk, collaboration, and intervention-learning research | Planned after the physical baseline |
 
-The completed Phase 1 autonomous degradation study contains 200 episodes:
-20 trials for the nominal condition and each of nine perturbation conditions.
-The human-input and arbitration stack has passed unit, compilation, scheduler,
-and live LIBERO validation, but those pilot runs are not formal statistical
-experiments.
+The matched pilot contains 20 autonomous, 20 Fixed, and 20 Cosine outcomes
+across four selected perturbation conditions. It is a descriptive excluded
+pilot with one task, one operator, and five repetitions per condition-mode cell.
+See the [canonical simulation-baseline archive](docs/simulation_saps_baseline.md)
+and its [generated final report](results/gate2_shared_autonomy_pilot_v2/REPORT.md).
 
-## What is reproduced
+## SAPS reference baseline
 
-The repository implements the SAPS action-level comparison conditions:
+The implemented action-level comparison conditions are:
 
 - autonomous policy execution;
 - pure teleoperation;
 - hard takeover;
-- fixed blending, with `0.5` as the paper coefficient;
-- cosine-similarity blending, with gain `k = 6` as in the paper.
+- Fixed blending with active-human autonomy weight `0.5`;
+- Cosine blending with logistic gain `k = 6`.
 
-Human activity is detected from the first six action dimensions. Motion is
-arbitrated separately from the gripper, which uses the SAPS closing-biased
-`max()` rule under this project's `-1=open`, `+1=close` convention.
+Actions have six end-effector motion dimensions and one gripper dimension. For
+Fixed and Cosine modes, motion follows:
+
+```text
+executed_motion = alpha * autonomous_motion + (1 - alpha) * human_motion
+```
+
+The gripper is arbitrated independently with the SAPS closing-biased `max()`
+rule under this repository's `-1=open`, `+1=close` convention. The
+[shared-autonomy runtime guide](docs/shared_autonomy.md) defines every mode,
+wait state, boundary condition, and logging field.
 
 ## Reproducibility baseline
 
-| Dependency | Pinned revision |
+| Dependency | Frozen identity |
 |---|---|
 | OpenPI | `15a9616a00943ada6c20a0f158e3adb39df2ccac` |
 | LIBERO | `f78abd68ee283de9f9be3c8f7e2a9ad60246e95c` |
-| Policy config | `pi05_libero` |
+| Policy configuration | `pi05_libero` |
+| Checkpoint | `gs://openpi-assets/checkpoints/pi05_libero` |
 | Task suite | `libero_object` |
 | Task | `pick up the cream cheese and place it in the basket` |
 
-OpenPI is included as the `third_party/openpi` Git submodule. Project-specific
-code remains in the outer repository; the retained OpenPI compatibility change
-is stored as a patch rather than an undocumented modification.
+OpenPI is pinned as `third_party/openpi`; LIBERO is pinned recursively below it.
+Project-specific compatibility changes are documented patches, not silent edits
+to either dependency.
+
+## Simulation validation
+
+The repository progressed from autonomous π0.5 deployment through controlled
+robustness and latency characterization, then SpaceMouse integration, Fixed and
+Cosine arbitration, and finally a matched descriptive pilot. The completed
+pilot observed autonomous degradation at larger selected object-position
+offsets and several recoveries under human steering. These observations validate
+the shared-autonomy pipeline; they do not establish statistical superiority or
+causal explanations for recovery.
+
+Simulation policy waits pause robot/environment state and simulation time while
+wall clock advances. For a conventional physical chunked-VLA baseline, the
+robot may hold or stop while waiting, but wall clock and the external physical
+environment continue. Continuous execution methods such as real-time chunking
+are outside the current baseline.
+
+## Physical deployment
+
+The next target is ordinary chunked π0.5/SAPS deployment on a fixed physical
+robot. Planned components include a fixed-arm interface, available fixed and
+wrist/external cameras, SpaceMouse Cartesian correction, Fixed `alpha = 0.5`,
+Cosine `k = 6`, SAPS-consistent gripper arbitration, and complete latency,
+policy-wait, operator, policy, and executed-action logging.
+
+Hardware support is not yet implemented. Physical safety must be independent of
+learned confidence and shared autonomy, using robot-native supervision,
+workspace and velocity limits, collision or force/torque monitoring where
+available, and an emergency stop. The concrete baseline specification is in
+[Simulation SAPS Baseline](docs/simulation_saps_baseline.md#physical-saps-next-stage).
+
+## Research extensions
+
+After the physical baseline is stable, the research direction is:
+
+1. short-horizon autonomous-continuation risk;
+2. evidence of collaboration, recovery, assistance reduction, and autonomy
+   resumption;
+3. selective learning from intervention.
+
+These are future research questions, not claims supported by the LIBERO pilot.
 
 ## Quick start
 
-### 1. Clone the complete repository
+Clone the pinned repository and submodules:
 
 ```bash
 git clone --recurse-submodules \
   https://github.com/ehsann90/saps-openpi-replication.git
 cd saps-openpi-replication
-
 git submodule status
 ```
 
-For an existing clone:
-
-```bash
-git submodule update --init --recursive
-```
-
-### 2. Apply the pinned compatibility patch and build images
+Apply the documented compatibility patch, build the validated Docker images,
+and run automated checks:
 
 ```bash
 make apply-patch
 make build-images
-```
-
-The two expected local images are:
-
-```text
-libero
-openpi_server
-```
-
-### 3. Run the automated checks
-
-```bash
 make check
 ```
 
-### 4. Start the deterministic policy server
+For autonomous or shared-autonomy development runs, start the policy server in
+one terminal:
 
 ```bash
 make policy-server
 ```
 
-Keep this terminal running for autonomous or shared-autonomy modes. Pure
-teleoperation and the browser input smoke test do not require the policy server.
-
-### 5. Run one mode in a second terminal
+Then use a unique output identity in another terminal, for example:
 
 ```bash
-# Autonomous smoke test
 make autonomous-smoke CONDITION=nominal
-
-# Pure teleoperation with the default keyboard input
-make teleop CONDITION=nominal TRIAL=0
-
-# Hard takeover
-make takeover \
-  CONDITION=nominal \
-  TRIAL=0
-
-# Equal/fixed blending
-make fixed-blend \
-  FIXED_AUTONOMY_WEIGHT=0.5 \
-  CONDITION=nominal \
-  TRIAL=0
-
-# Cosine-similarity blending
-make cosine-blend \
-  COSINE_GAIN=6.0 \
-  CONDITION=nominal \
-  TRIAL=0
+make takeover CONDITION=nominal TRIAL=0
+make fixed-blend CONDITION=nominal TRIAL=0 FIXED_AUTONOMY_WEIGHT=0.5
+make cosine-blend CONDITION=nominal TRIAL=0 COSINE_GAIN=6.0
 ```
 
-For operator-controlled modes, open the displayed browser URL and click
-**Arm controls** before issuing commands.
-
-For the physically calibrated SpaceMouse path, the Make targets automatically
-load `configs/spacemouse_profile.json` when `INPUT_SOURCE=spacemouse`:
+The completed matched-pilot roots are frozen. Do not reuse their experiment IDs
+or output directories. Regenerate the read-only derived archive with:
 
 ```bash
-make spacemouse-diagnostic \
-  SPACEMOUSE_DEVICE=/dev/input/by-id/usb-3Dconnexion_SpaceMouse_Wireless-event-joystick
-
-make teleop \
-  INPUT_SOURCE=spacemouse \
-  SPACEMOUSE_DEVICE=/dev/input/by-id/usb-3Dconnexion_SpaceMouse_Wireless-event-joystick \
-  CONDITION=nominal \
-  TRIAL=0
+make gate2-analysis
 ```
-
-The explicit device path is optional when capability-based auto-discovery finds
-the intended device. The same `INPUT_SOURCE` and `SPACEMOUSE_DEVICE` overrides
-apply to takeover, fixed-blend, cosine-blend, and formal session targets. See
-[the human-input guide](docs/human_input.md) for setup and safety details.
 
 ## Documentation
 
+Project overview and archive:
+
+- [Simulation SAPS baseline](docs/simulation_saps_baseline.md)
+- [Environment and dependency baseline](docs/environment-baseline.md)
+- [Repository structure and data policy](docs/repository_structure.md)
+- [Branch inventory at simulation closeout](docs/branch_inventory.md)
+
+Reference implementation:
+
 - [Installation and environment setup](docs/setup.md)
 - [Command runbook](docs/runbook.md)
+- [Shared-autonomy semantics and runtime](docs/shared_autonomy.md)
 - [Keyboard and SpaceMouse input](docs/human_input.md)
 - [Testing and validation](docs/testing.md)
-- [Gate 1 RTX 5080 AC/performance characterization](docs/gate1_rtx5080_ac_performance.md)
-- [Gate-2 v2 matched shared-autonomy pilot](docs/gate2_operator_pilot.md)
-- [Shared-autonomy semantics and runtime](docs/shared_autonomy.md)
-- [Phase 1 perturbations and deterministic sampling](docs/phase1_libero_perturbations_and_determinism.md)
-- [Formal experiment protocol](docs/experiment_protocol.md)
-- [Analysis plan and current tools](docs/analysis.md)
-- [Repository structure](docs/repository_structure.md)
+- [Analysis tools and interpretation limits](docs/analysis.md)
 
-Run `make help` for the compact command reference.
+Archived lower-level records:
 
-## Output policy
+- [Matched-pilot frozen protocol](docs/gate2_operator_pilot.md)
+- [Latency and scheduler characterization](docs/gate1_rtx5080_ac_performance.md)
+- [Autonomous perturbations and deterministic sampling](docs/phase1_libero_perturbations_and_determinism.md)
+- [Reusable operator-session protocol](docs/experiment_protocol.md)
 
-Generated episodes are written below `outputs/`; analysis products belong below
-`results/`. Both directories are ignored by Git. Preserve experiment manifests,
-software revisions, and output summaries outside the repository when archiving
-formal studies.
+Historical experiment identifiers such as `gate1`, `gate2`, and `gate2_v2` are
+retained in immutable protocol, command, and output paths for provenance. New
+documentation uses descriptive stage names.
+
+## Output and archive policy
+
+Raw episodes live below `outputs/` and remain outside Git. The completed frozen
+roots are:
+
+```text
+outputs/gate2_shared_autonomy_pilot_v2
+outputs/gate2_autonomous_pilot_v2
+```
+
+Small validated derived tables and reports for the completed baseline are
+tracked below `results/gate2_shared_autonomy_pilot_v2`. Other generated analysis
+products remain ignored unless deliberately selected as a reviewable archive.
+Raw outputs must never be edited to change an outcome or provenance record.
 
 ## Citation
 
-When using this replication, cite the original SAPS paper and identify the exact
-repository commit used for the experiment. A machine-readable citation template
-is provided in [`CITATION.cff`](CITATION.cff).
+When using this replication, cite the original SAPS paper and identify the
+exact repository milestone, collection commit, analysis commit, submodule
+revisions, checkpoint, and frozen protocol hashes. A machine-readable citation
+template is provided in [CITATION.cff](CITATION.cff).
