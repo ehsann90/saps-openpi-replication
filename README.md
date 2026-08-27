@@ -24,7 +24,8 @@ powered comparison of arbitration methods.
 | Keyboard and calibrated SpaceMouse input | Complete and physically validated |
 | Hard takeover, Fixed, and Cosine arbitration | Complete and validated |
 | Matched LIBERO shared-autonomy pilot | Complete: 60/60 outcomes, 20/20 exact triplets, analysis valid |
-| Fixed physical-robot SAPS baseline | Next implementation stage; not yet implemented |
+| π0.5-DROID offline physical-policy integration | M1 complete and validated |
+| Fixed physical-robot SAPS baseline | Later milestone; not yet implemented |
 | Risk, collaboration, and intervention-learning research | Planned after the physical baseline |
 
 The matched pilot contains 20 autonomous, 20 Fixed, and 20 Cosine outcomes
@@ -170,6 +171,7 @@ Reference implementation:
 - [Shared-autonomy semantics and runtime](docs/shared_autonomy.md)
 - [Keyboard and SpaceMouse input](docs/human_input.md)
 - [Testing and validation](docs/testing.md)
+- [Offline π0.5-DROID physical milestone M1](docs/physical_pi05_droid.md)
 - [Analysis tools and interpretation limits](docs/analysis.md)
 
 Archived lower-level records:

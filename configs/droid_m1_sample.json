@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "dataset": {
+    "name": "DROID raw",
+    "version": "1.0.1",
+    "bucket": "gresearch",
+    "documentation": "https://github.com/droid-dataset/droid/blob/main/docs/the-droid-dataset.md"
+  },
+  "episode": {
+    "uuid": "IRIS+7dfa2da3+2023-12-04-15h-44m-25s",
+    "object_prefix": "robotics/droid_raw/1.0.1/IRIS/success/2023-12-04/Mon_Dec__4_15:44:25_2023",
+    "trajectory_length": 228,
+    "wrist_camera_serial": "19824535",
+    "exterior_camera_serial": "23404442",
+    "language_annotation": {
+      "object": "robotics/droid_raw/1.0.1/aggregated-annotations-030724.json",
+      "key": "IRIS+7dfa2da3+2023-12-04-15h-44m-25s",
+      "field": "language_instruction1",
+      "value": "Remove the glass lid from the silver pot"
+    }
+  },
+  "files": [
+    {
+      "role": "metadata",
+      "relative_path": "metadata_IRIS+7dfa2da3+2023-12-04-15h-44m-25s.json",
+      "object": "robotics/droid_raw/1.0.1/IRIS/success/2023-12-04/Mon_Dec__4_15:44:25_2023/metadata_IRIS+7dfa2da3+2023-12-04-15h-44m-25s.json",
+      "size_bytes": 1754,
+      "md5_base64": "9cU3mz7oRSXJqjHFl9Du7g=="
+    },
+    {
+      "role": "trajectory",
+      "relative_path": "trajectory.h5",
+      "object": "robotics/droid_raw/1.0.1/IRIS/success/2023-12-04/Mon_Dec__4_15:44:25_2023/trajectory.h5",
+      "size_bytes": 1219948,
+      "md5_base64": "RolZXY7FhnuTKfsA2Bhm7A=="
+    },
+    {
+      "role": "wrist_video",
+      "relative_path": "recordings/MP4/19824535.mp4",
+      "object": "robotics/droid_raw/1.0.1/IRIS/success/2023-12-04/Mon_Dec__4_15:44:25_2023/recordings/MP4/19824535.mp4",
+      "size_bytes": 4169356,
+      "md5_base64": "kpxNJp1JmoVmub/9IVPDfw=="
+    },
+    {
+      "role": "exterior_video",
+      "relative_path": "recordings/MP4/23404442.mp4",
+      "object": "robotics/droid_raw/1.0.1/IRIS/success/2023-12-04/Mon_Dec__4_15:44:25_2023/recordings/MP4/23404442.mp4",
+      "size_bytes": 8479227,
+      "md5_base64": "vYNA1upXzm4Rprfbe4UjGQ=="
+    }
+  ],
+  "bundle": {
+    "step_indices": [0, 76, 152],
+    "recorded_action_horizon": 15,
+    "image_height": 180,
+    "image_width": 320
+  }
+}

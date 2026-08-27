@@ -44,11 +44,20 @@ GATE2_AUTONOMOUS_RESULTS ?= outputs/gate2_autonomous_pilot_v2
 AUTONOMOUS_RESULTS ?= outputs/autonomous_deterministic_n20_state0_v1
 TELEOP_RESULTS ?= outputs/saps_libero_teleoperation_v2
 SHARED_RESULTS ?= outputs/saps_libero_shared_autonomy_v2
+DROID_DATA_DIR ?= data/droid_m1
+DROID_SAMPLE_CONFIG ?= configs/droid_m1_sample.json
+DROID_OUTPUT ?= outputs/physical_pi05_droid_m1
+DROID_RUN_ID ?= m1_$(shell date -u +%Y%m%dT%H%M%SZ)
+DROID_NUM_SAMPLES ?= 3
+DROID_REPEAT_COUNT ?= 2
+DROID_POLICY_SEED ?= 20260827
 REDO_EPISODES ?=
 REDO_EPISODES_ARG = $(if $(strip $(REDO_EPISODES)),--redo-episode-ids $(REDO_EPISODES),)
 MANIFEST ?= configs/operator_shared_autonomy_manifest.json
 SESSION_OUTPUT ?= outputs/operator_experiment
 REPOSITORY_COMMIT := $(shell git rev-parse HEAD)
+OPENPI_COMMIT := $(shell git -C third_party/openpi rev-parse HEAD)
+DROID_DIRTY_ARG = $(if $(strip $(shell git status --porcelain)),--repository-dirty,)
 override GATE2_MANIFEST := configs/gate2_shared_autonomy_pilot_manifest.json
 override GATE2_AUTONOMOUS_PROTOCOL := configs/gate2_autonomous_pilot_protocol.json
 override GATE2_PROFILE := configs/spacemouse_profile.json
@@ -67,6 +76,9 @@ help:
 	@echo "Main processes:"
 	@echo "  make build-images"
 	@echo "  make policy-server"
+	@echo "  make droid-sample  # 13.9 MB genuine offline subset"
+	@echo "  make droid-policy-server"
+	@echo "  make droid-inference"
 	@echo "  make autonomous-smoke"
 	@echo "  make autonomous-sweep NUM_TRIALS=20"
 	@echo "  make teleop CONDITION=nominal TRIAL=0"
@@ -109,6 +121,7 @@ help:
 	@echo "  TELEOP_OUTPUT, AUTONOMOUS_OUTPUT, SHARED_OUTPUT"
 	@echo "  GATE2_ANALYSIS_OUTPUT, GATE2_AUTONOMOUS_RESULTS"
 	@echo "  FIXED_AUTONOMY_WEIGHT, COSINE_GAIN"
+	@echo "  DROID_NUM_SAMPLES, DROID_REPEAT_COUNT, DROID_POLICY_SEED, DROID_RUN_ID"
 
 .PHONY: apply-patch
 apply-patch:
@@ -127,6 +140,27 @@ policy-server:
 .PHONY: policy-stop
 policy-stop:
 	docker compose -f compose.yml stop openpi_server
+
+.PHONY: droid-sample
+droid-sample:
+	docker run --rm \
+		-v $(CURDIR):/workspace \
+		-w /workspace \
+		--entrypoint /bin/bash \
+		openpi_server:latest -lc \
+		'source /.venv/bin/activate && python tools/datasets/prepare_droid_m1_sample.py --config-path $(DROID_SAMPLE_CONFIG) --output-dir $(DROID_DATA_DIR) && chown -R $(LOCAL_UID):$(LOCAL_GID) $(DROID_DATA_DIR)'
+
+.PHONY: droid-policy-server
+droid-policy-server:
+	SAPS_SERVER_ARGS="--config-name pi05_droid --checkpoint-dir gs://openpi-assets/checkpoints/pi05_droid" \
+		$(COMPOSE) up openpi_server
+
+.PHONY: droid-inference
+droid-inference:
+	$(COMPOSE) run --rm --no-deps \
+		-e SAPS_SCRIPT=/workspace/scripts/droid_sample_inference.py \
+		-e SAPS_RUNTIME_ARGS="--sample-bundle-path $(DROID_DATA_DIR)/droid_m1_samples.npz --sample-metadata-path $(DROID_DATA_DIR)/droid_m1_samples.json --num-samples $(DROID_NUM_SAMPLES) --repeat-count $(DROID_REPEAT_COUNT) --policy-episode-seed $(DROID_POLICY_SEED) --repository-commit $(REPOSITORY_COMMIT) $(DROID_DIRTY_ARG) --openpi-commit $(OPENPI_COMMIT) --output-dir $(DROID_OUTPUT)/$(DROID_RUN_ID)" \
+		runtime
 
 .PHONY: operator-smoke
 operator-smoke:
