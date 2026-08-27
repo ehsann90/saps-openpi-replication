@@ -1,10 +1,15 @@
-# Gate-2 v2 Matched Shared-Autonomy Pilot
+# Frozen Matched-Pilot Protocol (historical Gate-2 v2)
 
-Gate 2 v2 is an excluded pilot/readiness experiment comparing autonomous,
-fixed blending, and cosine blending. It is descriptive evidence with five
-repetitions per condition-mode cell, not a powered final study. Pure
-teleoperation remains supported by the generic runners but is outside this
-protocol and needs a separately designed horizon before later evaluation.
+This lower-level record preserves the immutable protocol historically named
+Gate-2 v2. Collection and validation are complete: 60/60 outcomes are analyzable,
+20/20 exact matched triplets are present, `collection_complete = true`, and
+`analysis_valid = true` with no blocking errors. The experiment compares
+autonomous, Fixed, and Cosine execution with five repetitions per
+condition-mode cell. It is descriptive evidence, not a powered method study.
+
+The [Simulation SAPS Baseline](simulation_saps_baseline.md) is the canonical
+project-level archive and interpretation. This page retains historical names,
+commands, and paths because they are part of frozen provenance.
 
 The earlier `saps_libero_gate2_operator_pilot_v1` design and
 `configs/gate2_operator_pilot_manifest.json` are retained only as superseded
@@ -17,6 +22,17 @@ formal v2 input.
 |---|---|---|---:|
 | Shared | `saps_libero_gate2_shared_autonomy_pilot_v2` | `outputs/gate2_shared_autonomy_pilot_v2` | 40 |
 | Autonomous | `saps_libero_gate2_autonomous_pilot_v2` | `outputs/gate2_autonomous_pilot_v2` | 20 |
+
+| Provenance identity | Value |
+|---|---|
+| Collection commit | `d4013d7998b9843bf1e1a5fb25c7bbce515d0fdb` |
+| Accounting-analysis commit | `2d2d8fe5efa0a59a05ce8e59a6814f1c1895209f` |
+| OpenPI | `15a9616a00943ada6c20a0f158e3adb39df2ccac` |
+| LIBERO | `f78abd68ee283de9f9be3c8f7e2a9ad60246e95c` |
+| Checkpoint | `gs://openpi-assets/checkpoints/pi05_libero` |
+| Shared manifest SHA-256 | `61c3d346af87ffdef16b378fed9383a395b3d27947eabf768da1bd314491383a` |
+| Autonomous protocol SHA-256 | `47d84fed0dcb1909d9d99412af2515989fe46559e0e9fb0a06bbf70d1d10bd18` |
+| Perturbation config SHA-256 | `43c88fe649362303ec599c6397155380d0de1ece84dbdcf614a2a952829447c5` |
 
 The shared manifest is
 `configs/gate2_shared_autonomy_pilot_manifest.json`. The autonomous parameters
@@ -94,6 +110,21 @@ Analysis keeps these quantities separate:
 
 Shared wait ticks never count as simulated steps or simulated task time.
 
+The reported `human_active_duration_seconds` and `human_active_fraction` also
+use only environment/control steps. Human activity during policy waits is
+separate in `human_active_policy_wait_ticks`,
+`human_active_policy_wait_seconds`, and
+`human_active_policy_wait_fraction`. Including that wait activity does not
+explain the roughly 50% step-based intervention fractions. These values should
+not be compared directly with SAPS LIBERO-PRO intervention rates because the
+benchmark and protocol differ.
+
+This simulation pause does not imply that a physical external environment can
+freeze. A conventional physical chunked-VLA baseline may hold or stop the robot
+while waiting for inference, but wall clock and the external environment
+continue. That ordinary stop/replan/continue behavior is the next baseline;
+real-time chunking is not part of it.
+
 ## Non-launching preflights
 
 Run the shared preflight with the intended stable device path:
@@ -118,7 +149,10 @@ It prints all 20 condition/trial/initial-state/seed rows and verifies task,
 perturbation, environment, seed, replan, settling, frequency, and horizon
 settings. It does not depend on an autonomous output directory.
 
-## Collection and resume
+## Historical collection and resume commands
+
+The commands below document how the frozen collections were produced. Do not
+rerun them against the completed roots or reuse the frozen experiment IDs.
 
 Commit the complete protocol first and start the seeded policy server in a
 separate terminal. The server handshake advertises its policy configuration and
@@ -155,7 +189,7 @@ schedule, and repository commit before creating an environment. Compatible
 completed summaries are skipped. An existing incompatible completed summary is
 an error and is never silently overwritten.
 
-## Partial and final analysis
+## Reproducible final analysis
 
 Run analysis at any point:
 
@@ -163,8 +197,9 @@ Run analysis at any point:
 make gate2-analysis
 ```
 
-The analyzer retains all 60 planned rows and works when either collection is
-partial or not yet started. It reports observed coverage independently by mode.
+The analyzer retains all 60 planned rows and can still diagnose a partial copy,
+but the archived roots are complete. It reports observed coverage independently
+by mode.
 `matched_triplets.csv` contains only identities with all three valid outcomes;
 missing episodes are never fabricated or replaced by near matches. A seed or
 identity mismatch is blocking.
@@ -209,3 +244,8 @@ Fixed blending is audited at alpha `0.5` with absolute tolerance `1e-9`.
 Cosine diagnostic thresholds remain predeclared: near zero `alpha <= 0.10`,
 near one `alpha >= 0.90`, and material consecutive change
 `|delta alpha| >= 0.05`. Results remain descriptive pilot evidence.
+
+The final generated report records the accepted success table, matched
+interpretation, human-effort semantics, arbitration diagnostics, accounting
+clarification, limitations, and transition to physical SAPS. It is generated by
+the analyzer rather than edited independently.

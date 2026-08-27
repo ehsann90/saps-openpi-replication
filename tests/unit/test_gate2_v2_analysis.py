@@ -299,6 +299,17 @@ class Gate2V2AnalysisTest(unittest.TestCase):
             self.assertFalse(
                 report["timing"]["shared_wait_ticks_advance_environment"]
             )
+            generated_report = (
+                root / "analysis" / "REPORT.md"
+            ).read_text(encoding="utf-8")
+            self.assertIn(
+                "exclude human input during policy-wait ticks",
+                generated_report,
+            )
+            self.assertIn(
+                "physical external environment and wall clock continue",
+                generated_report,
+            )
 
     def test_autonomous_data_are_analyzed_without_shared_data(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

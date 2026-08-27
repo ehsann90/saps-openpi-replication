@@ -12,7 +12,9 @@ __pycache__/
 
 # Experiment outputs
 outputs/
-results/
+results/*
+!results/gate2_shared_autonomy_pilot_v2/
+!results/gate2_shared_autonomy_pilot_v2/**
 data/
 videos/
 logs/

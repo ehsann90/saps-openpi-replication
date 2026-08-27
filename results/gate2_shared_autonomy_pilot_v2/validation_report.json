@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "shared_experiment_id": "saps_libero_gate2_shared_autonomy_pilot_v2",
+  "autonomous_experiment_id": "saps_libero_gate2_autonomous_pilot_v2",
+  "session_root": "outputs/gate2_shared_autonomy_pilot_v2",
+  "autonomous_root": "outputs/gate2_autonomous_pilot_v2",
+  "scheduled_episode_count": 60,
+  "scheduled_by_mode": {
+    "autonomous": 20,
+    "fixed_blend": 20,
+    "cosine_blend": 20
+  },
+  "selected_analyzable_episode_count": 60,
+  "analyzable_by_mode": {
+    "autonomous": 20,
+    "cosine_blend": 20,
+    "fixed_blend": 20
+  },
+  "matched_triplet_count": 20,
+  "collection_complete": true,
+  "analysis_valid": true,
+  "ready_for_descriptive_analysis": true,
+  "ready_for_complete_gate2_report": true,
+  "timing": {
+    "environment_time_definition": "control_steps / 20 Hz",
+    "environment_step_horizon": 280,
+    "nominal_timeout_simulated_seconds": 14.0,
+    "wall_clock_is_separate": true,
+    "shared_wait_ticks_advance_environment": false,
+    "autonomous_inference_contributes_to_wall_time": true
+  },
+  "fixed_blend_deviation_episode_ids": [],
+  "policy_accounting": {
+    "shared_async_complete_episode_count": 23,
+    "shared_async_terminal_unobserved_episode_count": 17,
+    "shared_async_invalid_episode_count": 0,
+    "autonomous_sync_complete_episode_count": 20,
+    "autonomous_sync_invalid_episode_count": 0
+  },
+  "blocking_errors": [],
+  "warnings": [
+    "This is a descriptive excluded pilot, not a powered experiment.",
+    "17 shared episodes ended with one terminal policy request still in flight; those requests have no logged latency and are excluded from latency statistics."
+  ]
+}

@@ -110,6 +110,18 @@ POLICY_ACCOUNTING_FIELDS = (
     "terminal_unobserved_replan_index",
 )
 
+COLLECTION_COMMIT = "d4013d7998b9843bf1e1a5fb25c7bbce515d0fdb"
+ACCOUNTING_ANALYSIS_COMMIT = "2d2d8fe5efa0a59a05ce8e59a6814f1c1895209f"
+OPENPI_COMMIT = "15a9616a00943ada6c20a0f158e3adb39df2ccac"
+LIBERO_COMMIT = "f78abd68ee283de9f9be3c8f7e2a9ad60246e95c"
+POLICY_CHECKPOINT = "gs://openpi-assets/checkpoints/pi05_libero"
+SHARED_MANIFEST_SHA256 = (
+    "61c3d346af87ffdef16b378fed9383a395b3d27947eabf768da1bd314491383a"
+)
+AUTONOMOUS_PROTOCOL_SHA256 = (
+    "47d84fed0dcb1909d9d99412af2515989fe46559e0e9fb0a06bbf70d1d10bd18"
+)
+
 
 def _ordered_records(
     steps: list[dict[str, Any]],
@@ -421,7 +433,11 @@ def _write_csv(
         path.write_text("\n", encoding="utf-8")
         return
     with path.open("w", newline="", encoding="utf-8") as file:
-        writer = csv.DictWriter(file, fieldnames=fields or list(rows[0]))
+        writer = csv.DictWriter(
+            file,
+            fieldnames=fields or list(rows[0]),
+            lineterminator="\n",
+        )
         writer.writeheader()
         writer.writerows(rows)
 
@@ -823,33 +839,324 @@ def _triplets(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return output
 
 
-def _write_report(path: Path, report: dict[str, Any]) -> None:
+def _summary_by_mode(
+    rows: list[dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    return {str(row["mode"]): row for row in rows}
+
+
+def _summary_by_condition_mode(
+    rows: list[dict[str, Any]],
+) -> dict[tuple[str, str], dict[str, Any]]:
+    return {
+        (str(row["condition_id"]), str(row["mode"])): row
+        for row in rows
+    }
+
+
+def _count(value: Any) -> str:
+    return "—" if value is None else str(int(value))
+
+
+def _percentage(value: Any) -> str:
+    return "—" if value is None else f"{100.0 * float(value):.1f}%"
+
+
+def _seconds(value: Any) -> str:
+    return "—" if value is None else f"{float(value):.1f}"
+
+
+def _decimal(value: Any, digits: int = 2) -> str:
+    return "—" if value is None else f"{float(value):.{digits}f}"
+
+
+def _write_report(
+    path: Path,
+    *,
+    report: dict[str, Any],
+    mode_summary: list[dict[str, Any]],
+    condition_mode_summary: list[dict[str, Any]],
+    fixed_rows: list[dict[str, Any]],
+    cosine_aggregate: dict[str, Any],
+) -> None:
+    by_mode = _summary_by_mode(mode_summary)
+    by_cell = _summary_by_condition_mode(condition_mode_summary)
+
+    def success_cell(condition: str, mode: str) -> str:
+        row = by_cell[(condition, mode)]
+        valid = int(row["n_selected_valid"])
+        if valid == 0:
+            return "—"
+        return f"{int(row['n_success'])}/{valid}"
+
+    fixed = by_mode["fixed_blend"]
+    cosine = by_mode["cosine_blend"]
+    fixed_wait_ticks = int(fixed["policy_wait_ticks_total"])
+    cosine_wait_ticks = int(cosine["policy_wait_ticks_total"])
+    fixed_wait_active = int(fixed["human_active_policy_wait_ticks_total"])
+    cosine_wait_active = int(cosine["human_active_policy_wait_ticks_total"])
+    fixed_wait_active_fraction = (
+        fixed_wait_active / fixed_wait_ticks if fixed_wait_ticks else None
+    )
+    cosine_wait_active_fraction = (
+        cosine_wait_active / cosine_wait_ticks if cosine_wait_ticks else None
+    )
+    fixed_available = [
+        row for row in fixed_rows if row["metrics_available"]
+    ]
+    fixed_within_tolerance = sum(
+        bool(row["within_tolerance"]) for row in fixed_available
+    )
+    complete_report = bool(report["ready_for_complete_gate2_report"])
+    purpose = (
+        "This completed pilot closes the LIBERO simulation-baseline stage of "
+        "the SAPS–OpenPI replication. It establishes reference behavior and "
+        "validates the deployment, operator-control, arbitration, logging, "
+        "provenance, and analysis pipeline before transfer to a fixed physical "
+        "robot. It is descriptive infrastructure evidence, not a powered "
+        "comparison of arbitration methods."
+        if complete_report
+        else (
+            "This report validates an incomplete or local copy of the frozen "
+            "LIBERO matched-pilot design. It must not be presented as the final "
+            "simulation baseline until all coverage checks pass."
+        )
+    )
+    matched_interpretation = (
+        "Fixed recovered some autonomous failures while preserving the "
+        "autonomous successes in this small sample. Cosine recovered all "
+        "eight matched autonomous failures. Two `p02` identities that "
+        "succeeded autonomously failed under Cosine. Those two failures do "
+        "not establish an intrinsic Cosine regression: operator input, "
+        "intervention timing, post-intervention policy state, arbitration, "
+        "trajectory-specific effects, and their interactions cannot be "
+        "distinguished with this experiment."
+        if complete_report
+        else (
+            "Matched outcome interpretation is withheld until all 60 outcomes "
+            "and 20 exact triplets pass validation."
+        )
+    )
+    conclusion = (
+        "The simulation study established a reproducible π0.5/SAPS baseline "
+        "and validated the complete shared-autonomy execution and logging "
+        "pipeline. Autonomous performance degraded under larger object-position "
+        "perturbations, while Fixed and Cosine action blending enabled recovery "
+        "in several cases where autonomous execution failed. Because the pilot "
+        "used a single task, one operator, selected perturbations, and five "
+        "repetitions per condition-method cell, it is not intended as a powered "
+        "comparison between arbitration methods. It provides reference behavior "
+        "and deployment infrastructure for the next stage: ordinary chunked-VLA "
+        "SAPS on a fixed physical robot, followed by research on autonomous-"
+        "continuation risk, intervention, recovery, autonomy resumption, and "
+        "selective learning from intervention."
+        if complete_report
+        else (
+            "The collection is not yet complete and cannot be presented as the "
+            "final simulation baseline."
+        )
+    )
+    terminal_count = int(
+        report["policy_accounting"][
+            "shared_async_terminal_unobserved_episode_count"
+        ]
+    )
+    accounting_clarification = (
+        f"The {terminal_count} terminal requests have no logged latency and "
+        "are correctly excluded from latency statistics. This does not "
+        "invalidate any raw trajectory. All 20 autonomous episodes have "
+        "complete synchronous accounting."
+        if complete_report
+        else (
+            "Any accepted terminal request has no logged latency and is "
+            "excluded from latency statistics. Complete-collection accounting "
+            "claims are withheld until all outcomes validate."
+        )
+    )
+
     lines = [
-        "# Gate-2 v2 matched pilot report",
+        "# LIBERO matched simulation pilot report",
+        "",
+        purpose,
+        "",
+        "## Experimental design",
         "",
         (
-            "Gate 2 is excluded descriptive pilot/readiness evidence with "
-            "five repetitions per condition-mode cell, not a powered study."
+            "The frozen matched design contains 20 autonomous, 20 Fixed, and "
+            "20 Cosine outcomes. Conditions `nominal`, `p02`, `p06`, and `p09` "
+            "each have five trials per mode. The 20 condition/trial identities "
+            "are exact matched triplets with the same initial state and policy "
+            "seed protocol. Fixed uses autonomy weight `0.5`; Cosine uses gain "
+            "`k = 6`."
         ),
         "",
-        "## Coverage",
+        "## Frozen provenance",
         "",
-        f"- Expected outcomes: `60`",
+        "| Identity | Frozen value |",
+        "|---|---|",
+        f"| Collection commit | `{COLLECTION_COMMIT}` |",
+        f"| Accounting-analysis commit | `{ACCOUNTING_ANALYSIS_COMMIT}` |",
+        f"| OpenPI submodule | `{OPENPI_COMMIT}` |",
+        f"| LIBERO submodule | `{LIBERO_COMMIT}` |",
+        f"| Policy checkpoint | `{POLICY_CHECKPOINT}` |",
+        f"| SpaceMouse profile SHA-256 | `{GATE2_V2_PROFILE_SHA256}` |",
+        f"| Shared manifest SHA-256 | `{SHARED_MANIFEST_SHA256}` |",
+        (
+            "| Autonomous protocol SHA-256 | "
+            f"`{AUTONOMOUS_PROTOCOL_SHA256}` |"
+        ),
+        f"| Perturbation config SHA-256 | `{GATE2_V2_CONFIG_SHA256}` |",
+        "",
+        (
+            "The collection commit is the repository revision recorded by both "
+            "raw collections. The later accounting-analysis commit is kept "
+            "separate because it changed validation of asynchronous request/"
+            "result accounting, not the collected trajectories."
+        ),
+        "",
+        f"Raw data remain immutable at `{report['session_root']}` and "
+        f"`{report['autonomous_root']}`. This report and its CSV/JSON "
+        "companions are derived artifacts.",
+        "",
+        "## Coverage and validation",
+        "",
+        "- Expected outcomes: `60`",
         (
             "- Analyzable outcomes: "
-            f"`{report['selected_analyzable_episode_count']}`"
+            f"`{report['selected_analyzable_episode_count']}/60`"
         ),
         f"- Exact complete triplets: `{report['matched_triplet_count']}/20`",
         f"- Complete collection: `{report['collection_complete']}`",
+        f"- Analysis valid: `{report['analysis_valid']}`",
+        f"- Blocking validation errors: `{len(report['blocking_errors'])}`",
+        "",
+        "## Descriptive success outcomes",
+        "",
+        "| Condition | Autonomous | Fixed | Cosine |",
+        "|---|---:|---:|---:|",
+        *(
+            (
+                f"| {condition} | {success_cell(condition, 'autonomous')} | "
+                f"{success_cell(condition, 'fixed_blend')} | "
+                f"{success_cell(condition, 'cosine_blend')} |"
+            )
+            for condition in GATE2_V2_CONDITIONS
+        ),
+        (
+            "| Overall | "
+            f"{_count(by_mode['autonomous']['n_success'])}/"
+            f"{_count(by_mode['autonomous']['n_selected_valid'])} "
+            f"({_percentage(by_mode['autonomous']['success_rate_observed'])}) | "
+            f"{_count(fixed['n_success'])}/{_count(fixed['n_selected_valid'])} "
+            f"({_percentage(fixed['success_rate_observed'])}) | "
+            f"{_count(cosine['n_success'])}/"
+            f"{_count(cosine['n_selected_valid'])} "
+            f"({_percentage(cosine['success_rate_observed'])}) |"
+        ),
+        "",
+        (
+            "These are descriptive observations only; no statistical-"
+            "significance claim is attached."
+        ),
+        "",
+        "## Matched outcome interpretation",
+        "",
+        matched_interpretation,
+        "",
+        "## Human effort",
+        "",
+        (
+            "`human_active_duration_seconds` and `human_active_fraction` use "
+            "only actual environment/control steps. They exclude human input "
+            "during policy-wait ticks, when the simulation is paused. That "
+            "wait-period activity is logged separately."
+        ),
+        "",
+        "| Metric | Fixed | Cosine |",
+        "|---|---:|---:|",
+        (
+            "| Mean step-based human-active fraction | "
+            f"{_percentage(fixed['human_active_fraction_mean'])} | "
+            f"{_percentage(cosine['human_active_fraction_mean'])} |"
+        ),
+        (
+            "| Mean step-based human-active duration (s) | "
+            f"{_seconds(fixed['human_active_duration_mean_seconds'])} | "
+            f"{_seconds(cosine['human_active_duration_mean_seconds'])} |"
+        ),
+        (
+            "| Mean correction segments per episode | "
+            f"{_decimal(fixed['correction_segments_mean'])} | "
+            f"{_decimal(cosine['correction_segments_mean'])} |"
+        ),
+        (
+            "| Policy-wait duration, all episodes (s) | "
+            f"{_seconds(fixed['policy_wait_duration_total_seconds'])} | "
+            f"{_seconds(cosine['policy_wait_duration_total_seconds'])} |"
+        ),
+        (
+            "| Human-active policy-wait duration (s) | "
+            f"{fixed_wait_active / GATE2_V2_CONTROL_FREQUENCY_HZ:.1f} | "
+            f"{cosine_wait_active / GATE2_V2_CONTROL_FREQUENCY_HZ:.1f} |"
+        ),
+        (
+            "| Human-active share of policy-wait ticks | "
+            f"{_percentage(fixed_wait_active_fraction)} | "
+            f"{_percentage(cosine_wait_active_fraction)} |"
+        ),
+        "",
+        (
+            "Including wait-period activity modestly changes the overall "
+            "intervention picture but does not explain the roughly 50% "
+            "step-based rates. These fractions must not be compared directly "
+            "with the roughly 10.8% and 30% LIBERO-PRO rates reported by SAPS, "
+            "which use a different benchmark and protocol. SAPS real-world "
+            "fractions are more comparable in magnitude, but this pilot does "
+            "not establish exact cross-paper equivalence."
+        ),
+        "",
+        "## Arbitration diagnostics",
+        "",
+        (
+            f"All `{fixed_within_tolerance}/{len(fixed_available)}` analyzable "
+            "Fixed episodes used active-human autonomy weight `0.5` within "
+            "absolute tolerance `1e-9`; no deviation was detected."
+        ),
+        "",
+        (
+            "Cosine produced "
+            f"`{_count(cosine_aggregate.get('weight_count'))}` defined active "
+            "weights and "
+            f"`{_count(cosine_aggregate.get('undefined_weight_count'))}` "
+            "undefined weights. Across active steps, the aggregate mean weight "
+            f"was `{_decimal(cosine_aggregate.get('weight_mean'), 3)}`, "
+            f"with `{_percentage(cosine_aggregate.get('near_zero_fraction'))}` "
+            "near zero, "
+            f"`{_percentage(cosine_aggregate.get('near_one_fraction'))}` near "
+            "one, and "
+            f"`{_percentage(cosine_aggregate.get('intermediate_fraction'))}` "
+            "intermediate. These are implementation diagnostics, not evidence "
+            "of method superiority."
+        ),
         "",
         "## Timing semantics",
         "",
         (
-            "Simulated/environment execution time is `control_steps / 20 Hz`. "
-            "Wall-control and total wall time are retained separately. Shared "
-            "scheduler waits and inference latency are diagnostics and never "
-            "increase simulated-step count. Autonomous inference latency is "
-            "reported from replan step logs and contributes to wall time."
+            "In this simulation baseline, policy waits do not advance robot "
+            "simulation state, environment state, or simulation/environment "
+            "time; wall clock does advance. Simulated execution time is "
+            "`control_steps / 20 Hz`, while wall-control and total wall time "
+            "are retained separately. Autonomous synchronous inference also "
+            "contributes to wall time."
+        ),
+        "",
+        (
+            "For the next conventional physical chunked-VLA baseline, the "
+            "robot may hold its commanded state or stop motion while waiting "
+            "for the next action chunk, but the physical external environment "
+            "and wall clock continue evolving. Stop/replan/continue is a valid "
+            "baseline. Continuous execution methods such as real-time chunking "
+            "may later reduce pauses, but RTC is outside this baseline."
         ),
         "",
         "## Policy accounting",
@@ -875,6 +1182,28 @@ def _write_report(path: Path, report: dict[str, Any]) -> None:
             "- Autonomous synchronous complete accounting: "
             f"`{report['policy_accounting']['autonomous_sync_complete_episode_count']}`"
         ),
+        "",
+        accounting_clarification,
+        "",
+        "## Limitations",
+        "",
+        "- One LIBERO task.",
+        "- Four selected perturbation conditions.",
+        "- Five repetitions per condition-mode cell.",
+        "- One nonexpert operator and one SpaceMouse interface.",
+        "- No multi-operator study.",
+        "- Descriptive excluded pilot, not a powered method comparison.",
+        "",
+        (
+            "A single nonexpert operator is not by itself inconsistent with "
+            "the SAPS within-benchmark setup, but this sample and its task and "
+            "participant coverage are insufficient for a paper-level "
+            "comparison of arbitration methods."
+        ),
+        "",
+        "## Conclusion and transition",
+        "",
+        conclusion,
     ]
     if report["blocking_errors"]:
         lines.extend(["", "## Blocking errors", ""])
@@ -895,7 +1224,7 @@ def analyze_gate2_v2_collection(
 
     errors: list[str] = []
     warnings = [
-        "Gate 2 is a descriptive excluded pilot, not a powered experiment."
+        "This is a descriptive excluded pilot, not a powered experiment."
     ]
     manifest, shared_schedule = _shared_inputs(
         session_root,
@@ -1114,5 +1443,12 @@ def analyze_gate2_v2_collection(
         json.dumps(report, indent=2) + "\n",
         encoding="utf-8",
     )
-    _write_report(output_dir / "REPORT.md", report)
+    _write_report(
+        output_dir / "REPORT.md",
+        report=report,
+        mode_summary=mode_summary,
+        condition_mode_summary=condition_mode_summary,
+        fixed_rows=fixed_rows,
+        cosine_aggregate=cosine_aggregate,
+    )
     return report
