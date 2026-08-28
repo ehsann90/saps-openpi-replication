@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "discovery_date": "2026-08-28",
+  "status": "live_acceptance_passed",
+  "wrist_camera": {
+    "model": "Intel RealSense D435I",
+    "serial": "342222073510",
+    "firmware": "5.13.0.55",
+    "ros_topic": "/wrist/wrist_camera/color/image_raw",
+    "acceptance_rgb_profile": "640x360x30"
+  },
+  "exterior_camera": {
+    "model": "Intel RealSense D435I",
+    "serial": "244222076317",
+    "firmware": "5.17.3.10",
+    "ros_topic": "/exterior/exterior_camera/color/image_raw",
+    "acceptance_rgb_profile": "640x480x15",
+    "status": "temporary_exterior_for_m3_live_acceptance",
+    "scientific_role": "temporary; not a permanent exterior-camera assumption"
+  },
+  "robot": {
+    "joint_state_topic": "/franka/joint_states",
+    "gripper_state_topic": "/franka_gripper/joint_states",
+    "gripper_joint_names": ["_finger_joint1", "_finger_joint2"],
+    "gripper_closure": "clip(1 - total_width_m / 0.08, 0, 1)",
+    "base_frame": "fr3_link0",
+    "tcp_frame": "fr3_hand_tcp"
+  },
+  "policy_images": {
+    "shape": [180, 320, 3],
+    "dtype": "uint8",
+    "color_order": "RGB",
+    "preprocessing": "center crop to 16:9, then deterministic resize"
+  },
+  "spnavd": {
+    "device": "3Dconnexion SpaceMouse Wireless",
+    "usb_id": "256f:c62e",
+    "maximum_raw_value": 500.0,
+    "deadzone": 0.3,
+    "stale_timeout_seconds": 0.25,
+    "open_button": 0,
+    "close_button": 1
+  },
+  "live_acceptance": {
+    "date": "2026-08-28",
+    "observation_run": "outputs/physical_pi05_droid_m3/m3_live_20260828T1548Z",
+    "spnav_runs": [
+      "outputs/physical_pi05_droid_m3/spnav_live_20260828T1552Z",
+      "outputs/physical_pi05_droid_m3/spnav_buttons_20260828T1554Z"
+    ],
+    "comparison": "outputs/physical_pi05_droid_m3/comparison_live_20260828T1556Z.json",
+    "actuation": false
+  },
+  "note": "The live capture command requires an explicit distinct exterior serial and refuses wrist-image substitution. Serial 244222076317 is accepted only as the temporary exterior camera for this M3 live run."
+}

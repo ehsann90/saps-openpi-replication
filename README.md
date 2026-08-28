@@ -26,6 +26,7 @@ powered comparison of arbitration methods.
 | Matched LIBERO shared-autonomy pilot | Complete: 60/60 outcomes, 20/20 exact triplets, analysis valid |
 | π0.5-DROID offline physical-policy integration | M1 complete and validated |
 | DROID joint-to-FR3 Cartesian embodiment | M2 complete and validated offline |
+| Live FR3 observation and spnavd input | M3 complete and live-validated without actuation |
 | Fixed physical-robot SAPS baseline | Later milestone; not yet implemented |
 | Risk, collaboration, and intervention-learning research | Planned after the physical baseline |
 
@@ -96,8 +97,11 @@ wrist/external cameras, SpaceMouse Cartesian correction, Fixed `alpha = 0.5`,
 Cosine `k = 6`, SAPS-consistent gripper arbitration, and complete latency,
 policy-wait, operator, policy, and executed-action logging.
 
-Offline policy inference and FR3 embodiment kinematics are implemented; live
-hardware I/O and actuation are not. Physical safety must be independent of
+Offline policy inference, FR3 embodiment kinematics, and non-actuating live
+input diagnostics are implemented. A second D435I is temporarily assigned as
+the exterior camera for M3 acceptance; this is not a permanent scientific
+camera-role assumption. Actuation is not implemented.
+Physical safety must be independent of
 learned confidence and shared autonomy, using robot-native supervision,
 workspace and velocity limits, collision or force/torque monitoring where
 available, and an emergency stop. The concrete baseline specification is in
@@ -175,6 +179,7 @@ Reference implementation:
 - [Testing and validation](docs/testing.md)
 - [Offline π0.5-DROID physical milestone M1](docs/physical_pi05_droid.md)
 - [Offline DROID-to-FR3 embodiment milestone M2](docs/physical_fr3_embodiment.md)
+- [Live observation and SpaceMouse milestone M3](docs/physical_m3_inputs.md)
 - [Analysis tools and interpretation limits](docs/analysis.md)
 
 Archived lower-level records:

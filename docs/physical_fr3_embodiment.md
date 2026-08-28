@@ -238,11 +238,11 @@ thresholds at 0.5 nor maps closure to Franka Hand width, Move, or Grasp calls.
 
 ## M3/M4 boundaries
 
-M3 still needs read-only/live FR3 state timing, camera alignment and
-preprocessing, and SpaceMouse motion mapped into the same Cartesian axes and
-normalization. In particular, current SpaceMouse Servo messages are expressed
-in `fr3_hand_tcp`, whereas M2's policy twist components are expressed in
-`fr3_link0`; arbitration inputs must use one explicit common expression frame.
+The [M3 live-input milestone](physical_m3_inputs.md) now implements
+subscriber-only FR3 timing, deterministic camera preprocessing, spnavd input,
+and the `fr3_hand_tcp`-to-`fr3_link0` component transformation. Its live shadow
+acceptance passed on 2026-08-28 using a temporary, explicitly serial-pinned
+exterior D435I; no robot or gripper command was issued.
 
 M4 still owns 15-to-50 Hz action-rate conversion, base/TCP command-frame
 mapping, execution and safety scaling, Servo collision/singularity behavior,

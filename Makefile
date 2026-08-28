@@ -54,6 +54,23 @@ DROID_POLICY_SEED ?= 20260827
 M2_M1_RUN ?= outputs/physical_pi05_droid_m1/validation_final_20260827T1318Z/run.json
 M2_OUTPUT ?= outputs/physical_pi05_droid_m2
 M2_RUN_ID ?= m2_$(shell date -u +%Y%m%dT%H%M%SZ)
+M3_OUTPUT ?= outputs/physical_pi05_droid_m3
+M3_RUN_ID ?= m3_$(shell date -u +%Y%m%dT%H%M%SZ)
+M3_RUN_DIR = $(M3_OUTPUT)/$(M3_RUN_ID)
+M3_SPACEMOUSE_RUN_ID ?= spnav_$(shell date -u +%Y%m%dT%H%M%SZ)
+M3_SPACEMOUSE_RUN_DIR = $(M3_OUTPUT)/$(M3_SPACEMOUSE_RUN_ID)
+M3_EXTERIOR_SERIAL ?=
+M3_PROMPT ?= pick up the object
+M3_OBSERVATIONS ?= 5
+M3_CAPTURE_TIMEOUT ?= 30
+M3_WRIST_TOPIC ?= /wrist/wrist_camera/color/image_raw
+M3_EXTERIOR_TOPIC ?= /exterior/exterior_camera/color/image_raw
+M3_JOINT_TOPIC ?= /franka/joint_states
+M3_GRIPPER_TOPIC ?= /franka_gripper/joint_states
+M3_SPACEMOUSE_DURATION ?= 10
+M3_SPACEMOUSE_OUTPUT ?=
+M3_PROJECTION ?=
+M3_COMPARISON_OUTPUT ?= $(M3_OUTPUT)/comparison_$(shell date -u +%Y%m%dT%H%M%SZ).json
 FRANKA_DESCRIPTION_DIR ?= /home/hvl-robotics2404/franka_ros2_ws/src/franka_description
 IGD_FR3_CONTROL_DIR ?= /home/hvl-robotics2404/franka_ros2_ws/src/igd_fr3_control
 FRANKA_ROS2_INSTALL ?= /home/hvl-robotics2404/franka_ros2_ws/install
@@ -86,6 +103,9 @@ help:
 	@echo "  make droid-policy-server"
 	@echo "  make droid-inference"
 	@echo "  make droid-fr3-m2  # offline only; never commands the FR3"
+	@echo "  make physical-m3-observation M3_EXTERIOR_SERIAL=<serial>"
+	@echo "  make physical-m3-shadow M3_EXTERIOR_SERIAL=<serial>"
+	@echo "  make physical-m3-spacemouse  # subscriber/spnavd log only"
 	@echo "  make autonomous-smoke"
 	@echo "  make autonomous-sweep NUM_TRIALS=20"
 	@echo "  make teleop CONDITION=nominal TRIAL=0"
@@ -130,6 +150,7 @@ help:
 	@echo "  FIXED_AUTONOMY_WEIGHT, COSINE_GAIN"
 	@echo "  DROID_NUM_SAMPLES, DROID_REPEAT_COUNT, DROID_POLICY_SEED, DROID_RUN_ID"
 	@echo "  M2_M1_RUN, M2_OUTPUT, M2_RUN_ID, FRANKA_DESCRIPTION_DIR"
+	@echo "  M3_RUN_ID, M3_EXTERIOR_SERIAL, M3_PROMPT, M3_OBSERVATIONS"
 
 .PHONY: apply-patch
 apply-patch:
@@ -182,6 +203,77 @@ droid-fr3-m2:
 		--franka-description-dir $(FRANKA_DESCRIPTION_DIR) \
 		--igd-control-dir $(IGD_FR3_CONTROL_DIR) \
 		--output-dir $(M2_OUTPUT)/$(M2_RUN_ID)'
+
+.PHONY: physical-m3-observation
+physical-m3-observation:
+	@test -n "$(strip $(M3_EXTERIOR_SERIAL))" || \
+		{ echo "M3 requires an explicit M3_EXTERIOR_SERIAL."; \
+		  echo "Temporary serial 244222076317 is not selected implicitly."; \
+		  exit 2; }
+	bash -lc 'source /opt/ros/jazzy/setup.bash && \
+		source $(FRANKA_ROS2_INSTALL)/setup.bash && \
+		cd $(CURDIR) && \
+		export PYTHONPATH="$(CURDIR)/src:$${PYTHONPATH}" && \
+		/usr/bin/python3 \
+		tools/diagnostics/capture_physical_m3_observations.py \
+		--output-dir $(M3_RUN_DIR) \
+		--exterior-camera-serial $(M3_EXTERIOR_SERIAL) \
+		--prompt "$(M3_PROMPT)" \
+		--wrist-image-topic $(M3_WRIST_TOPIC) \
+		--exterior-image-topic $(M3_EXTERIOR_TOPIC) \
+		--joint-state-topic $(M3_JOINT_TOPIC) \
+		--gripper-state-topic $(M3_GRIPPER_TOPIC) \
+		--observation-count $(M3_OBSERVATIONS) \
+		--timeout-seconds $(M3_CAPTURE_TIMEOUT) \
+		--franka-description-dir $(FRANKA_DESCRIPTION_DIR) \
+		--igd-control-dir $(IGD_FR3_CONTROL_DIR)'
+
+.PHONY: physical-m3-shadow-inference
+physical-m3-shadow-inference:
+	$(COMPOSE) run --rm --no-deps \
+		-e SAPS_SCRIPT=/workspace/scripts/physical_shadow_inference.py \
+		-e SAPS_RUNTIME_ARGS="--run-dir $(M3_RUN_DIR) --policy-episode-seed $(DROID_POLICY_SEED)" \
+		runtime
+
+.PHONY: physical-m3-shadow-project
+physical-m3-shadow-project:
+	bash -lc 'source /opt/ros/jazzy/setup.bash && \
+		source $(FRANKA_ROS2_INSTALL)/setup.bash && \
+		cd $(CURDIR) && \
+		export PYTHONPATH="$(CURDIR)/src:$${PYTHONPATH}" && \
+		/usr/bin/python3 \
+		tools/diagnostics/project_physical_m3_shadow.py \
+		--run-dir $(M3_RUN_DIR) \
+		--franka-description-dir $(FRANKA_DESCRIPTION_DIR)'
+
+.PHONY: physical-m3-shadow
+physical-m3-shadow:
+	$(MAKE) physical-m3-observation M3_RUN_ID=$(M3_RUN_ID)
+	$(MAKE) physical-m3-shadow-inference M3_RUN_ID=$(M3_RUN_ID)
+	$(MAKE) physical-m3-shadow-project M3_RUN_ID=$(M3_RUN_ID)
+
+.PHONY: physical-m3-spacemouse
+physical-m3-spacemouse:
+	bash -lc 'source /opt/ros/jazzy/setup.bash && \
+		source $(FRANKA_ROS2_INSTALL)/setup.bash && \
+		cd $(CURDIR) && \
+		export PYTHONPATH="$(CURDIR)/src:$${PYTHONPATH}" && \
+		/usr/bin/python3 \
+		tools/diagnostics/inspect_physical_spnav.py \
+		--output-dir $(M3_SPACEMOUSE_RUN_DIR) \
+		--duration-seconds $(M3_SPACEMOUSE_DURATION) \
+		--joint-state-topic $(M3_JOINT_TOPIC) \
+		--franka-description-dir $(FRANKA_DESCRIPTION_DIR) \
+		--igd-control-dir $(IGD_FR3_CONTROL_DIR)'
+
+.PHONY: physical-m3-compare
+physical-m3-compare:
+	@test -n "$(strip $(M3_PROJECTION))" || \
+		{ echo "Set M3_PROJECTION=<shadow_projection.json>."; exit 2; }
+	@test -n "$(strip $(M3_SPACEMOUSE_OUTPUT))" || \
+		{ echo "Set M3_SPACEMOUSE_OUTPUT=<spnav.json>."; exit 2; }
+	$(RUNTIME) /bin/bash -lc \
+		'source /.venv/bin/activate && python /workspace/tools/analysis/compare_physical_m3_actions.py --projection-path $(M3_PROJECTION) --spnav-path $(M3_SPACEMOUSE_OUTPUT) --output-path $(M3_COMPARISON_OUTPUT)'
 
 .PHONY: operator-smoke
 operator-smoke:

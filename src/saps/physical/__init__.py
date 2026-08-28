@@ -1,2 +1,1 @@
-"""Offline-safe physical robot representation utilities."""
-
+"""Physical robot representation and read-only observation utilities."""

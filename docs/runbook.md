@@ -16,6 +16,7 @@ Detailed explanations are in:
 - [`gate2_operator_pilot.md`](gate2_operator_pilot.md)
 - [`experiment_protocol.md`](experiment_protocol.md)
 - [`analysis.md`](analysis.md)
+- [`physical_m3_inputs.md`](physical_m3_inputs.md)
 
 ## 1. Bootstrap
 
@@ -93,7 +94,42 @@ unprofiled raw/default settings. Fresh calibration without loading an existing
 profile is available from the Python runner's `--no-load-existing-profile`
 option.
 
-## 6. Autonomous execution
+## 6. Physical M3 shadow diagnostics
+
+M3 is live-validated and non-actuating. It requires an already running
+read-only FR3 stack and two RealSense color nodes selected by distinct serials.
+For the 2026-08-28 live
+acceptance only, serial `244222076317` is the temporary exterior camera; this
+does not establish its permanent scientific role. See
+[`physical_m3_inputs.md`](physical_m3_inputs.md) before running it.
+
+Start the pinned DROID policy server:
+
+```bash
+make droid-policy-server
+```
+
+Capture live inputs, infer in shadow mode, and project through M2:
+
+```bash
+make physical-m3-shadow \
+  M3_RUN_ID=m3_$(date -u +%Y%m%dT%H%M%SZ) \
+  M3_EXTERIOR_SERIAL=244222076317 \
+  M3_PROMPT="pick up the object"
+```
+
+Collect a separate current-state SpaceMouse diagnostic:
+
+```bash
+make physical-m3-spacemouse \
+  M3_SPACEMOUSE_RUN_ID=spnav_$(date -u +%Y%m%dT%H%M%SZ)
+```
+
+Stop the policy server afterward with `make policy-stop`. These targets never
+launch or command the robot, but the surrounding laboratory bringup is
+stateful and must follow its own safety procedure.
+
+## 7. Autonomous execution
 
 Single-condition smoke test:
 
@@ -123,7 +159,7 @@ make autonomous-sweep \
   AUTONOMOUS_OUTPUT=outputs/autonomous_selected
 ```
 
-## 7. Human input selection
+## 8. Human input selection
 
 Keyboard is the default input. For SpaceMouse operation, add
 `INPUT_SOURCE=spacemouse` to the Make invocation. The optional
@@ -133,7 +169,7 @@ Make targets automatically use the committed
 `configs/spacemouse_profile.json`; override `SPACEMOUSE_PROFILE` only when a
 different validated profile is intentionally required.
 
-## 8. Archived matched simulation pilot
+## 9. Archived matched simulation pilot
 
 The matched pilot is complete. Its raw roots and historical experiment IDs are
 frozen; do not launch or resume collection against them. Regenerate and validate
@@ -175,7 +211,7 @@ See the
 [Gate-2 protocol](gate2_operator_pilot.md) for counterbalancing, provenance,
 redo, and scope restrictions.
 
-## 9. Pure teleoperation
+## 10. Pure teleoperation
 
 Manifest-driven 20-trial operator schedule (280 steps, 14 simulated seconds):
 
@@ -201,7 +237,7 @@ make teleop \
 
 Omit the two SpaceMouse overrides to run with the keyboard.
 
-## 10. Shared autonomy
+## 11. Shared autonomy
 
 Manifest-driven shared-autonomy schedule (280 steps, 14 simulated seconds):
 
@@ -261,7 +297,7 @@ The underlying shared-autonomy Python runner still accepts
 `--arbitration-mode autonomous` for programmatic experiment orchestration. For
 manual autonomous runs, use `make autonomous-smoke` or `make autonomous-sweep`.
 
-## 11. Browser controls
+## 12. Browser controls
 
 | Key | Command |
 |---|---|
@@ -278,7 +314,7 @@ manual autonomous runs, use `make autonomous-smoke` or `make autonomous-sweep`.
 Click **Arm controls** before using the keyboard. Losing browser focus clears
 pressed keys.
 
-## 12. Common variables
+## 13. Common variables
 
 | Variable | Default | Meaning |
 |---|---:|---|
@@ -298,7 +334,7 @@ pressed keys.
 | `FIXED_AUTONOMY_WEIGHT` | `0.5` | Active-human fixed blend weight |
 | `COSINE_GAIN` | `6.0` | Logistic cosine gain |
 
-## 13. Analysis tools
+## 14. Analysis tools
 
 Analyze an autonomous sweep:
 
@@ -320,7 +356,7 @@ variables when analyzing another collection.
 
 See [`analysis.md`](analysis.md) for outputs and interpretation constraints.
 
-## 14. Output conventions
+## 15. Output conventions
 
 Generated data:
 
@@ -365,7 +401,7 @@ session root:
 <session>/attempts/<episode_id>/attempt_<number>/...
 ```
 
-## 15. Commit checklist
+## 16. Commit checklist
 
 ```bash
 git status --short

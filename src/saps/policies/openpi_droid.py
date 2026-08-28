@@ -9,7 +9,6 @@ import time
 from typing import Any
 
 import numpy as np
-from openpi_client.websocket_client_policy import WebsocketClientPolicy
 
 
 SAPS_PROTOCOL_VERSION = 1
@@ -78,11 +77,13 @@ class OpenPiDroidPolicy:
         port: int = 8000,
         client: Any | None = None,
     ) -> None:
-        self._client = (
-            WebsocketClientPolicy(host, port)
-            if client is None
-            else client
-        )
+        if client is None:
+            from openpi_client.websocket_client_policy import (
+                WebsocketClientPolicy,
+            )
+
+            client = WebsocketClientPolicy(host, port)
+        self._client = client
         self.last_sampling_metadata: dict[str, Any] | None = None
 
     @property
