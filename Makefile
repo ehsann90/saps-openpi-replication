@@ -51,6 +51,12 @@ DROID_RUN_ID ?= m1_$(shell date -u +%Y%m%dT%H%M%SZ)
 DROID_NUM_SAMPLES ?= 3
 DROID_REPEAT_COUNT ?= 2
 DROID_POLICY_SEED ?= 20260827
+M2_M1_RUN ?= outputs/physical_pi05_droid_m1/validation_final_20260827T1318Z/run.json
+M2_OUTPUT ?= outputs/physical_pi05_droid_m2
+M2_RUN_ID ?= m2_$(shell date -u +%Y%m%dT%H%M%SZ)
+FRANKA_DESCRIPTION_DIR ?= /home/hvl-robotics2404/franka_ros2_ws/src/franka_description
+IGD_FR3_CONTROL_DIR ?= /home/hvl-robotics2404/franka_ros2_ws/src/igd_fr3_control
+FRANKA_ROS2_INSTALL ?= /home/hvl-robotics2404/franka_ros2_ws/install
 REDO_EPISODES ?=
 REDO_EPISODES_ARG = $(if $(strip $(REDO_EPISODES)),--redo-episode-ids $(REDO_EPISODES),)
 MANIFEST ?= configs/operator_shared_autonomy_manifest.json
@@ -79,6 +85,7 @@ help:
 	@echo "  make droid-sample  # 13.9 MB genuine offline subset"
 	@echo "  make droid-policy-server"
 	@echo "  make droid-inference"
+	@echo "  make droid-fr3-m2  # offline only; never commands the FR3"
 	@echo "  make autonomous-smoke"
 	@echo "  make autonomous-sweep NUM_TRIALS=20"
 	@echo "  make teleop CONDITION=nominal TRIAL=0"
@@ -122,6 +129,7 @@ help:
 	@echo "  GATE2_ANALYSIS_OUTPUT, GATE2_AUTONOMOUS_RESULTS"
 	@echo "  FIXED_AUTONOMY_WEIGHT, COSINE_GAIN"
 	@echo "  DROID_NUM_SAMPLES, DROID_REPEAT_COUNT, DROID_POLICY_SEED, DROID_RUN_ID"
+	@echo "  M2_M1_RUN, M2_OUTPUT, M2_RUN_ID, FRANKA_DESCRIPTION_DIR"
 
 .PHONY: apply-patch
 apply-patch:
@@ -161,6 +169,19 @@ droid-inference:
 		-e SAPS_SCRIPT=/workspace/scripts/droid_sample_inference.py \
 		-e SAPS_RUNTIME_ARGS="--sample-bundle-path $(DROID_DATA_DIR)/droid_m1_samples.npz --sample-metadata-path $(DROID_DATA_DIR)/droid_m1_samples.json --num-samples $(DROID_NUM_SAMPLES) --repeat-count $(DROID_REPEAT_COUNT) --policy-episode-seed $(DROID_POLICY_SEED) --repository-commit $(REPOSITORY_COMMIT) $(DROID_DIRTY_ARG) --openpi-commit $(OPENPI_COMMIT) --output-dir $(DROID_OUTPUT)/$(DROID_RUN_ID)" \
 		runtime
+
+.PHONY: droid-fr3-m2
+droid-fr3-m2:
+	bash -lc 'source /opt/ros/jazzy/setup.bash && \
+		source $(FRANKA_ROS2_INSTALL)/setup.bash && \
+		cd $(CURDIR) && \
+		export PYTHONPATH="$(CURDIR)/src:$${PYTHONPATH}" && \
+		/usr/bin/python3 \
+		tools/diagnostics/project_droid_m1_to_fr3.py \
+		--m1-run-path $(M2_M1_RUN) \
+		--franka-description-dir $(FRANKA_DESCRIPTION_DIR) \
+		--igd-control-dir $(IGD_FR3_CONTROL_DIR) \
+		--output-dir $(M2_OUTPUT)/$(M2_RUN_ID)'
 
 .PHONY: operator-smoke
 operator-smoke:

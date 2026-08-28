@@ -25,6 +25,7 @@ powered comparison of arbitration methods.
 | Hard takeover, Fixed, and Cosine arbitration | Complete and validated |
 | Matched LIBERO shared-autonomy pilot | Complete: 60/60 outcomes, 20/20 exact triplets, analysis valid |
 | π0.5-DROID offline physical-policy integration | M1 complete and validated |
+| DROID joint-to-FR3 Cartesian embodiment | M2 complete and validated offline |
 | Fixed physical-robot SAPS baseline | Later milestone; not yet implemented |
 | Risk, collaboration, and intervention-learning research | Planned after the physical baseline |
 
@@ -95,7 +96,8 @@ wrist/external cameras, SpaceMouse Cartesian correction, Fixed `alpha = 0.5`,
 Cosine `k = 6`, SAPS-consistent gripper arbitration, and complete latency,
 policy-wait, operator, policy, and executed-action logging.
 
-Hardware support is not yet implemented. Physical safety must be independent of
+Offline policy inference and FR3 embodiment kinematics are implemented; live
+hardware I/O and actuation are not. Physical safety must be independent of
 learned confidence and shared autonomy, using robot-native supervision,
 workspace and velocity limits, collision or force/torque monitoring where
 available, and an emergency stop. The concrete baseline specification is in
@@ -172,6 +174,7 @@ Reference implementation:
 - [Keyboard and SpaceMouse input](docs/human_input.md)
 - [Testing and validation](docs/testing.md)
 - [Offline π0.5-DROID physical milestone M1](docs/physical_pi05_droid.md)
+- [Offline DROID-to-FR3 embodiment milestone M2](docs/physical_fr3_embodiment.md)
 - [Analysis tools and interpretation limits](docs/analysis.md)
 
 Archived lower-level records:
