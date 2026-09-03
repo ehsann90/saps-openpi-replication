@@ -145,10 +145,12 @@ Columns are `fr3_joint1` through `fr3_joint7`.
 Run the deterministic validation against the actual local description:
 
 ```bash
-make validate-fr3-kinematics \
-  FRANKA_DESCRIPTION_DIR="$HOME/franka_ros2_ws/src/franka_description" \
-  FRANKA_ROS2_INSTALL="$HOME/franka_ros2_ws/install"
+make validate-fr3-kinematics
 ```
+
+The default `FRANKA_ROS2_WS=$HOME/franka_ros2_ws` derives both the description
+and install paths. If the workspace is elsewhere, override only its root, for
+example `make validate-fr3-kinematics FRANKA_ROS2_WS=/home/franka_ros2_ws`.
 
 With Pinocchio 4.0.0 and expanded-URDF SHA-256
 `23d7f794e78ea7947a871cadacc41f0f66444b2a60208b07233b6cfffcc1d766`, the
@@ -177,9 +179,7 @@ non-actuating diagnostic with:
 
 ```bash
 make validate-droid-fr3-mapping \
-  M3_MAPPING_RUN=outputs/physical_pi05_droid_m3/m3_live_20260828T1548Z \
-  FRANKA_DESCRIPTION_DIR="$HOME/franka_ros2_ws/src/franka_description" \
-  FRANKA_ROS2_INSTALL="$HOME/franka_ros2_ws/install"
+  M3_MAPPING_RUN=outputs/physical_pi05_droid_m3/m3_live_20260828T1548Z
 ```
 
 For each action it compares the differential prediction

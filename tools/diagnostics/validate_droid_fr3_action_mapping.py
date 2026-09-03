@@ -602,9 +602,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--franka-description-dir",
         type=Path,
-        default=Path(
-            "~/franka_ros2_ws/src/franka_description"
-        ).expanduser(),
+        default=Path.home() / "franka_ros2_ws/src/franka_description",
     )
 
     args = parser.parse_args()

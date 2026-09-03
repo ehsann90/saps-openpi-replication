@@ -73,9 +73,10 @@ M3_PROJECTION ?=
 M3_COMPARISON_OUTPUT ?= $(M3_OUTPUT)/comparison_$(shell date -u +%Y%m%dT%H%M%SZ).json
 M3_MAPPING_RUN ?= outputs/physical_pi05_droid_m3/m3_live_20260828T1548Z
 ALLOW_LEGACY_M2 ?=
-FRANKA_DESCRIPTION_DIR ?= /home/hvl-robotics2404/franka_ros2_ws/src/franka_description
-IGD_FR3_CONTROL_DIR ?= /home/hvl-robotics2404/franka_ros2_ws/src/igd_fr3_control
-FRANKA_ROS2_INSTALL ?= /home/hvl-robotics2404/franka_ros2_ws/install
+FRANKA_ROS2_WS ?= $(HOME)/franka_ros2_ws
+FRANKA_DESCRIPTION_DIR ?= $(FRANKA_ROS2_WS)/src/franka_description
+IGD_FR3_CONTROL_DIR ?= $(FRANKA_ROS2_WS)/src/igd_fr3_control
+FRANKA_ROS2_INSTALL ?= $(FRANKA_ROS2_WS)/install
 REDO_EPISODES ?=
 REDO_EPISODES_ARG = $(if $(strip $(REDO_EPISODES)),--redo-episode-ids $(REDO_EPISODES),)
 MANIFEST ?= configs/operator_shared_autonomy_manifest.json
@@ -153,7 +154,8 @@ help:
 	@echo "  GATE2_ANALYSIS_OUTPUT, GATE2_AUTONOMOUS_RESULTS"
 	@echo "  FIXED_AUTONOMY_WEIGHT, COSINE_GAIN"
 	@echo "  DROID_NUM_SAMPLES, DROID_REPEAT_COUNT, DROID_POLICY_SEED, DROID_RUN_ID"
-	@echo "  M2_M1_RUN, M2_OUTPUT, M2_RUN_ID, FRANKA_DESCRIPTION_DIR"
+	@echo "  M2_M1_RUN, M2_OUTPUT, M2_RUN_ID, FRANKA_ROS2_WS"
+	@echo "  FRANKA_DESCRIPTION_DIR, IGD_FR3_CONTROL_DIR"
 	@echo "  M3_RUN_ID, M3_MAPPING_RUN, M3_EXTERIOR_SERIAL, M3_PROMPT"
 	@echo "  M3_OBSERVATIONS, FRANKA_ROS2_INSTALL, ALLOW_LEGACY_M2"
 
@@ -202,36 +204,36 @@ droid-fr3-m2:
 		{ echo "Superseded M2 projection requires ALLOW_LEGACY_M2=1."; \
 		  exit 2; }
 	bash -lc 'source /opt/ros/jazzy/setup.bash && \
-		source $(FRANKA_ROS2_INSTALL)/setup.bash && \
+		source "$(FRANKA_ROS2_INSTALL)/setup.bash" && \
 		cd $(CURDIR) && \
 		export PYTHONPATH="$(CURDIR)/src:$${PYTHONPATH}" && \
 		/usr/bin/python3 \
 		tools/diagnostics/project_droid_m1_to_fr3.py \
 		--m1-run-path $(M2_M1_RUN) \
-		--franka-description-dir $(FRANKA_DESCRIPTION_DIR) \
-		--igd-control-dir $(IGD_FR3_CONTROL_DIR) \
+		--franka-description-dir "$(FRANKA_DESCRIPTION_DIR)" \
+		--igd-control-dir "$(IGD_FR3_CONTROL_DIR)" \
 		--output-dir $(M2_OUTPUT)/$(M2_RUN_ID)'
 
 .PHONY: validate-fr3-kinematics
 validate-fr3-kinematics:
 	bash -lc 'source /opt/ros/jazzy/setup.bash && \
-		source $(FRANKA_ROS2_INSTALL)/setup.bash && \
+		source "$(FRANKA_ROS2_INSTALL)/setup.bash" && \
 		cd $(CURDIR) && \
 		export PYTHONPATH="$(CURDIR)/src:$${PYTHONPATH}" && \
 		/usr/bin/python3 \
 		tools/diagnostics/validate_fr3_forward_kinematics.py \
-		--xacro-path $(FRANKA_DESCRIPTION_DIR)/robots/fr3/fr3.urdf.xacro'
+		--xacro-path "$(FRANKA_DESCRIPTION_DIR)/robots/fr3/fr3.urdf.xacro"'
 
 .PHONY: validate-droid-fr3-mapping
 validate-droid-fr3-mapping:
 	bash -lc 'source /opt/ros/jazzy/setup.bash && \
-		source $(FRANKA_ROS2_INSTALL)/setup.bash && \
+		source "$(FRANKA_ROS2_INSTALL)/setup.bash" && \
 		cd $(CURDIR) && \
 		export PYTHONPATH="$(CURDIR)/src:$${PYTHONPATH}" && \
 		/usr/bin/python3 \
 		tools/diagnostics/validate_droid_fr3_action_mapping.py \
 		--run-dir $(M3_MAPPING_RUN) \
-		--franka-description-dir $(FRANKA_DESCRIPTION_DIR)'
+		--franka-description-dir "$(FRANKA_DESCRIPTION_DIR)"'
 
 .PHONY: physical-m3-observation
 physical-m3-observation:
@@ -240,7 +242,7 @@ physical-m3-observation:
 		  echo "Temporary serial 244222076317 is not selected implicitly."; \
 		  exit 2; }
 	bash -lc 'source /opt/ros/jazzy/setup.bash && \
-		source $(FRANKA_ROS2_INSTALL)/setup.bash && \
+		source "$(FRANKA_ROS2_INSTALL)/setup.bash" && \
 		cd $(CURDIR) && \
 		export PYTHONPATH="$(CURDIR)/src:$${PYTHONPATH}" && \
 		/usr/bin/python3 \
@@ -254,8 +256,8 @@ physical-m3-observation:
 		--gripper-state-topic $(M3_GRIPPER_TOPIC) \
 		--observation-count $(M3_OBSERVATIONS) \
 		--timeout-seconds $(M3_CAPTURE_TIMEOUT) \
-		--franka-description-dir $(FRANKA_DESCRIPTION_DIR) \
-		--igd-control-dir $(IGD_FR3_CONTROL_DIR)'
+		--franka-description-dir "$(FRANKA_DESCRIPTION_DIR)" \
+		--igd-control-dir "$(IGD_FR3_CONTROL_DIR)"'
 
 .PHONY: physical-m3-shadow-inference
 physical-m3-shadow-inference:
@@ -270,13 +272,13 @@ physical-m3-shadow-project:
 		{ echo "Superseded M2 projection requires ALLOW_LEGACY_M2=1."; \
 		  exit 2; }
 	bash -lc 'source /opt/ros/jazzy/setup.bash && \
-		source $(FRANKA_ROS2_INSTALL)/setup.bash && \
+		source "$(FRANKA_ROS2_INSTALL)/setup.bash" && \
 		cd $(CURDIR) && \
 		export PYTHONPATH="$(CURDIR)/src:$${PYTHONPATH}" && \
 		/usr/bin/python3 \
 		tools/diagnostics/project_physical_m3_shadow.py \
 		--run-dir $(M3_RUN_DIR) \
-		--franka-description-dir $(FRANKA_DESCRIPTION_DIR)'
+		--franka-description-dir "$(FRANKA_DESCRIPTION_DIR)"'
 
 .PHONY: physical-m3-shadow
 physical-m3-shadow:
@@ -290,7 +292,7 @@ physical-m3-shadow:
 .PHONY: physical-m3-spacemouse
 physical-m3-spacemouse:
 	bash -lc 'source /opt/ros/jazzy/setup.bash && \
-		source $(FRANKA_ROS2_INSTALL)/setup.bash && \
+		source "$(FRANKA_ROS2_INSTALL)/setup.bash" && \
 		cd $(CURDIR) && \
 		export PYTHONPATH="$(CURDIR)/src:$${PYTHONPATH}" && \
 		/usr/bin/python3 \
@@ -298,8 +300,8 @@ physical-m3-spacemouse:
 		--output-dir $(M3_SPACEMOUSE_RUN_DIR) \
 		--duration-seconds $(M3_SPACEMOUSE_DURATION) \
 		--joint-state-topic $(M3_JOINT_TOPIC) \
-		--franka-description-dir $(FRANKA_DESCRIPTION_DIR) \
-		--igd-control-dir $(IGD_FR3_CONTROL_DIR)'
+		--franka-description-dir "$(FRANKA_DESCRIPTION_DIR)" \
+		--igd-control-dir "$(IGD_FR3_CONTROL_DIR)"'
 
 .PHONY: physical-m3-compare
 physical-m3-compare:

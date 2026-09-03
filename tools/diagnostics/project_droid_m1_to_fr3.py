@@ -762,17 +762,12 @@ def _parse_args() -> Args:
     parser.add_argument(
         "--franka-description-dir",
         type=Path,
-        default=Path(
-            "/home/hvl-robotics2404/franka_ros2_ws/src/"
-            "franka_description"
-        ),
+        default=Path.home() / "franka_ros2_ws/src/franka_description",
     )
     parser.add_argument(
         "--igd-control-dir",
         type=Path,
-        default=Path(
-            "/home/hvl-robotics2404/franka_ros2_ws/src/igd_fr3_control"
-        ),
+        default=Path.home() / "franka_ros2_ws/src/igd_fr3_control",
     )
     parser.add_argument(
         "--m1-starting-commit",

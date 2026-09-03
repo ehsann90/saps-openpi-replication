@@ -303,10 +303,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--franka-description-dir",
         type=Path,
-        default=Path(
-            "/home/hvl-robotics2404/franka_ros2_ws/src/"
-            "franka_description"
-        ),
+        default=Path.home() / "franka_ros2_ws/src/franka_description",
     )
     return parser.parse_args()
 

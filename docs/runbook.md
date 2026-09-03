@@ -130,6 +130,12 @@ make validate-droid-fr3-mapping \
 The old normalized M2 projection is a provenance-only path and requires
 `ALLOW_LEGACY_M2=1`; do not use it to define physical SAPS scales.
 
+Physical commands derive `FRANKA_DESCRIPTION_DIR`, `IGD_FR3_CONTROL_DIR`, and
+`FRANKA_ROS2_INSTALL` from `FRANKA_ROS2_WS`, which defaults to
+`$HOME/franka_ros2_ws`. Set `FRANKA_ROS2_WS=/another/path/franka_ros2_ws` when
+the workspace is installed elsewhere; individual derived paths remain
+overridable for nonstandard layouts.
+
 Collect a separate current-state SpaceMouse diagnostic:
 
 ```bash

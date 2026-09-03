@@ -14,9 +14,10 @@ from saps.physical.fr3_forward_kinematics import fr3_tcp_jacobian
 from saps.physical.fr3_kinematics import Fr3PinocchioKinematics
 
 
-DEFAULT_FR3_XACRO = Path(
-    "~/franka_ros2_ws/src/franka_description/robots/fr3/fr3.urdf.xacro"
-).expanduser()
+DEFAULT_FR3_XACRO = (
+    Path.home()
+    / "franka_ros2_ws/src/franka_description/robots/fr3/fr3.urdf.xacro"
+)
 DEFAULT_RANDOM_SAMPLES = 1000
 DEFAULT_SEED = 20260902
 POSITION_TOLERANCE_M = 1e-9
