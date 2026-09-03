@@ -1,4 +1,4 @@
-"""Offline Pinocchio backend for the laboratory FR3 description."""
+"""Independent Pinocchio validation backend for the lab FR3 description."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from saps.physical.embodiment import FR3_JOINT_NAMES
 
 
 class Fr3PinocchioKinematics:
-    """FR3 Jacobian and FK with no ROS graph or robot connection.
+    """Independent FR3 Jacobian/FK checks with no robot connection.
 
     The returned geometric Jacobian describes the ``fr3_hand_tcp`` origin
     relative to ``fr3_link0``. Its first three rows are linear velocity in
@@ -159,7 +159,7 @@ class Fr3PinocchioKinematics:
         return _readonly(jacobian_base)
 
     def forward_kinematics(self, joint_position: np.ndarray) -> np.ndarray:
-        """Return base-to-TCP homogeneous transform for current q."""
+        """Return base-to-selected-frame homogeneous transform for q."""
 
         q = self._joint_position(joint_position)
         data = self._model.createData()

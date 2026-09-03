@@ -1,4 +1,4 @@
-"""Tests for pure DROID-to-FR3 embodiment mathematics."""
+"""Regression tests for the retained legacy M2 implementation."""
 
 from __future__ import annotations
 
@@ -41,7 +41,7 @@ def valid_policy_action() -> np.ndarray:
     )
 
 
-class DroidJointActionSemanticsTest(unittest.TestCase):
+class LegacyDroidJointActionSemanticsTest(unittest.TestCase):
     def setUp(self) -> None:
         self.semantics = DroidJointActionSemantics()
 
@@ -102,7 +102,7 @@ class DroidJointActionSemanticsTest(unittest.TestCase):
                     self.semantics.transform(native)
 
 
-class DroidToFr3TaskSpaceAdapterTest(unittest.TestCase):
+class LegacyDroidToFr3TaskSpaceAdapterTest(unittest.TestCase):
     def test_correct_six_by_seven_jacobian_multiplication(self) -> None:
         jacobian = np.arange(42, dtype=np.float64).reshape(6, 7) / 10
         provider = SyntheticJacobianProvider(jacobian)
@@ -212,7 +212,7 @@ class DroidToFr3TaskSpaceAdapterTest(unittest.TestCase):
         )
 
 
-class CartesianRepresentationTest(unittest.TestCase):
+class LegacyCartesianRepresentationTest(unittest.TestCase):
     def test_canonical_gripper_boundaries_and_range(self) -> None:
         self.assertEqual(validate_gripper_closure(0.0), 0.0)
         self.assertEqual(validate_gripper_closure(1.0), 1.0)

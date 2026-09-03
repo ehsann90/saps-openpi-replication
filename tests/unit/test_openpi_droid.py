@@ -10,6 +10,7 @@ import numpy as np
 
 from saps.policies.openpi_droid import DroidRunProvenance
 from saps.policies.openpi_droid import DROID_POLICY_INPUT_KEYS
+from saps.policies.openpi_droid import map_droid_reference_joint_action
 from saps.policies.openpi_droid import OpenPiDroidPolicy
 from saps.policies.openpi_droid import prepare_droid_observation
 from saps.policies.openpi_droid import validate_droid_action_response
@@ -109,6 +110,34 @@ class DroidObservationContractTest(unittest.TestCase):
 
 
 class DroidActionContractTest(unittest.TestCase):
+    def test_reference_joint_action_uses_componentwise_clipping(self) -> None:
+        action = np.asarray(
+            [2.0, -3.0, 0.5, -0.25, 1.0, -1.0, 0.0, 0.75],
+            dtype=np.float64,
+        )
+
+        mapped = map_droid_reference_joint_action(action)
+
+        np.testing.assert_array_equal(
+            mapped.reference_joint_coordinates,
+            [1.0, -1.0, 0.5, -0.25, 1.0, -1.0, 0.0],
+        )
+        np.testing.assert_allclose(
+            mapped.delta_q_rad,
+            [0.2, -0.2, 0.1, -0.05, 0.2, -0.2, 0.0],
+        )
+        self.assertEqual(mapped.policy_joint_coordinates[0], 2.0)
+
+    def test_reference_joint_action_rejects_invalid_values(self) -> None:
+        with self.assertRaisesRegex(TypeError, "floating dtype"):
+            map_droid_reference_joint_action(np.zeros(8, dtype=np.int64))
+        with self.assertRaisesRegex(ValueError, "shape"):
+            map_droid_reference_joint_action(np.zeros(7, dtype=np.float64))
+        action = np.zeros(8, dtype=np.float64)
+        action[2] = np.nan
+        with self.assertRaisesRegex(ValueError, "finite"):
+            map_droid_reference_joint_action(action)
+
     def test_action_horizon_is_observed_not_assumed(self) -> None:
         for horizon in (1, 10, 15, 23):
             with self.subTest(horizon=horizon):

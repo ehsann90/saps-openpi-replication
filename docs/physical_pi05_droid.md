@@ -216,15 +216,19 @@ dimensions 0..6: DROID joint_velocity
 dimension 7:     DROID gripper_position
 ```
 
-Despite its name, the DROID `joint_velocity` field is not directly a physical
-rad/s command. In the DROID controller source it is a normalized relative
-velocity representation. `RobotIKSolver` uses a 15 Hz control rate,
-`max_joint_delta = 0.2`, clips the relative command when its largest magnitude
-exceeds one, and maps one unit to a `0.2 rad` joint-position delta for that
-controller update. A simple nominal conversion would therefore be
-`3 rad/s` per unit at 15 Hz, but M2 must preserve and validate the actual
-per-step clipping and robot-controller semantics rather than treating the
-policy output as unbounded physical velocity.
+Despite its name, DROID `joint_velocity` is not directly a physical rad/s
+command. The reference boundary is
+
+```text
+u_pi = policy_action[0:7]
+u_ref = clip(u_pi, -1, 1)       # component by component
+delta_q = 0.2 u_ref             # rad/reference update
+```
+
+This is not global vector rescaling. The `15 * delta_q` quantity is only an
+equivalent average-velocity diagnostic at DROID's 15 Hz reference cadence; it
+is not the native policy command or an FR3 command. See the authoritative
+[FR3 kinematics and mapping record](physical_fr3_embodiment.md).
 
 DROID gripper position is absolute and normalized by physical width:
 
@@ -235,9 +239,9 @@ gripper_position = 1 - current_width / maximum_width
 ```
 
 The pinned live DROID example thresholds the policy gripper value at `0.5`,
-binarizes it to zero or one, and then clips the full action to `[-1, 1]` before
-execution. M1 records the continuous value leaving the policy adapter and does
-not threshold, clip, or execute it.
+binarizes it to zero or one, and then clips every action component to `[-1, 1]`
+before execution. M1 records the continuous value leaving the policy adapter
+and does not threshold, clip, or execute it.
 
 The checkpoint action quantiles used for the inverse scaling are:
 
@@ -271,7 +275,9 @@ dimension in the handshake and sampling metadata.
 
 The actual pinned runtime returned `(15, 8)` for all six calls. The example's
 `(10, 8)` assertion is therefore stale for `pi05_droid` at this pinned revision;
-the configured horizon of 15 is the observed runtime behavior.
+the configured horizon of 15 is the observed model output. The intended pinned
+physical DROID execution horizon is the first 8 actions at 15 Hz before
+replanning; all 15 actions are used only for full-chunk diagnostics here.
 
 ## Determinism
 
@@ -282,12 +288,11 @@ with the same episode seed and replan index, logs the noise SHA-256, and checks
 exact array equality plus maximum absolute difference. OpenPI sampling
 semantics are not modified.
 
-## Limitations and M2 boundary
+## Boundary to physical embodiment
 
-The diagnostic establishes the native DROID/OpenPI boundary only. Before any
-FR3 command is possible, M2 must define and numerically validate how the seven
-normalized DROID per-step joint commands map through the current FR3 state and
-Jacobian into six-dimensional Cartesian motion. It must also decide whether
-to preserve DROID's nominal 15 Hz step semantics or rescale for another
-controller rate, and it must implement gripper representation conversion
-separately. None of those conversions exists in M1.
+M1 establishes the OpenPI boundary only. The manual FR3 FK, Jacobian, and
+finite-action diagnostic are documented in
+[`physical_fr3_embodiment.md`](physical_fr3_embodiment.md). Cartesian SAPS
+scales, Cartesian-correction-to-joint mapping, execution scheduling, streaming
+freshness, gripper execution, and physical safety supervision remain
+unresolved; none is an M1 result.

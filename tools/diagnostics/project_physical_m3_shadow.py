@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Project live M3 shadow actions through M2 with captured FR3 states."""
+"""Reproduce the superseded M2 projection of captured M3 actions.
+
+This is an explicit legacy/provenance path, not the current physical mapping.
+"""
 
 from __future__ import annotations
 
@@ -18,7 +21,7 @@ from saps.physical.fr3_kinematics import Fr3PinocchioKinematics
 
 
 def main(args: argparse.Namespace) -> None:
-    """Apply M2 kinematics to every native action without robot transport."""
+    """Apply legacy M2 kinematics without robot transport."""
 
     run_dir = args.run_dir.resolve()
     capture_path = run_dir / "run.json"

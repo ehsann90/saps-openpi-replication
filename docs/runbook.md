@@ -109,14 +109,26 @@ Start the pinned DROID policy server:
 make droid-policy-server
 ```
 
-Capture live inputs, infer in shadow mode, and project through M2:
+Capture live inputs with a unique identity:
 
 ```bash
-make physical-m3-shadow \
+make physical-m3-observation \
   M3_RUN_ID=m3_$(date -u +%Y%m%dT%H%M%SZ) \
   M3_EXTERIOR_SERIAL=244222076317 \
   M3_PROMPT="pick up the object"
 ```
+
+Run shadow inference for that captured identity, then validate the saved
+actions with the hand-derived FK/Jacobian mapping:
+
+```bash
+make physical-m3-shadow-inference M3_RUN_ID=<captured-run-id>
+make validate-droid-fr3-mapping \
+  M3_MAPPING_RUN=outputs/physical_pi05_droid_m3/<captured-run-id>
+```
+
+The old normalized M2 projection is a provenance-only path and requires
+`ALLOW_LEGACY_M2=1`; do not use it to define physical SAPS scales.
 
 Collect a separate current-state SpaceMouse diagnostic:
 

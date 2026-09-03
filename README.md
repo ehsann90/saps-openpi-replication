@@ -25,9 +25,9 @@ powered comparison of arbitration methods.
 | Hard takeover, Fixed, and Cosine arbitration | Complete and validated |
 | Matched LIBERO shared-autonomy pilot | Complete: 60/60 outcomes, 20/20 exact triplets, analysis valid |
 | π0.5-DROID offline physical-policy integration | M1 complete and validated |
-| DROID joint-to-FR3 Cartesian embodiment | M2 complete and validated offline |
+| Manual FR3 FK/Jacobian and DROID finite-action mapping | Validated offline |
 | Live FR3 observation and spnavd input | M3 complete and live-validated without actuation |
-| Fixed physical-robot SAPS baseline | Later milestone; not yet implemented |
+| Physical Cartesian scales, correction mapping, and execution | Unresolved; not implemented |
 | Risk, collaboration, and intervention-learning research | Planned after the physical baseline |
 
 The matched pilot contains 20 autonomous, 20 Fixed, and 20 Cosine outcomes
@@ -178,7 +178,7 @@ Reference implementation:
 - [Keyboard and SpaceMouse input](docs/human_input.md)
 - [Testing and validation](docs/testing.md)
 - [Offline π0.5-DROID physical milestone M1](docs/physical_pi05_droid.md)
-- [Offline DROID-to-FR3 embodiment milestone M2](docs/physical_fr3_embodiment.md)
+- [Validated FR3 kinematics and DROID action mapping](docs/physical_fr3_embodiment.md)
 - [Live observation and SpaceMouse milestone M3](docs/physical_m3_inputs.md)
 - [Analysis tools and interpretation limits](docs/analysis.md)
 

@@ -1,4 +1,11 @@
-"""Pure DROID-joint to FR3 task-space embodiment mathematics."""
+"""FR3 frame constants and the historical, non-authoritative M2 adapter.
+
+The M2 classes are retained so existing diagnostic artifacts remain
+interpretable. They use superseded global joint-vector rescaling and proposed
+Cartesian scales; neither is the current physical mapping. New work must use
+``saps.policies.openpi_droid.map_droid_reference_joint_action`` and the
+hand-derived FR3 kinematics.
+"""
 
 from __future__ import annotations
 
@@ -84,7 +91,7 @@ class CartesianPolicyAction:
 
 @dataclasses.dataclass(frozen=True)
 class CartesianNormalization:
-    """Explicit diagonal scaling for a Cartesian per-step displacement.
+    """Legacy M2 diagonal scaling for a Cartesian displacement.
 
     Translation entries are metres per policy step. Rotation entries are
     radians per policy step. Normalization never clips its result.
@@ -139,7 +146,7 @@ class CartesianNormalization:
 
 
 class DroidJointActionSemantics:
-    """Exact 15-Hz DROID normalized relative-joint semantics."""
+    """Legacy M2 global-rescaling semantics; not the DROID reference."""
 
     def __init__(
         self,
@@ -185,7 +192,7 @@ class DroidJointActionSemantics:
 
 
 class DroidToFr3TaskSpaceAdapter:
-    """Project one DROID action using the FR3 state supplied for that step."""
+    """Legacy M2 projection retained only for historical diagnostics."""
 
     def __init__(
         self,

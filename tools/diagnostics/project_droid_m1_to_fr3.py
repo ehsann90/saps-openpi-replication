@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Project genuine M1 pi05-DROID actions through the FR3 model offline."""
+"""Reproduce the superseded M2 projection for provenance only.
+
+This explicit legacy path uses global arm-vector rescaling and proposed
+0.075-m/0.15-rad Cartesian scales. It is not the authoritative DROID-to-FR3
+mapping and must not be used to design physical SAPS behavior.
+"""
 
 from __future__ import annotations
 

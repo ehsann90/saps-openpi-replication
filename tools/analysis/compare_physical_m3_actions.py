@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare live M3 policy and human normalized-action diagnostics."""
+"""Compare superseded M2/M3 normalized artifacts for provenance only."""
 
 from __future__ import annotations
 

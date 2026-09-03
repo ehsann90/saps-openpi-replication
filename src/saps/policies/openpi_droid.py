@@ -14,6 +14,7 @@ import numpy as np
 SAPS_PROTOCOL_VERSION = 1
 DROID_ACTION_DIMENSION = 8
 DROID_JOINT_DIMENSION = 7
+DROID_MAX_JOINT_DELTA_RAD = 0.2
 DROID_POLICY_INPUT_KEYS = (
     "observation/exterior_image_1_left",
     "observation/wrist_image_left",
@@ -33,6 +34,15 @@ class DroidPolicyResponse:
     server_timing: dict[str, Any] | None
     sampling_metadata: dict[str, Any] | None
     response_keys: tuple[str, ...]
+
+
+@dataclasses.dataclass(frozen=True)
+class DroidReferenceJointAction:
+    """Pinned DROID arm coordinates and their per-step joint increment."""
+
+    policy_joint_coordinates: np.ndarray
+    reference_joint_coordinates: np.ndarray
+    delta_q_rad: np.ndarray
 
 
 @dataclasses.dataclass(frozen=True)
@@ -264,6 +274,46 @@ def validate_droid_action_response(
     result = np.array(actions, copy=True)
     result.setflags(write=False)
     return result
+
+
+def map_droid_reference_joint_action(
+    action: np.ndarray,
+) -> DroidReferenceJointAction:
+    """Apply the pinned DROID component clip and 0.2-rad step scale.
+
+    The eight-dimensional input is one checkpoint-unnormalized OpenPI action.
+    Only dimensions zero through six are arm coordinates; the gripper value is
+    deliberately not transformed here.
+    """
+
+    value = np.asarray(action)
+    if not np.issubdtype(value.dtype, np.floating):
+        raise TypeError(
+            "DROID action must have a floating dtype, received "
+            f"{value.dtype}."
+        )
+    if value.shape != (DROID_ACTION_DIMENSION,):
+        raise ValueError(
+            "DROID action must have shape (8,), received "
+            f"{value.shape}."
+        )
+    if not np.all(np.isfinite(value)):
+        raise ValueError("DROID action must contain only finite values.")
+
+    policy_coordinates = np.array(
+        value[:DROID_JOINT_DIMENSION],
+        dtype=np.float64,
+        copy=True,
+    )
+    reference_coordinates = np.clip(policy_coordinates, -1.0, 1.0)
+    delta_q_rad = DROID_MAX_JOINT_DELTA_RAD * reference_coordinates
+    for array in (policy_coordinates, reference_coordinates, delta_q_rad):
+        array.setflags(write=False)
+    return DroidReferenceJointAction(
+        policy_joint_coordinates=policy_coordinates,
+        reference_joint_coordinates=reference_coordinates,
+        delta_q_rad=delta_q_rad,
+    )
 
 
 def summarize_action_chunk(actions: np.ndarray) -> list[dict[str, Any]]:

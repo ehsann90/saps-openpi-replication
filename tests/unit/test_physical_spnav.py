@@ -13,9 +13,6 @@ from saps.human_input.spnav import process_spnav_motion
 from saps.human_input.spnav import rotate_normalized_cartesian_motion
 from saps.human_input.spnav import SpnavConfig
 from saps.human_input.spnav import SpnavHumanInputBackend
-from saps.physical.embodiment import CartesianNormalization
-from saps.physical.embodiment import DroidToFr3TaskSpaceAdapter
-from saps.physical.embodiment import FR3_JOINT_NAMES
 
 
 class FakeSpnavBoundary:
@@ -46,18 +43,6 @@ class FakeSpnavBoundary:
     def device_exists(self, path: str) -> bool:
         del path
         return self.device_present
-
-
-class IdentityJacobianProvider:
-    joint_names = FR3_JOINT_NAMES
-    base_frame = "fr3_link0"
-    end_effector_frame = "fr3_hand_tcp"
-
-    def jacobian(self, joint_position: np.ndarray) -> np.ndarray:
-        del joint_position
-        matrix = np.zeros((6, 7), dtype=np.float64)
-        matrix[:, :6] = np.eye(6)
-        return matrix
 
 
 class SpnavAxisProcessingTest(unittest.TestCase):
@@ -93,25 +78,6 @@ class SpnavAxisProcessingTest(unittest.TestCase):
 
 
 class HumanFrameTransformationTest(unittest.TestCase):
-    def test_policy_and_human_share_six_dimensional_unclipped_shape(self) -> None:
-        adapter = DroidToFr3TaskSpaceAdapter(
-            IdentityJacobianProvider(),
-            normalization=CartesianNormalization(),
-        )
-        policy = adapter.project(
-            np.asarray([2.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.5]),
-            np.zeros(7),
-        ).normalized_motion
-        human = process_spnav_motion(
-            [0, 0, -750, 0, 0, 0],
-            SpnavConfig(deadzone=0.0),
-        ).tcp_frame_normalized
-
-        self.assertEqual(policy.shape, (6,))
-        self.assertEqual(human.shape, (6,))
-        self.assertGreater(policy[0], 1.0)
-        self.assertGreater(human[0], 1.0)
-
     def test_rotation_resolves_both_blocks_and_preserves_norms(self) -> None:
         angle = np.pi / 3.0
         rotation = np.asarray(

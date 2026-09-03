@@ -231,8 +231,8 @@ def main(args: argparse.Namespace) -> None:
                 "refer to the TCP point, so no translational adjoint term"
             ),
             "normalization": (
-                "M2 isotropic translation block 0.075 m and rotation block "
-                "0.15 rad; the block rotation commutes with normalization"
+                "dimensionless physical Cartesian scales s_t and s_r are "
+                "unresolved; this diagnostic applies no physical SI scale"
             ),
             "servo_execution_scales_used": False,
         },

@@ -71,6 +71,8 @@ M3_SPACEMOUSE_DURATION ?= 10
 M3_SPACEMOUSE_OUTPUT ?=
 M3_PROJECTION ?=
 M3_COMPARISON_OUTPUT ?= $(M3_OUTPUT)/comparison_$(shell date -u +%Y%m%dT%H%M%SZ).json
+M3_MAPPING_RUN ?= outputs/physical_pi05_droid_m3/m3_live_20260828T1548Z
+ALLOW_LEGACY_M2 ?=
 FRANKA_DESCRIPTION_DIR ?= /home/hvl-robotics2404/franka_ros2_ws/src/franka_description
 IGD_FR3_CONTROL_DIR ?= /home/hvl-robotics2404/franka_ros2_ws/src/igd_fr3_control
 FRANKA_ROS2_INSTALL ?= /home/hvl-robotics2404/franka_ros2_ws/install
@@ -102,9 +104,11 @@ help:
 	@echo "  make droid-sample  # 13.9 MB genuine offline subset"
 	@echo "  make droid-policy-server"
 	@echo "  make droid-inference"
-	@echo "  make droid-fr3-m2  # offline only; never commands the FR3"
+	@echo "  make validate-fr3-kinematics  # hand-derived FK/Jacobian"
+	@echo "  make validate-droid-fr3-mapping  # accepted M3 saved run"
+	@echo "  make droid-fr3-m2 ALLOW_LEGACY_M2=1  # superseded provenance"
 	@echo "  make physical-m3-observation M3_EXTERIOR_SERIAL=<serial>"
-	@echo "  make physical-m3-shadow M3_EXTERIOR_SERIAL=<serial>"
+	@echo "  make physical-m3-shadow-inference M3_RUN_ID=<captured-run>"
 	@echo "  make physical-m3-spacemouse  # subscriber/spnavd log only"
 	@echo "  make autonomous-smoke"
 	@echo "  make autonomous-sweep NUM_TRIALS=20"
@@ -150,7 +154,8 @@ help:
 	@echo "  FIXED_AUTONOMY_WEIGHT, COSINE_GAIN"
 	@echo "  DROID_NUM_SAMPLES, DROID_REPEAT_COUNT, DROID_POLICY_SEED, DROID_RUN_ID"
 	@echo "  M2_M1_RUN, M2_OUTPUT, M2_RUN_ID, FRANKA_DESCRIPTION_DIR"
-	@echo "  M3_RUN_ID, M3_EXTERIOR_SERIAL, M3_PROMPT, M3_OBSERVATIONS"
+	@echo "  M3_RUN_ID, M3_MAPPING_RUN, M3_EXTERIOR_SERIAL, M3_PROMPT"
+	@echo "  M3_OBSERVATIONS, FRANKA_ROS2_INSTALL, ALLOW_LEGACY_M2"
 
 .PHONY: apply-patch
 apply-patch:
@@ -193,6 +198,9 @@ droid-inference:
 
 .PHONY: droid-fr3-m2
 droid-fr3-m2:
+	@test "$(ALLOW_LEGACY_M2)" = "1" || \
+		{ echo "Superseded M2 projection requires ALLOW_LEGACY_M2=1."; \
+		  exit 2; }
 	bash -lc 'source /opt/ros/jazzy/setup.bash && \
 		source $(FRANKA_ROS2_INSTALL)/setup.bash && \
 		cd $(CURDIR) && \
@@ -203,6 +211,27 @@ droid-fr3-m2:
 		--franka-description-dir $(FRANKA_DESCRIPTION_DIR) \
 		--igd-control-dir $(IGD_FR3_CONTROL_DIR) \
 		--output-dir $(M2_OUTPUT)/$(M2_RUN_ID)'
+
+.PHONY: validate-fr3-kinematics
+validate-fr3-kinematics:
+	bash -lc 'source /opt/ros/jazzy/setup.bash && \
+		source $(FRANKA_ROS2_INSTALL)/setup.bash && \
+		cd $(CURDIR) && \
+		export PYTHONPATH="$(CURDIR)/src:$${PYTHONPATH}" && \
+		/usr/bin/python3 \
+		tools/diagnostics/validate_fr3_forward_kinematics.py \
+		--xacro-path $(FRANKA_DESCRIPTION_DIR)/robots/fr3/fr3.urdf.xacro'
+
+.PHONY: validate-droid-fr3-mapping
+validate-droid-fr3-mapping:
+	bash -lc 'source /opt/ros/jazzy/setup.bash && \
+		source $(FRANKA_ROS2_INSTALL)/setup.bash && \
+		cd $(CURDIR) && \
+		export PYTHONPATH="$(CURDIR)/src:$${PYTHONPATH}" && \
+		/usr/bin/python3 \
+		tools/diagnostics/validate_droid_fr3_action_mapping.py \
+		--run-dir $(M3_MAPPING_RUN) \
+		--franka-description-dir $(FRANKA_DESCRIPTION_DIR)'
 
 .PHONY: physical-m3-observation
 physical-m3-observation:
@@ -237,6 +266,9 @@ physical-m3-shadow-inference:
 
 .PHONY: physical-m3-shadow-project
 physical-m3-shadow-project:
+	@test "$(ALLOW_LEGACY_M2)" = "1" || \
+		{ echo "Superseded M2 projection requires ALLOW_LEGACY_M2=1."; \
+		  exit 2; }
 	bash -lc 'source /opt/ros/jazzy/setup.bash && \
 		source $(FRANKA_ROS2_INSTALL)/setup.bash && \
 		cd $(CURDIR) && \
@@ -248,6 +280,9 @@ physical-m3-shadow-project:
 
 .PHONY: physical-m3-shadow
 physical-m3-shadow:
+	@test "$(ALLOW_LEGACY_M2)" = "1" || \
+		{ echo "Superseded M2 projection requires ALLOW_LEGACY_M2=1."; \
+		  exit 2; }
 	$(MAKE) physical-m3-observation M3_RUN_ID=$(M3_RUN_ID)
 	$(MAKE) physical-m3-shadow-inference M3_RUN_ID=$(M3_RUN_ID)
 	$(MAKE) physical-m3-shadow-project M3_RUN_ID=$(M3_RUN_ID)
@@ -268,6 +303,9 @@ physical-m3-spacemouse:
 
 .PHONY: physical-m3-compare
 physical-m3-compare:
+	@test "$(ALLOW_LEGACY_M2)" = "1" || \
+		{ echo "Superseded normalized comparison requires ALLOW_LEGACY_M2=1."; \
+		  exit 2; }
 	@test -n "$(strip $(M3_PROJECTION))" || \
 		{ echo "Set M3_PROJECTION=<shadow_projection.json>."; exit 2; }
 	@test -n "$(strip $(M3_SPACEMOUSE_OUTPUT))" || \

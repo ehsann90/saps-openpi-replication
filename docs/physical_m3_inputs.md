@@ -6,14 +6,14 @@ M3 implements two non-actuating physical input paths:
 
 ```text
 FR3 state + two serial-pinned RGB cameras -> pi05_droid observation
-spnavd SpaceMouse + current FR3 orientation -> normalized fr3_link0 input
+spnavd SpaceMouse + current FR3 orientation -> dimensionless fr3_link0 input
 ```
 
-It also provides a staged shadow path from captured live observations through
-`pi05_droid` and the M2 task-space adapter. None of these programs creates a
-ROS publisher, service client, or action client. They cannot publish Servo
-commands or call Franka Hand actions. M4 execution and arbitration are not
-implemented.
+It also preserves captured live observations and `pi05_droid` shadow actions
+for the current manual-FK/Jacobian diagnostic. None of these programs creates
+a ROS publisher, service client, or action client. They cannot publish Servo
+commands or call Franka Hand actions. Physical execution and arbitration are
+not implemented.
 
 The software, mocked contracts, and live acceptance passed on 2026-08-28.
 Acceptance used wrist serial `342222073510` and temporary exterior serial
@@ -23,19 +23,23 @@ not a permanent scientific camera-role assumption. This state is recorded in
 
 ## Provenance boundary
 
-M3 begins at M2 commit
-`b5a18d1c7c54d8c78afbec71b5f3addbfee60c5b`. The pinned OpenPI submodule
-remains `15a9616a00943ada6c20a0f158e3adb39df2ccac`.
+The accepted M3 capture was built from historical M2 commit
+`b5a18d1c7c54d8c78afbec71b5f3addbfee60c5b`; that identity is artifact
+provenance, not endorsement of the superseded M2 mapping. The pinned OpenPI
+submodule remains `15a9616a00943ada6c20a0f158e3adb39df2ccac`.
 
-The read-only lab repositories remain:
+The accepted 2026-08-28 artifacts recorded the read-only lab repositories as:
 
 - `franka_description` at
   `fac4949828c8b627ccb8593628212f59a8f46d00`;
 - `igd_fr3_control` at
   `1ecd52e310f069d855591ff69c17e5c3412e1722`.
 
-Their pre-existing local modifications are not changed. Each live diagnostic
-records the commit, status, and SHA-256 of the full local binary diff.
+Their then-existing local modifications were not changed. Each live diagnostic
+records the commit, status, and SHA-256 of the full local binary diff. The
+current clean `franka_description` identity used for the manual kinematics
+validation is recorded in
+[`physical_fr3_embodiment.md`](physical_fr3_embodiment.md).
 
 ## Live ROS contract
 
@@ -157,7 +161,7 @@ No old frame is accepted after it exceeds the configured age. After the first
 observation, both camera stamps must advance before another observation is
 captured, so rapid joint callbacks cannot duplicate either image pair.
 
-## Shadow inference workflow
+## Shadow inference and current mapping validation
 
 First start the pinned DROID policy server in its own terminal:
 
@@ -166,32 +170,37 @@ make droid-policy-server
 ```
 
 With the existing read-only FR3 stack and both serial-pinned camera nodes
-running, execute a new shadow identity:
+running, capture a new observation identity:
 
 ```bash
-make physical-m3-shadow \
+make physical-m3-observation \
   M3_RUN_ID=m3_$(date -u +%Y%m%dT%H%M%SZ) \
   M3_EXTERIOR_SERIAL=244222076317 \
   M3_PROMPT="pick up the object"
 ```
 
-The target performs three explicit stages:
+Then run shadow inference against that captured identity:
 
-1. system ROS Python captures several complete observations into
-   `observation_bundle.npz` and `run.json`;
-2. the validated runtime container queries `pi05_droid`, requires `(15, 8)`,
-   and writes `policy_actions.npz` and `shadow_policy.json`;
-3. system ROS Python projects actions at each observation's captured `q` and
-   writes `shadow_projection.json`.
+```bash
+make physical-m3-shadow-inference M3_RUN_ID=M3_RUN
+```
 
-The projection stage applies all 15 actions at the same captured state for
-distribution diagnostics and logs actions 0, 7, and 14 in detail. It does not
-roll forward an imagined robot state. Eventual M4 execution must reacquire `q`
-and `J(q)` for every executed action.
+This writes `policy_actions.npz` and `shadow_policy.json` and requires the
+observed `(15, 8)` policy shape. Validate the saved joint observations and
+actions with the current hand-derived mapping:
+
+```bash
+make validate-droid-fr3-mapping \
+  M3_MAPPING_RUN=outputs/physical_pi05_droid_m3/M3_RUN
+```
+
+That diagnostic evaluates the intended 8-action model rollout and separately
+labels all 15 actions as a full-chunk stress diagnostic. It does not write a
+new bulky artifact or roll a physical robot state.
 
 All artifacts live below ignored `outputs/physical_pi05_droid_m3/<run-id>/`.
-Every stage refuses to overwrite an existing artifact. Stop the policy server
-after the run:
+The capture and inference stages refuse to overwrite existing artifacts. Stop
+the policy server after the run:
 
 ```bash
 make policy-stop
@@ -199,9 +208,11 @@ make policy-stop
 
 The accepted live run is
 `outputs/physical_pi05_droid_m3/m3_live_20260828T1548Z/`. It contains five
-physical observations, five `(15, 8)` shadow action chunks, and 75 projections
-at captured live FR3 states. Shadow inference records wall-clock observation
-age at call start and completion in addition to client and model timing.
+physical observations and five `(15, 8)` shadow action chunks. Its existing
+`shadow_projection.json` is preserved as historical evidence from the
+superseded M2 adapter, not as the current mapping. Shadow inference records
+wall-clock observation age at call start and completion in addition to client
+and model timing.
 
 ## Physical SpaceMouse contract
 
@@ -247,7 +258,7 @@ make physical-m3-spacemouse \
 ```
 
 The output logs connection and physical-device status, raw and mapped axes,
-TCP- and base-frame normalized motion, motion activity, stale state, buttons,
+TCP- and base-frame dimensionless motion, motion activity, stale state, buttons,
 event age, current joints, the live TF transform used, and its Pinocchio
 rotation disagreement.
 
@@ -256,53 +267,49 @@ Acceptance evidence is in `spnav_live_20260828T1552Z` and
 deadzone in both directions, button 0 produced open intent, button 1 produced
 close intent, and every stale sample had zero six-dimensional motion.
 
-## Common SAPS frame
+## Frame transformation and unresolved scale
 
-SpaceMouse components enter M3 expressed along `fr3_hand_tcp` axes. M2 policy
-motion is expressed along `fr3_link0` axes. Both refer to motion at the TCP
-point, so M3 resolves the components with the current TCP orientation:
+SpaceMouse components enter M3 expressed along `fr3_hand_tcp` axes. The manual
+policy Jacobian is resolved along `fr3_link0` axes. Both refer to motion at the
+TCP point, so M3 resolves SpaceMouse components with the current TCP
+orientation:
 
 ```text
 h_base = diag(R_base_tcp, R_base_tcp) h_tcp
 ```
 
-There is no `p x omega` term because the reference point is not changed. With
-M2 normalization
+There is no `p x omega` term because the reference point is not changed.
+Rotation alone does not establish a common physical SAPS action space: the
+dimensionless translation and rotation scales `s_t` and `s_r` remain
+unselected. MoveIt Servo's existing `0.4 m/s` and `0.8 rad/s` settings are not
+SAPS normalization and are not used by this diagnostic.
 
-```text
-S = diag(0.075, 0.075, 0.075, 0.15, 0.15, 0.15)
-```
+## Historical policy/human distribution comparison
 
-each block is isotropic, so
-`S^-1 diag(R,R) S = diag(R,R)`. Translation norm, rotation norm, overall norm,
-dot products, and cosine geometry are preserved under a common proper rotation.
-Unit tests verify those properties numerically. MoveIt Servo's `0.4` and `0.8`
-execution scales are not used.
-
-## Policy/human distribution comparison
-
-After both diagnostics exist, compare their unmodified normalized values:
+The accepted M3 artifacts include a comparison produced with the superseded
+M2 `0.075 m`/`0.15 rad` proposal. It is retained only for provenance and can
+be reproduced only with an explicit legacy opt-in:
 
 ```bash
 make physical-m3-compare \
+  ALLOW_LEGACY_M2=1 \
   M3_PROJECTION=outputs/physical_pi05_droid_m3/M3_RUN/shadow_projection.json \
   M3_SPACEMOUSE_OUTPUT=outputs/physical_pi05_droid_m3/SPNAV_RUN/spnav.json
 ```
 
-The report includes component ranges, translation/rotation/overall norms,
-above-unit frequencies, active-human medians, and human-to-policy median ratios.
-It refuses a SpaceMouse log with no active motion. It does not tune either
-source; a serious mismatch is recorded for M4.
+The report includes component ranges, norms, and median ratios under that old
+proposal. It must not be used to choose current physical scales or arbitration.
 
 The accepted comparison is
 `outputs/physical_pi05_droid_m3/comparison_live_20260828T1556Z.json`. It records
 the unmodified policy and active-human distributions; no gain or normalization
 was tuned.
 
-## M4 boundary
+## Physical-execution boundary
 
-M4 still owns all commands and safety decisions: 15 Hz policy to 50 Hz Servo
-scheduling, chunk holding or interpolation, physical motion scale, final Servo
-command frame, workspace/velocity/singularity clipping, observation/action age
-limits, arbitration, and physical gripper mapping. M3 outputs are diagnostic
-candidates only and are never robot commands.
+All commands and safety decisions remain future work: reference 8-action
+execution at 15 Hz versus lower-level scheduling, chunk holding or
+interpolation, physical SAPS scales, Cartesian-correction-to-joint mapping,
+final command frame, workspace/velocity/singularity handling,
+observation/action age limits, arbitration, and physical gripper mapping. M3
+outputs are diagnostic evidence only and are never robot commands.
