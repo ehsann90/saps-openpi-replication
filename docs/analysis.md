@@ -1,5 +1,21 @@
 # Analysis
 
+## Physical FR3 characteristic length
+
+Analyze one or more completed, non-actuating M3 capture/shadow-inference runs:
+
+```bash
+make analyze-droid-fr3-characteristic-length \
+  M3_CHARACTERISTIC_RUNS="outputs/physical_pi05_droid_m3/<run-a> \
+outputs/physical_pi05_droid_m3/<run-b>"
+```
+
+The tool uses the first eight actions of each 15-action policy chunk and exact
+manual FK finite motion. It reports per-run and pooled physical-motion scale
+evidence without selecting a final characteristic length. See
+[`physical_fr3_embodiment.md`](physical_fr3_embodiment.md) for the equations,
+ratio exclusion rule, and scientific limitations.
+
 ## 1. Current autonomous analyzer
 
 The repository currently includes:

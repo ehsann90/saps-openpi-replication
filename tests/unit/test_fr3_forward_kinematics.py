@@ -47,6 +47,38 @@ class Fr3ForwardKinematicsTest(unittest.TestCase):
             0.1034,
         )
 
+    def test_flange_to_tcp_transform_matches_franka_hand_mount(self) -> None:
+        q = np.asarray(
+            [-0.2, 0.1, 0.3, -1.7, 0.2, 1.2, -0.4],
+            dtype=np.float64,
+        )
+        flange = fr3_flange_fk(q)
+        tcp = fr3_tcp_fk(q)
+        flange_rotation = flange[:3, :3]
+        relative_rotation = flange_rotation.T @ tcp[:3, :3]
+        relative_translation = flange_rotation.T @ (
+            tcp[:3, 3] - flange[:3, 3]
+        )
+        angle = -np.pi / 4.0
+        expected_rotation = np.asarray(
+            [
+                [np.cos(angle), -np.sin(angle), 0.0],
+                [np.sin(angle), np.cos(angle), 0.0],
+                [0.0, 0.0, 1.0],
+            ]
+        )
+
+        np.testing.assert_allclose(
+            relative_rotation,
+            expected_rotation,
+            atol=1e-12,
+        )
+        np.testing.assert_allclose(
+            relative_translation,
+            [0.0, 0.0, 0.1034],
+            atol=1e-12,
+        )
+
     def test_analytical_jacobian_matches_centered_finite_difference(self) -> None:
         q = np.asarray(
             [-0.2, 0.1, 0.3, -1.7, 0.2, 1.2, -0.4],

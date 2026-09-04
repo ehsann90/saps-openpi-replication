@@ -72,6 +72,10 @@ M3_SPACEMOUSE_OUTPUT ?=
 M3_PROJECTION ?=
 M3_COMPARISON_OUTPUT ?= $(M3_OUTPUT)/comparison_$(shell date -u +%Y%m%dT%H%M%SZ).json
 M3_MAPPING_RUN ?= outputs/physical_pi05_droid_m3/m3_live_20260828T1548Z
+M3_CHARACTERISTIC_RUNS ?= $(M3_MAPPING_RUN)
+M3_CHARACTERISTIC_JSON ?=
+M3_CHARACTERISTIC_JSON_ARG = $(if $(strip $(M3_CHARACTERISTIC_JSON)),\
+	--output-json $(M3_CHARACTERISTIC_JSON),)
 ALLOW_LEGACY_M2 ?=
 FRANKA_ROS2_WS ?= $(HOME)/franka_ros2_ws
 FRANKA_DESCRIPTION_DIR ?= $(FRANKA_ROS2_WS)/src/franka_description
@@ -107,6 +111,7 @@ help:
 	@echo "  make droid-inference"
 	@echo "  make validate-fr3-kinematics  # hand-derived FK/Jacobian"
 	@echo "  make validate-droid-fr3-mapping  # accepted M3 saved run"
+	@echo "  make analyze-droid-fr3-characteristic-length  # saved M3 runs"
 	@echo "  make droid-fr3-m2 ALLOW_LEGACY_M2=1  # superseded provenance"
 	@echo "  make physical-m3-observation M3_EXTERIOR_SERIAL=<serial>"
 	@echo "  make physical-m3-shadow-inference M3_RUN_ID=<captured-run>"
@@ -156,7 +161,8 @@ help:
 	@echo "  DROID_NUM_SAMPLES, DROID_REPEAT_COUNT, DROID_POLICY_SEED, DROID_RUN_ID"
 	@echo "  M2_M1_RUN, M2_OUTPUT, M2_RUN_ID, FRANKA_ROS2_WS"
 	@echo "  FRANKA_DESCRIPTION_DIR, IGD_FR3_CONTROL_DIR"
-	@echo "  M3_RUN_ID, M3_MAPPING_RUN, M3_EXTERIOR_SERIAL, M3_PROMPT"
+	@echo "  M3_RUN_ID, M3_MAPPING_RUN, M3_CHARACTERISTIC_RUNS"
+	@echo "  M3_CHARACTERISTIC_JSON, M3_EXTERIOR_SERIAL, M3_PROMPT"
 	@echo "  M3_OBSERVATIONS, FRANKA_ROS2_INSTALL, ALLOW_LEGACY_M2"
 
 .PHONY: apply-patch
@@ -234,6 +240,18 @@ validate-droid-fr3-mapping:
 		tools/diagnostics/validate_droid_fr3_action_mapping.py \
 		--run-dir $(M3_MAPPING_RUN) \
 		--franka-description-dir "$(FRANKA_DESCRIPTION_DIR)"'
+
+.PHONY: analyze-droid-fr3-characteristic-length
+analyze-droid-fr3-characteristic-length:
+	bash -lc 'source /opt/ros/jazzy/setup.bash && \
+		source "$(FRANKA_ROS2_INSTALL)/setup.bash" && \
+		cd $(CURDIR) && \
+		export PYTHONPATH="$(CURDIR)/src:$${PYTHONPATH}" && \
+		/usr/bin/python3 \
+		tools/analysis/analyze_droid_fr3_characteristic_length.py \
+		--franka-description-dir "$(FRANKA_DESCRIPTION_DIR)" \
+		$(M3_CHARACTERISTIC_JSON_ARG) \
+		$(M3_CHARACTERISTIC_RUNS)'
 
 .PHONY: physical-m3-observation
 physical-m3-observation:

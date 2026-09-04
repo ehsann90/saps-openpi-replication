@@ -106,6 +106,27 @@ def fr3_tcp_fk(joint_position_rad: np.ndarray) -> np.ndarray:
     return fr3_flange_fk(joint_position_rad) @ flange_to_tcp
 
 
+def fr3_tcp_finite_displacement(
+    joint_position_rad: np.ndarray,
+    delta_q_rad: np.ndarray,
+) -> np.ndarray:
+    """Return exact finite TCP displacement from the manual NumPy FK.
+
+    Translation is ``p(q + delta_q) - p(q)`` in metres. Rotation is the
+    base-resolved logarithm of ``R(q + delta_q) R(q)^T`` in radians.
+    """
+
+    q = _joint_vector(joint_position_rad)
+    delta_q = _joint_vector(delta_q_rad)
+    initial = fr3_tcp_fk(q)
+    final = fr3_tcp_fk(q + delta_q)
+    delta_position = final[:3, 3] - initial[:3, 3]
+    delta_rotation = _rotation_vector(
+        final[:3, :3] @ initial[:3, :3].T
+    )
+    return np.concatenate((delta_position, delta_rotation))
+
+
 def fr3_tcp_jacobian(joint_position_rad: np.ndarray) -> np.ndarray:
     """Return the geometric TCP Jacobian resolved in ``fr3_link0``.
 
@@ -142,3 +163,27 @@ def _joint_vector(value: np.ndarray) -> np.ndarray:
     if not np.all(np.isfinite(result)):
         raise ValueError("FR3 joint positions must be finite.")
     return np.array(result, dtype=np.float64, copy=True)
+
+
+def _rotation_vector(rotation: np.ndarray) -> np.ndarray:
+    """Return the axis-angle vector for one relative rotation matrix."""
+
+    cosine = np.clip((np.trace(rotation) - 1.0) / 2.0, -1.0, 1.0)
+    angle = float(np.arccos(cosine))
+    antisymmetric = rotation - rotation.T
+    vee = np.asarray(
+        [
+            antisymmetric[2, 1],
+            antisymmetric[0, 2],
+            antisymmetric[1, 0],
+        ],
+        dtype=np.float64,
+    )
+    if angle < 1e-8:
+        return 0.5 * vee
+    if np.pi - angle < 1e-6:
+        raise RuntimeError(
+            "Relative rotation is too close to pi for the finite-motion "
+            "diagnostic logarithm."
+        )
+    return angle / (2.0 * np.sin(angle)) * vee

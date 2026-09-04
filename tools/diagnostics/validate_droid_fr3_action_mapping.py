@@ -9,7 +9,7 @@ from typing import Any
 import numpy as np
 
 from saps.physical.fr3_forward_kinematics import (
-    fr3_tcp_fk,
+    fr3_tcp_finite_displacement,
     fr3_tcp_jacobian,
 )
 from saps.physical.fr3_kinematics import Fr3PinocchioKinematics
@@ -35,60 +35,13 @@ def droid_arm_delta_q(
     )
 
 
-def skew_to_vector(skew: np.ndarray) -> np.ndarray:
-    """Return the vector whose cross-product matrix is ``skew``."""
-
-    return np.array(
-        [
-            skew[2, 1],
-            skew[0, 2],
-            skew[1, 0],
-        ],
-        dtype=np.float64,
-    )
-
-
-def rotation_vector(rotation: np.ndarray) -> np.ndarray:
-    """Return axis-angle rotation vector for a rotation matrix."""
-
-    cos_theta = (np.trace(rotation) - 1.0) / 2.0
-    cos_theta = np.clip(cos_theta, -1.0, 1.0)
-
-    theta = float(np.arccos(cos_theta))
-
-    vee = skew_to_vector(rotation - rotation.T)
-
-    if theta < 1e-8:
-        # R - R.T ~= 2 [theta * axis]_x
-        return 0.5 * vee
-
-    if np.pi - theta < 1e-6:
-        raise RuntimeError(
-            "Relative rotation too close to pi for this simple "
-            "diagnostic log implementation."
-        )
-
-    return theta / (2.0 * np.sin(theta)) * vee
-
-
 def exact_tcp_displacement(
     q: np.ndarray,
     delta_q: np.ndarray,
 ) -> np.ndarray:
     """Exact finite TCP displacement from our manually validated FK."""
 
-    T0 = fr3_tcp_fk(q)
-    T1 = fr3_tcp_fk(q + delta_q)
-
-    delta_position = T1[:3, 3] - T0[:3, 3]
-
-    # Spatial/base-resolved relative rotation.
-    R_delta = T1[:3, :3] @ T0[:3, :3].T
-    delta_rotation = rotation_vector(R_delta)
-
-    return np.concatenate(
-        [delta_position, delta_rotation]
-    )
+    return fr3_tcp_finite_displacement(q, delta_q)
 
 
 def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float | None:

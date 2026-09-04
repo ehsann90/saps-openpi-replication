@@ -40,6 +40,12 @@ The relevant files are:
   `end_effectors/common/franka_hand.xacro`, which supply the default
   `0.1034 m` Hand-to-TCP translation.
 
+The manufacturer manuals used as supporting cross-checks were *Product Manual
+Franka Research 3* (R02210, revision 1.5, English), *Product Manual Franka
+Hand* (R50010, revision 1.2, English), and the earlier *Franka Emika Robot's
+Instruction Handbook* (document 100010, October 2021). They are named here for
+provenance only; manual PDFs are not stored in this repository.
+
 The pinned OpenPI submodule remains at
 `15a9616a00943ada6c20a0f158e3adb39df2ccac`. Neither external source was
 modified during this consolidation.
@@ -210,6 +216,51 @@ Its minimum translation and rotation direction cosines were `0.99216` and
 `0.99553`, and maximum errors were `2.92 mm` and `1.04e-2 rad`. Neither
 rollout is measured FR3 execution. No next-state joint-limit violation occurred
 in either idealized rollout.
+
+## Physical-motion characteristic-length analysis
+
+The dedicated offline analyzer estimates translation/rotation balance from
+one or more saved M3 runs while preserving the same finite-motion contract:
+
+```bash
+make analyze-droid-fr3-characteristic-length \
+  M3_CHARACTERISTIC_RUNS="outputs/physical_pi05_droid_m3/<run-a> \
+outputs/physical_pi05_droid_m3/<run-b>"
+```
+
+Set `M3_CHARACTERISTIC_JSON=/tmp/fr3_characteristic_length.json` to retain a
+machine-readable summary outside the ignored raw-output tree. For every
+measured observation, the analyzer rolls out only actions 0 through 7 using
+`q[k+1] = q[k] + delta_q[k]`. It computes each TCP step from the exact manual
+NumPy FK, not `J(q) delta_q`, and reports per-run and pooled norm statistics,
+median/P95/RMS/maximum characteristic-length anchors, per-action ratios, the
+balance under provisional `ell_0 = 0.30 m/rad`, and model next-state
+joint-limit violations.
+
+Per-action ratios exclude rotations at or below the recorded numerical
+threshold (default `1e-9 rad`); they are not stabilized with an epsilon. The
+analyzer assigns no pass/fail threshold and does not accept a final `ell`.
+Physical configuration diversity is not inferable from the NPZ artifacts and
+must be established by the lab procedure. Repeated frames from a static state
+do not constitute independent physical diversity.
+
+Applied to the only currently available accepted run,
+`m3_live_20260828T1548Z` (prompt `pick up the object`), this analyzes five
+observations and 40 first-eight actions. It reproduces translation
+median/P75/P90/P95/maximum of `0.0245885`, `0.0325950`, `0.0355034`,
+`0.0385608`, and `0.0418354 m`; rotation values are `0.0607562`, `0.0902013`,
+`0.133368`, `0.136759`, and `0.138421 rad`. The resulting anchors are
+`ell_median=0.404707`, `ell_p95=0.281961`, `ell_rms=0.322996`, and diagnostic
+`ell_max=0.302233 m/rad`.
+
+All 40 per-action ratios exceed the `1e-9 rad` rotation threshold. Their
+P05/P25/median/P75/P95 values are `0.0937178`, `0.225809`, `0.362301`,
+`0.576769`, and `0.778045 m/rad`. Under provisional `ell_0=0.30 m/rad`, the
+corresponding block-balance values are `0.312393`, `0.752697`, `1.20767`,
+`1.92256`, and `2.59348`; the pooled squared-energy ratio is `1.15918`.
+No model next-state joint-limit violation occurs. This single short capture
+does not establish a robot/scene configuration change, so it cannot complete
+the requested broader/diverse validation or accept `ell_0` as final.
 
 ## Simulation and physical action spaces
 
