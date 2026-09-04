@@ -62,9 +62,12 @@ array order is ignored; the values are selected by name and returned as
 `float32 (7,)`. Missing, duplicate, unexpected, non-numeric, or non-finite
 states are rejected.
 
-The live hand node publishes `_finger_joint1` and `_finger_joint2`, each at
-half the physical width. The pinned hand xacro authoritatively limits each
-finger to `0.04 m`, so total maximum width is `0.08 m`. M3 uses:
+The live hand node may publish the legacy names `_finger_joint1` and
+`_finger_joint2` or the current FR3-prefixed names `fr3_finger_joint1` and
+`fr3_finger_joint2`, each at half the physical width. M3 requires exactly one
+complete recognized pair, records the observed names, and rejects mixed or
+unexpected names. The pinned hand xacro authoritatively limits each finger to
+`0.04 m`, so total maximum width is `0.08 m`. M3 uses:
 
 ```text
 width = finger_joint1 + finger_joint2

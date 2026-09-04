@@ -19,6 +19,14 @@ FR3_FINGER_JOINT_NAMES = (
     "_finger_joint1",
     "_finger_joint2",
 )
+CURRENT_FR3_FINGER_JOINT_NAMES = (
+    "fr3_finger_joint1",
+    "fr3_finger_joint2",
+)
+ACCEPTED_FR3_FINGER_JOINT_NAME_PAIRS = (
+    FR3_FINGER_JOINT_NAMES,
+    CURRENT_FR3_FINGER_JOINT_NAMES,
+)
 
 
 @dataclasses.dataclass(frozen=True)
@@ -48,6 +56,7 @@ class JointSnapshot:
 class GripperSnapshot:
     """One physical Franka Hand width and canonical closure."""
 
+    joint_names: tuple[str, ...]
     finger_position_m: np.ndarray
     width_m: float
     maximum_width_m: float
@@ -155,10 +164,29 @@ def gripper_snapshot_from_joint_state(
         maximum_finger_position_m,
         "maximum_finger_position_m",
     )
+    actual_names = tuple(names)
+    duplicate_names = sorted(
+        {name for name in actual_names if actual_names.count(name) > 1}
+    )
+    if duplicate_names:
+        raise ValueError(
+            "Franka Hand JointState contains duplicate joints: "
+            f"{duplicate_names}."
+        )
+    recognized = [
+        pair
+        for pair in ACCEPTED_FR3_FINGER_JOINT_NAME_PAIRS
+        if set(actual_names) == set(pair)
+    ]
+    if len(recognized) != 1:
+        raise ValueError(
+            "Franka Hand JointState must contain exactly one recognized "
+            f"finger pair; received {list(actual_names)}."
+        )
     fingers = _strict_named_positions(
         names,
         positions,
-        expected_names=FR3_FINGER_JOINT_NAMES,
+        expected_names=recognized[0],
         state_name="Franka Hand JointState",
     )
     maximum_width = 2.0 * maximum_finger
@@ -166,6 +194,7 @@ def gripper_snapshot_from_joint_state(
     unclipped_closure = 1.0 - width / maximum_width
     closure = gripper_closure_from_width(width, maximum_width_m=maximum_width)
     return GripperSnapshot(
+        joint_names=actual_names,
         finger_position_m=_readonly(fingers, dtype=np.float32),
         width_m=width,
         maximum_width_m=maximum_width,

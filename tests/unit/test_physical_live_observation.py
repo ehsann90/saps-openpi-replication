@@ -8,6 +8,7 @@ import numpy as np
 
 from saps.physical.embodiment import FR3_JOINT_NAMES
 from saps.physical.live_observation import assemble_physical_policy_observation
+from saps.physical.live_observation import CURRENT_FR3_FINGER_JOINT_NAMES
 from saps.physical.live_observation import decode_ros_rgb_image
 from saps.physical.live_observation import FR3_FINGER_JOINT_NAMES
 from saps.physical.live_observation import gripper_closure_from_width
@@ -108,6 +109,47 @@ class GripperContractTest(unittest.TestCase):
         self.assertEqual(snapshot.unclipped_closure, 0.5)
         self.assertEqual(snapshot.closure, 0.5)
         self.assertFalse(snapshot.closure_clipped)
+
+    def test_current_and_legacy_finger_names_have_identical_semantics(
+        self,
+    ) -> None:
+        for names in (
+            FR3_FINGER_JOINT_NAMES,
+            CURRENT_FR3_FINGER_JOINT_NAMES,
+        ):
+            with self.subTest(names=names):
+                snapshot = gripper_snapshot_from_joint_state(
+                    tuple(reversed(names)),
+                    (0.03, 0.01),
+                    stamp=stamp(1.0),
+                    maximum_finger_position_m=0.04,
+                )
+                self.assertEqual(snapshot.joint_names, tuple(reversed(names)))
+                np.testing.assert_allclose(
+                    snapshot.finger_position_m,
+                    [0.01, 0.03],
+                )
+                self.assertEqual(snapshot.width_m, 0.04)
+                self.assertEqual(snapshot.closure, 0.5)
+
+    def test_mixed_missing_duplicate_and_unexpected_names_are_rejected(
+        self,
+    ) -> None:
+        invalid = (
+            (("_finger_joint1", "fr3_finger_joint2"), (0.01, 0.03)),
+            (("fr3_finger_joint1",), (0.01,)),
+            (("fr3_finger_joint1", "fr3_finger_joint1"), (0.01, 0.03)),
+            (("fr3_finger_joint1", "other_joint"), (0.01, 0.03)),
+        )
+        for names, positions in invalid:
+            with self.subTest(names=names):
+                with self.assertRaises(ValueError):
+                    gripper_snapshot_from_joint_state(
+                        names,
+                        positions,
+                        stamp=stamp(1.0),
+                        maximum_finger_position_m=0.04,
+                    )
 
     def test_measured_open_boundary_overshoot_is_explicitly_clipped(self) -> None:
         snapshot = gripper_snapshot_from_joint_state(

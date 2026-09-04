@@ -19,6 +19,9 @@ from typing import Any
 import numpy as np
 
 from saps.physical.embodiment import FR3_JOINT_NAMES
+from saps.physical.live_observation import (
+    ACCEPTED_FR3_FINGER_JOINT_NAME_PAIRS,
+)
 from saps.physical.live_observation import FR3_FINGER_JOINT_NAMES
 from saps.physical.live_observation import ObservationFreshness
 from saps.physical.ros_observation import RosCameraContract
@@ -181,6 +184,14 @@ def main(args: Args) -> None:
             "gripper_state_topic": contract.gripper_state_topic,
             "joint_order": list(FR3_JOINT_NAMES),
             "finger_joint_order": list(FR3_FINGER_JOINT_NAMES),
+            "accepted_finger_joint_name_pairs": [
+                list(pair)
+                for pair in ACCEPTED_FR3_FINGER_JOINT_NAME_PAIRS
+            ],
+            "observed_finger_joint_names": [
+                list(observation.gripper_snapshot.joint_names)
+                for observation in observations
+            ],
             "wrist_image_topic": contract.wrist_camera.topic,
             "exterior_image_topic": contract.exterior_camera.topic,
             "source_rates": collector.source_rates(),
@@ -337,6 +348,7 @@ def _observation_record(index: int, observation: Any) -> dict[str, Any]:
         },
         "joint_position_rad": observation.joint_snapshot.position_rad.tolist(),
         "gripper": {
+            "joint_names": list(observation.gripper_snapshot.joint_names),
             "finger_position_m": (
                 observation.gripper_snapshot.finger_position_m.tolist()
             ),
