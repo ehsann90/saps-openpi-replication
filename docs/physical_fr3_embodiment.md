@@ -244,23 +244,36 @@ Physical configuration diversity is not inferable from the NPZ artifacts and
 must be established by the lab procedure. Repeated frames from a static state
 do not constitute independent physical diversity.
 
-Applied to the only currently available accepted run,
-`m3_live_20260828T1548Z` (prompt `pick up the object`), this analyzes five
-observations and 40 first-eight actions. It reproduces translation
-median/P75/P90/P95/maximum of `0.0245885`, `0.0325950`, `0.0355034`,
-`0.0385608`, and `0.0418354 m`; rotation values are `0.0607562`, `0.0902013`,
-`0.133368`, `0.136759`, and `0.138421 rad`. The resulting anchors are
-`ell_median=0.404707`, `ell_p95=0.281961`, `ell_rms=0.322996`, and diagnostic
-`ell_max=0.302233 m/rad`.
+## Physical Cosine-SAPS characteristic length
 
-All 40 per-action ratios exceed the `1e-9 rad` rotation threshold. Their
-P05/P25/median/P75/P95 values are `0.0937178`, `0.225809`, `0.362301`,
-`0.576769`, and `0.778045 m/rad`. Under provisional `ell_0=0.30 m/rad`, the
-corresponding block-balance values are `0.312393`, `0.752697`, `1.20767`,
-`1.92256`, and `2.59348`; the pooled squared-energy ratio is `1.15918`.
-No model next-state joint-limit violation occurs. This single short capture
-does not establish a robot/scene configuration change, so it cannot complete
-the requested broader/diverse validation or accept `ell_0` as final.
+Physical Cosine-SAPS uses the fixed characteristic length
+`ℓ = 0.30 m/rad` only to weight translation relative to rotation in its
+similarity metric:
+
+```text
+c = cos([Δp_h; ℓ Δθ_h], [Δp_π; ℓ Δθ_π])
+```
+
+Fixed blending does not require `ℓ`. The weighting is independent of
+SpaceMouse physical gains and robot safety or execution limits.
+
+The decision evidence covers 9 physical configurations, 45 physical
+observations, and 360 first-eight model-rollout actions. Exact finite manual FK
+was used for `Δp` and `Δθ`. Conservative filtering retained 358
+actions after removing 2 joint-limit-violating transitions. Both violations
+were at action index 7 of an 8-action rollout, so no subsequent propagated
+actions were contaminated. The filtered anchors were
+`ell_median=0.298885004 m/rad`, `ell_p95=0.278661021 m/rad`, and
+`ell_rms=0.295709232 m/rad`; at `ell=0.30 m/rad`, the squared
+translation-to-weighted-rotation energy ratio was `0.971599441`. The
+leave-one-configuration-out `ell_rms` range was
+`0.279145125–0.320865892 m/rad`.
+
+The rounded value was selected before shared-autonomy outcome experiments and
+was not tuned from task success, operator preference, or intervention
+outcomes. Configuration-level variation is intentionally not normalized away.
+This is a fixed baseline metric for the FR3/π0.5-DROID physical setup, not a
+universal SE(3) constant.
 
 ## Simulation and physical action spaces
 

@@ -13,8 +13,8 @@ outputs/physical_pi05_droid_m3/<run-b>"
 The tool uses the first eight actions of each 15-action policy chunk and exact
 manual FK finite motion. It reports per-run and pooled physical-motion scale
 evidence without selecting a final characteristic length. See
-[`physical_fr3_embodiment.md`](physical_fr3_embodiment.md) for the equations,
-ratio exclusion rule, and scientific limitations.
+[`physical_fr3_embodiment.md`](physical_fr3_embodiment.md) for the analyzer
+contract and the frozen physical Cosine-SAPS characteristic length.
 
 ## 1. Current autonomous analyzer
 
