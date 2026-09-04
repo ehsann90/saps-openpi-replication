@@ -284,11 +284,19 @@ operated directly there. The committed simulation SpaceMouse gains
 `translation=0.40` and `rotation=0.08` are simulation action-space calibration;
 they must not be transferred as physical SI gains.
 
+The physical baseline instead represents policy and human motion in common
+Cartesian SI coordinates at the Franka Hand TCP. Fixed SAPS can blend those
+commands directly and therefore requires no translation/rotation normalization.
+Cosine-SAPS uses the separately defined characteristic length
+`ℓ = 0.30 m/rad` to specify the relative translation/rotation weighting in its
+agreement metric; no independent physical `s_t` and `s_r` scales are retained.
+
 ## Current unresolved design issues
 
-The following are open design and validation questions, not decisions:
+The following remain open design and validation questions:
 
-- dimensionless physical SAPS Cartesian scales `s_t` and `s_r`;
+- physical SpaceMouse gains and the mapping from dimensionless device input to
+  Cartesian human motion;
 - policy-preserving Cartesian correction to joint-command mapping;
 - execution scheduling between the 15 Hz reference semantics and lower-level
   control;
@@ -296,6 +304,8 @@ The following are open design and validation questions, not decisions:
 - physical safety supervision, including limits, collision handling,
   singularities, workspace constraints, and operator stop behavior.
 
-The lab Servo values `0.4 m/s` and `0.8 rad/s` are existing controller settings,
-not SAPS normalization. No Servo gain, pseudoinverse, IK rule, or actuator path
-is selected by this document.
+The existing lab Servo values `0.4 m/s` and `0.8 rad/s` are candidate starting
+values for the physical SpaceMouse translation and rotation gains. They are
+independent of the Cosine-SAPS characteristic length and of physical safety
+limits, and remain to be validated for operator controllability before being
+adopted. No pseudoinverse, IK rule, or final actuator path is selected here.
