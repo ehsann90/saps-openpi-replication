@@ -324,3 +324,8 @@ make check
 
 For documentation-only changes, `make check` remains recommended because command
 examples and Makefile targets can drift even when Python code is unchanged.
+
+P1-A discrete-target verification is documented in
+[`physical_pi05_p1a.md`](physical_pi05_p1a.md). Its finite live command consumes
+real policy chunks and samples measured joints at 15 Hz without actuation.
+Candidate acceptance is a diagnostic gate, not physical execution approval.

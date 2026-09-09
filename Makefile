@@ -67,7 +67,7 @@ PHYSICAL_REQUESTS ?= 10
 PHYSICAL_PYTHON ?= $(CURDIR)/.venv-physical/bin/python
 PHYSICAL_CONFIG ?= configs/physical_pi05_fr3.json
 export PHYSICAL_RUN_ID PHYSICAL_PROMPT PHYSICAL_REQUESTS PHYSICAL_PYTHON
-export PHYSICAL_CONFIG FRANKA_ROS2_INSTALL DROID_POLICY_SEED
+export PHYSICAL_CONFIG DROID_POLICY_SEED
 M3_OBSERVATIONS ?= 5
 M3_CAPTURE_TIMEOUT ?= 30
 M3_WRIST_TOPIC ?= /wrist/wrist_camera/color/image_raw
@@ -88,6 +88,7 @@ FRANKA_ROS2_WS ?= $(HOME)/franka_ros2_ws
 FRANKA_DESCRIPTION_DIR ?= $(FRANKA_ROS2_WS)/src/franka_description
 IGD_FR3_CONTROL_DIR ?= $(FRANKA_ROS2_WS)/src/igd_fr3_control
 FRANKA_ROS2_INSTALL ?= $(FRANKA_ROS2_WS)/install
+export FRANKA_ROS2_INSTALL
 REDO_EPISODES ?=
 REDO_EPISODES_ARG = $(if $(strip $(REDO_EPISODES)),--redo-episode-ids $(REDO_EPISODES),)
 MANIFEST ?= configs/operator_shared_autonomy_manifest.json
@@ -122,6 +123,7 @@ help:
 	@echo "  make droid-fr3-m2 ALLOW_LEGACY_M2=1  # superseded provenance"
 	@echo "  make physical-m3-observation M3_EXTERIOR_SERIAL=<serial>"
 	@echo "  make physical-m3-shadow-inference M3_RUN_ID=<captured-run>"
+	@echo "  make physical-pi05-target-verify PHYSICAL_RUN_ID=<unique> PHYSICAL_PROMPT=<instruction>"
 	@echo "  make physical-pi05-shadow PHYSICAL_RUN_ID=<unique> PHYSICAL_PROMPT=<instruction>"
 	@echo "  make physical-m3-spacemouse  # subscriber/spnavd log only"
 	@echo "  make autonomous-smoke"
@@ -296,6 +298,22 @@ physical-pi05-shadow:
 		--config "$$PHYSICAL_CONFIG" \
 		--output-dir "outputs/physical_pi05_droid_p0/$$PHYSICAL_RUN_ID" \
 		--prompt "$$PHYSICAL_PROMPT" --requests "$$PHYSICAL_REQUESTS" \
+		--policy-episode-seed "$$DROID_POLICY_SEED"'
+
+P1A_REQUESTS ?= 1
+export P1A_REQUESTS
+
+.PHONY: physical-pi05-target-verify
+physical-pi05-target-verify:
+	@test -n "$$PHYSICAL_RUN_ID" -a -n "$$PHYSICAL_PROMPT" || \
+		{ echo "Set an explicit PHYSICAL_RUN_ID and PHYSICAL_PROMPT."; exit 2; }
+	bash -c 'source /opt/ros/jazzy/setup.bash && \
+		source "$$FRANKA_ROS2_INSTALL/setup.bash" && \
+		export PYTHONPATH="$$PWD/src:$$PWD/third_party/openpi/packages/openpi-client/src:$${PYTHONPATH}" && \
+		"$$PHYSICAL_PYTHON" scripts/physical_discrete_target_verifier.py \
+		--config "$$PHYSICAL_CONFIG" \
+		--output-dir "outputs/physical_pi05_droid_p1a/$$PHYSICAL_RUN_ID" \
+		--prompt "$$PHYSICAL_PROMPT" --requests "$$P1A_REQUESTS" \
 		--policy-episode-seed "$$DROID_POLICY_SEED"'
 
 .PHONY: physical-m3-shadow-inference
