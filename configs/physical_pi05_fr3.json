@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "milestone": "physical_pi05_droid_p0",
+  "execution_enabled": false,
+  "policy": {
+    "config": "pi05_droid",
+    "checkpoint": "gs://openpi-assets/checkpoints/pi05_droid",
+    "openpi_commit": "15a9616a00943ada6c20a0f158e3adb39df2ccac",
+    "action_shape": [15, 8],
+    "reference_future_open_loop_horizon": 8
+  },
+  "wrist_camera": {
+    "role": "wrist",
+    "serial": "342222073510",
+    "model": "Intel RealSense D435I",
+    "topic": "/camera/wrist_camera/color/image_raw",
+    "node": "/camera/wrist_camera"
+  },
+  "exterior_camera": {
+    "role": "exterior",
+    "serial": "244222076317",
+    "model": "Intel RealSense D435I",
+    "topic": "/camera/external_camera/color/image_raw",
+    "node": "/camera/external_camera"
+  },
+  "robot": {
+    "joint_state_topic": "/franka/joint_states",
+    "gripper_state_topic": "/franka_gripper/joint_states",
+    "maximum_finger_position_m": 0.04,
+    "base_frame": "fr3_link0",
+    "tcp_frame": "fr3_hand_tcp"
+  },
+  "native_images": {
+    "shape": [720, 1280, 3],
+    "encoding": "rgb8",
+    "expected_rate_hz": 30,
+    "hardware_synchronized": false
+  },
+  "client_images": {
+    "shape": [180, 320, 3],
+    "dtype": "uint8",
+    "color_order": "RGB",
+    "preprocessing": "existing centre crop to 16:9 then OpenCV INTER_AREA downsize; INTER_LINEAR for upsize"
+  },
+  "freshness": {
+    "maximum_source_age_seconds": 0.5,
+    "maximum_cross_source_skew_seconds": 0.25
+  }
+}

@@ -34,6 +34,7 @@ class DroidPolicyResponse:
     server_timing: dict[str, Any] | None
     sampling_metadata: dict[str, Any] | None
     response_keys: tuple[str, ...]
+    model_input_audit: dict[str, Any] | None = None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -134,6 +135,7 @@ class OpenPiDroidPolicy:
         *,
         policy_episode_seed: int | None = None,
         replan_index: int | None = None,
+        audit_model_input: bool = False,
     ) -> DroidPolicyResponse:
         """Request and validate one native eight-dimensional action chunk."""
 
@@ -143,6 +145,8 @@ class OpenPiDroidPolicy:
                 "be supplied or both be omitted."
             )
 
+        if audit_model_input and policy_episode_seed is None:
+            raise ValueError("Model auditing requires a seeded request.")
         if policy_episode_seed is None:
             request = policy_input
         else:
@@ -152,6 +156,8 @@ class OpenPiDroidPolicy:
                 "policy_episode_seed": int(policy_episode_seed),
                 "replan_index": int(replan_index),
             }
+            if audit_model_input:
+                request["audit_model_input"] = True
 
         start = time.perf_counter()
         result = self._client.infer(request)
@@ -191,6 +197,10 @@ class OpenPiDroidPolicy:
             ),
             sampling_metadata=sampling_metadata,
             response_keys=tuple(sorted(str(key) for key in result)),
+            model_input_audit=_optional_mapping(
+                result.get("saps_model_input_audit"),
+                field_name="saps_model_input_audit",
+            ),
         )
 
 

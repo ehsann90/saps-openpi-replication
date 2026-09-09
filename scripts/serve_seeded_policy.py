@@ -8,6 +8,9 @@ import dataclasses
 import hashlib
 import http
 import logging
+from pathlib import Path
+import subprocess
+import sys
 import time
 import traceback
 from typing import Any
@@ -21,6 +24,8 @@ from openpi.training import config as training_config
 import tyro
 import websockets.asyncio.server as websocket_server
 import websockets.frames
+
+from saps.policies.model_input_audit import infer_with_model_audit
 
 
 SAPS_PROTOCOL_VERSION = 1
@@ -68,6 +73,22 @@ class SeededWebsocketPolicyServer:
             "policy_config_name": config_name,
             "policy_checkpoint": checkpoint_dir,
         }
+        if config_name == "pi05_droid":
+            openpi_root = Path(__file__).resolve().parents[1] / "third_party/openpi"
+            self._metadata["saps_model_input_audit"] = {
+                "schema_version": 1,
+                "runtime": {
+                    "python": sys.version, "jax": jax.__version__,
+                    "numpy": np.__version__,
+                },
+                "openpi_commit": subprocess.check_output(
+                    [
+                        "git", "-c", f"safe.directory={openpi_root}",
+                        "-C", str(openpi_root), "rev-parse", "HEAD",
+                    ],
+                    text=True,
+                ).strip(),
+            }
 
     def serve_forever(self) -> None:
         asyncio.run(self.run())
@@ -162,10 +183,17 @@ class SeededWebsocketPolicyServer:
                     ).hexdigest()
 
                     inference_start = time.monotonic()
-                    result = self._policy.infer(
-                        observation,
-                        noise=noise,
-                    )
+                    if request.get("audit_model_input", False):
+                        if "saps_model_input_audit" not in self._metadata:
+                            raise ValueError("Model audit requires pi05_droid.")
+                        result = infer_with_model_audit(
+                            self._policy, observation, noise=noise,
+                        )
+                    else:
+                        result = self._policy.infer(
+                            observation,
+                            noise=noise,
+                        )
                     inference_seconds = (
                         time.monotonic() - inference_start
                     )

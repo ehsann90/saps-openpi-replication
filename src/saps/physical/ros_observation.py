@@ -346,6 +346,7 @@ class RosPhysicalObservationCollector:
         joint_state_type: Any | None = None,
         image_type: Any | None = None,
         qos_profile: Any | None = None,
+        preserve_native_images: bool = False,
     ) -> None:
         if (
             joint_state_type is None
@@ -366,6 +367,7 @@ class RosPhysicalObservationCollector:
         self.contract = contract
         self.prompt = prompt
         self.freshness = freshness
+        self.preserve_native_images = preserve_native_images
         self.latest_joint: JointSnapshot | None = None
         self.latest_gripper: Any | None = None
         self.latest_wrist: Any | None = None
@@ -472,6 +474,7 @@ class RosPhysicalObservationCollector:
                 model=camera.model,
                 topic=camera.topic,
                 source_encoding=str(message.encoding),
+                preserve_native_image=self.preserve_native_images,
             )
             if camera.role == "wrist":
                 self.latest_wrist = frame

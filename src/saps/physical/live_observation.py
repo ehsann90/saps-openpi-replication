@@ -78,6 +78,7 @@ class CameraFrame:
     source_encoding: str
     native_shape: tuple[int, int, int]
     preprocessing: str
+    native_image_rgb: np.ndarray | None = None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -319,6 +320,7 @@ def make_camera_frame(
     model: str,
     topic: str,
     source_encoding: str,
+    preserve_native_image: bool = False,
 ) -> CameraFrame:
     """Validate identity and preprocess one explicitly selected camera."""
 
@@ -341,6 +343,9 @@ def make_camera_frame(
         source_encoding=source_encoding,
         native_shape=tuple(int(value) for value in native.shape),
         preprocessing=operation,
+        native_image_rgb=(
+            _readonly(native, dtype=np.uint8) if preserve_native_image else None
+        ),
     )
 
 

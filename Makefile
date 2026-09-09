@@ -61,6 +61,13 @@ M3_SPACEMOUSE_RUN_ID ?= spnav_$(shell date -u +%Y%m%dT%H%M%SZ)
 M3_SPACEMOUSE_RUN_DIR = $(M3_OUTPUT)/$(M3_SPACEMOUSE_RUN_ID)
 M3_EXTERIOR_SERIAL ?=
 M3_PROMPT ?= pick up the object
+PHYSICAL_RUN_ID ?=
+PHYSICAL_PROMPT ?=
+PHYSICAL_REQUESTS ?= 10
+PHYSICAL_PYTHON ?= $(CURDIR)/.venv-physical/bin/python
+PHYSICAL_CONFIG ?= configs/physical_pi05_fr3.json
+export PHYSICAL_RUN_ID PHYSICAL_PROMPT PHYSICAL_REQUESTS PHYSICAL_PYTHON
+export PHYSICAL_CONFIG FRANKA_ROS2_INSTALL DROID_POLICY_SEED
 M3_OBSERVATIONS ?= 5
 M3_CAPTURE_TIMEOUT ?= 30
 M3_WRIST_TOPIC ?= /wrist/wrist_camera/color/image_raw
@@ -115,6 +122,7 @@ help:
 	@echo "  make droid-fr3-m2 ALLOW_LEGACY_M2=1  # superseded provenance"
 	@echo "  make physical-m3-observation M3_EXTERIOR_SERIAL=<serial>"
 	@echo "  make physical-m3-shadow-inference M3_RUN_ID=<captured-run>"
+	@echo "  make physical-pi05-shadow PHYSICAL_RUN_ID=<unique> PHYSICAL_PROMPT=<instruction>"
 	@echo "  make physical-m3-spacemouse  # subscriber/spnavd log only"
 	@echo "  make autonomous-smoke"
 	@echo "  make autonomous-sweep NUM_TRIALS=20"
@@ -276,6 +284,19 @@ physical-m3-observation:
 		--timeout-seconds $(M3_CAPTURE_TIMEOUT) \
 		--franka-description-dir "$(FRANKA_DESCRIPTION_DIR)" \
 		--igd-control-dir "$(IGD_FR3_CONTROL_DIR)"'
+
+.PHONY: physical-pi05-shadow
+physical-pi05-shadow:
+	@test -n "$$PHYSICAL_RUN_ID" -a -n "$$PHYSICAL_PROMPT" || \
+		{ echo "Set an explicit PHYSICAL_RUN_ID and PHYSICAL_PROMPT."; exit 2; }
+	bash -c 'source /opt/ros/jazzy/setup.bash && \
+		source "$$FRANKA_ROS2_INSTALL/setup.bash" && \
+		export PYTHONPATH="$$PWD/src:$$PWD/third_party/openpi/packages/openpi-client/src:$${PYTHONPATH}" && \
+		"$$PHYSICAL_PYTHON" scripts/physical_live_shadow_inference.py \
+		--config "$$PHYSICAL_CONFIG" \
+		--output-dir "outputs/physical_pi05_droid_p0/$$PHYSICAL_RUN_ID" \
+		--prompt "$$PHYSICAL_PROMPT" --requests "$$PHYSICAL_REQUESTS" \
+		--policy-episode-seed "$$DROID_POLICY_SEED"'
 
 .PHONY: physical-m3-shadow-inference
 physical-m3-shadow-inference:

@@ -51,6 +51,13 @@ increase the count while every test still reports `ok`.
 
 ## 2. Browser input smoke test
 
+For physical P0, focused tests are in `test_physical_live_shadow.py`, alongside
+the existing physical observation and DROID contract tests. They use fake
+sources/transport and require no ROS, network, GPU, cameras, or robot. The
+supervised hardware acceptance procedure and evidence schema are in
+[physical_pi05_p0.md](physical_pi05_p0.md); do not run hardware as part of
+`make check` or count unit fixtures as physical acceptance.
+
 This test does not create LIBERO and does not require the policy server:
 
 ```bash

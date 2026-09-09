@@ -1,5 +1,11 @@
 # Physical M1: Offline π0.5-DROID
 
+The current finite FR3 shadow workflow is documented in
+[physical_pi05_p0.md](physical_pi05_p0.md). It consumes the current
+`fr3_lab_stack` camera topics and logs native `[15,8]` inference with zero
+actuation and actual model-input auditing. The M1 description below retains
+its original provenance.
+
 ## Scope and status
 
 This completed milestone establishes an offline-only path from genuine DROID
