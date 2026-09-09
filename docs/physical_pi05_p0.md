@@ -301,8 +301,8 @@ frozen pin, `fr3_lab_stack` main at
 Lab launch sources agree with the new config. M3's older camera topics and
 profiles remain historical. The infrastructure README still mentions a pending
 15-minute teleoperation qualification; that is not a prerequisite for this
-non-actuating P0 task. The actual live ROS graph and hardware/model behavior
-remain to be verified during the supervised run.
+non-actuating P0 task. The supervised runs above subsequently verified the live
+ROS sources and model behavior required for P0 acceptance.
 
 ## Implementation and automated verification report
 
@@ -356,16 +356,13 @@ no existing test was disabled or suppressed. Robosuite's existing private-macro
 warnings remained visible and did not fail checks.
 
 No live FR3/camera run, checkpoint inference, GPU model audit, or live ROS graph
-inspection was performed automatically. The host client environment setup is
-documented but not installed by this change. Actual checkpoint transforms and
-hardware acceptance remain unverified until the finite supervised run;
-unit fixtures are not physical evidence. In particular, timing and camera
-identity queries must be reviewed from that run, not inferred from the local
-launch files.
+inspection was performed by the automated checks. Physical evidence comes from
+the accepted supervised runs above, not from unit fixtures or local launch
+files.
 
 OpenPI dependency files, `fr3_lab_stack`, `igd_fr3_control`, historical M3
 configuration/artifacts, simulation evaluation, action scaling/normalization,
 and the established FR3 Cartesian mapping were not changed. The new P0 output
 schema and camera profiles identify a separate diagnostic run family and must
-not be relabeled as historical M3 or formal evaluation data. No commit, push,
-merge, or pull request was created.
+not be relabeled as historical M3 or formal evaluation data. No merge or pull
+request was created.
