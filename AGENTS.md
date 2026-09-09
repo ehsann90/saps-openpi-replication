@@ -48,6 +48,28 @@ reviewable fixture or representative result.
 
 ## Working Method
 
+### Incremental Task Mode
+
+When the user gives a narrow, explicitly scoped implementation task, treat that
+scope as a hard boundary.
+
+* Inspect only the requested code and direct dependencies needed to implement it.
+* Reuse existing runtime, logging, and test infrastructure where possible.
+* Do not broaden the task into refactoring, cleanup, extra diagnostics, future
+  milestones, or architecture redesign.
+* Do not create or update documentation unless explicitly requested or required
+  to keep an existing user-facing command accurate.
+* Add only focused tests needed for the new behavior; do not expand unrelated
+  regression coverage.
+* For intermediate experimental gates, focused tests plus `make compile` are
+  sufficient unless shared/core behavior is changed or the user explicitly asks
+  for `make check`.
+* Reserve full documentation updates and `make check` for milestone closeout,
+  commit-ready work, or explicit user requests.
+* Keep the final report concise: files changed, checks run, result, and unresolved
+  issues.
+* Do not commit or push unless explicitly requested.
+
 Before editing:
 
 1. Read the relevant implementation, tests, configuration, and documentation.
@@ -61,7 +83,8 @@ During implementation:
 * Make the smallest coherent change that satisfies the task.
 * Do not refactor unrelated code.
 * Preserve public interfaces and output schemas unless a change is required.
-* Update tests and documentation alongside behavioral changes.
+* Update tests as needed for the requested behavior. Update documentation
+  according to the incremental-task rules above.
 * Prefer fixing the cause of an error over suppressing validation or warnings.
 * Do not introduce dependencies without explaining why the existing stack is
   insufficient.
