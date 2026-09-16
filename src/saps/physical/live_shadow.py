@@ -123,6 +123,162 @@ def observation_record(observation: Any) -> dict[str, Any]:
     }
 
 
+def validate_live_policy(policy: OpenPiDroidPolicy,
+                         record: dict[str, Any]) -> None:
+    """Validate the frozen DROID server identity before any request."""
+
+    policy.validate_policy_identity(config_name=POLICY_CONFIG, checkpoint=POLICY_CHECKPOINT)
+    metadata = policy.server_metadata
+    audit_identity = metadata.get("saps_model_input_audit", {})
+    if (audit_identity.get("schema_version") != 1
+            or audit_identity.get("openpi_commit") != OPENPI_COMMIT):
+        raise ValueError("Server must advertise pinned OpenPI and model audit v1.")
+    if metadata["saps_seeded_sampling"].get("action_horizon") != 15:
+        raise ValueError("P0 server must advertise a 15-action horizon.")
+    record["server_metadata"] = metadata
+
+
+def prepare_live_request(
+    *, collector: Any, output_dir: Path, index: int,
+    policy_episode_seed: int, observation_timeout: float,
+    spin_once: Callable[[], None], config: dict[str, Any],
+    record: dict[str, Any], gate: CameraPairGate,
+    monotonic: Callable[[], float] = time.monotonic,
+) -> tuple[Any, Path]:
+    """Acquire, validate and persist a fresh observation; no command interface."""
+
+    deadline = monotonic() + observation_timeout
+    last_error = None
+    while True:
+        if monotonic() >= deadline:
+            raise TimeoutError(
+                f"No fresh advancing camera pair: missing={collector.missing_sources()}, "
+                f"callbacks={collector.errors}, assembly={last_error}"
+            )
+        spin_once()
+        signature = collector.latest_signature()
+        record["duplicate_or_nonadvancing_pair_checks"] = gate.rejected_checks
+        if not gate.accepts(signature) or collector.errors:
+            continue
+        try:
+            observation = collector.assemble()
+        except ValueError as error:
+            last_error = str(error)
+            record["last_rejected_observation"] = last_error
+            continue
+        break
+    validate_request(observation.policy_input)
+    for frame in (observation.wrist_frame, observation.exterior_frame):
+        if (list(frame.native_shape) != config["native_images"]["shape"]
+                or frame.source_encoding.lower() != config["native_images"]["encoding"]):
+            raise ValueError("Live camera profile differs from configured RGB8 1280x720.")
+        if frame.native_image_rgb is None:
+            raise ValueError("P0 requires retained native RGB evidence.")
+    gate.commit(signature)
+    sample_dir = output_dir / f"request_{index:04d}"
+    sample_dir.mkdir(exist_ok=False)
+    bundle = sample_dir / "observation.npz"
+    sample = observation_record(observation)
+    np.savez_compressed(bundle, **observation.policy_input)
+    native_path = sample_dir / "native_rgb.npz"
+    np.savez_compressed(
+        native_path, wrist=observation.wrist_frame.native_image_rgb,
+        exterior=observation.exterior_frame.native_image_rgb,
+    )
+    sample.update({
+        "request_index": index, "chunk_index": index, "replan_index": index,
+        "policy_episode_seed": policy_episode_seed,
+        "observation_bundle": file_evidence(bundle),
+        "native_rgb_bundle": file_evidence(native_path),
+        "camera_pair_source_stamps": signature[:2],
+        "source_rates": collector.source_rates(),
+        "duplicate_or_nonadvancing_pair_checks": gate.rejected_checks,
+        "reference_future_open_loop_horizon": 8,
+        "policy_actions_executed": 0,
+    })
+    write_json(sample_dir / "request.json", sample)
+    return observation, sample_dir
+
+
+def infer_live_request(
+    *, observation: Any, sample_dir: Path, policy: OpenPiDroidPolicy,
+    index: int, policy_episode_seed: int, ros_now: Callable[[], float],
+    config: dict[str, Any],
+    monotonic: Callable[[], float] = time.monotonic,
+    call_timing: dict[str, Any] | None = None,
+    monotonic_ns: Callable[[], int] = time.monotonic_ns,
+) -> float:
+    """Submit once and retain the existing native response and model audit."""
+
+    start_ros, start_mono, start_utc = ros_now(), monotonic(), utc_now()
+    age = start_ros - observation.timing.oldest_source_ros_seconds
+    if age < 0 or age > config["freshness"]["maximum_source_age_seconds"]:
+        raise ValueError("Observation expired before policy submission.")
+    if call_timing is not None:
+        call_timing["request_start_monotonic_ns"] = monotonic_ns()
+    try:
+        response = policy.infer(
+            observation.policy_input, policy_episode_seed=policy_episode_seed,
+            replan_index=index, audit_model_input=index == 0,
+        )
+    finally:
+        if call_timing is not None:
+            call_timing["response_completion_monotonic_ns"] = monotonic_ns()
+        completed_mono, completed_ros = monotonic(), ros_now()
+        completed_utc = utc_now()
+        write_json(sample_dir / "request_timing.json", {
+            "request_started_utc": start_utc,
+            "request_started_ros_seconds": start_ros,
+            "request_started_monotonic_seconds": start_mono,
+            "observation_age_at_request_seconds": age,
+            "call_ended_utc": completed_utc,
+            "call_ended_monotonic_seconds": completed_mono,
+            "call_ended_ros_seconds": completed_ros,
+        })
+    # Save even an unexpected finite horizon before rejecting it.
+    action_path = sample_dir / "actions.npz"
+    np.savez_compressed(action_path, actions=response.actions)
+    result = {
+        "request_index": index, "replan_index": index, "chunk_index": index,
+        "request_started_utc": start_utc,
+        "request_started_ros_seconds": start_ros,
+        "request_started_monotonic_seconds": start_mono,
+        "observation_age_at_request_seconds": age,
+        "response_completed_utc": completed_utc,
+        "response_completed_ros_seconds": completed_ros,
+        "response_completed_monotonic_seconds": completed_mono,
+        "observation_age_at_response_seconds": (
+            completed_ros - observation.timing.oldest_source_ros_seconds
+        ),
+        "client_round_trip_seconds": response.client_round_trip_seconds,
+        "policy_timing": response.policy_timing, "server_timing": response.server_timing,
+        "sampling_metadata": response.sampling_metadata,
+        "response_keys": response.response_keys,
+        "action": array_evidence(response.actions), "finite": True,
+        "action_bundle": file_evidence(action_path),
+        "per_dimension_summary": summarize_action_chunk(response.actions),
+        "returned_horizon": response.actions.shape[0],
+        "reference_future_open_loop_horizon": 8, "policy_actions_executed": 0,
+    }
+    write_json(sample_dir / "response.json", result)
+    if response.actions.shape != ACTION_SHAPE:
+        raise ValueError(f"P0 requires native [15, 8], got {response.actions.shape}.")
+    sampling = response.sampling_metadata or {}
+    digest = sampling.get("noise_sha256", "")
+    if (not isinstance(digest, str) or len(digest) != 64
+            or any(char not in "0123456789abcdef" for char in digest)):
+        raise ValueError("P0 requires the seeded noise SHA-256.")
+    if response.policy_timing is None or response.server_timing is None:
+        raise ValueError("P0 requires model and server timing evidence.")
+    if index == 0:
+        audit_record = save_model_audit(
+            response.model_input_audit, observation.policy_input,
+            sample_dir / "model_audit",
+        )
+        write_json(sample_dir / "model_audit.json", audit_record)
+    return response.client_round_trip_seconds
+
+
 def run_live_loop(
     *, collector: Any, policy: OpenPiDroidPolicy, output_dir: Path,
     request_count: int, policy_episode_seed: int, observation_timeout: float,
@@ -136,131 +292,22 @@ def run_live_loop(
     The caller owns run allocation, failure finalization, and ROS cleanup.
     """
 
-    policy.validate_policy_identity(config_name=POLICY_CONFIG, checkpoint=POLICY_CHECKPOINT)
-    metadata = policy.server_metadata
-    audit_identity = metadata.get("saps_model_input_audit", {})
-    if (audit_identity.get("schema_version") != 1
-            or audit_identity.get("openpi_commit") != OPENPI_COMMIT):
-        raise ValueError("Server must advertise pinned OpenPI and model audit v1.")
-    if metadata["saps_seeded_sampling"].get("action_horizon") != 15:
-        raise ValueError("P0 server must advertise a 15-action horizon.")
-    record["server_metadata"] = metadata
+    validate_live_policy(policy, record)
     gate = CameraPairGate()
     record["completed_requests"] = 0
     for index in range(request_count):
-        deadline = monotonic() + observation_timeout
-        last_error = None
-        while True:
-            if monotonic() >= deadline:
-                raise TimeoutError(
-                    f"No fresh advancing camera pair: missing={collector.missing_sources()}, "
-                    f"callbacks={collector.errors}, assembly={last_error}"
-                )
-            spin_once()
-            signature = collector.latest_signature()
-            record["duplicate_or_nonadvancing_pair_checks"] = gate.rejected_checks
-            if not gate.accepts(signature) or collector.errors:
-                continue
-            try:
-                observation = collector.assemble()
-            except ValueError as error:
-                last_error = str(error)
-                record["last_rejected_observation"] = last_error
-                continue
-            break
-        validate_request(observation.policy_input)
-        for frame in (observation.wrist_frame, observation.exterior_frame):
-            if (list(frame.native_shape) != config["native_images"]["shape"]
-                    or frame.source_encoding.lower() != config["native_images"]["encoding"]):
-                raise ValueError("Live camera profile differs from configured RGB8 1280x720.")
-            if frame.native_image_rgb is None:
-                raise ValueError("P0 requires retained native RGB evidence.")
-        gate.commit(signature)
-        sample_dir = output_dir / f"request_{index:04d}"
-        sample_dir.mkdir(exist_ok=False)
-        bundle = sample_dir / "observation.npz"
-        sample = observation_record(observation)
-        np.savez_compressed(bundle, **observation.policy_input)
-        native_path = sample_dir / "native_rgb.npz"
-        np.savez_compressed(
-            native_path, wrist=observation.wrist_frame.native_image_rgb,
-            exterior=observation.exterior_frame.native_image_rgb,
+        observation, sample_dir = prepare_live_request(
+            collector=collector, output_dir=output_dir, index=index,
+            policy_episode_seed=policy_episode_seed,
+            observation_timeout=observation_timeout, spin_once=spin_once,
+            config=config, record=record, gate=gate, monotonic=monotonic,
         )
-        sample.update({
-            "request_index": index, "chunk_index": index, "replan_index": index,
-            "policy_episode_seed": policy_episode_seed,
-            "observation_bundle": file_evidence(bundle),
-            "native_rgb_bundle": file_evidence(native_path),
-            "camera_pair_source_stamps": signature[:2],
-            "source_rates": collector.source_rates(),
-            "duplicate_or_nonadvancing_pair_checks": gate.rejected_checks,
-            "reference_future_open_loop_horizon": 8,
-            "policy_actions_executed": 0,
-        })
-        write_json(sample_dir / "request.json", sample)
-        start_ros, start_mono, start_utc = ros_now(), monotonic(), utc_now()
-        age = start_ros - observation.timing.oldest_source_ros_seconds
-        if age < 0 or age > config["freshness"]["maximum_source_age_seconds"]:
-            raise ValueError("Observation expired before policy submission.")
-        try:
-            response = policy.infer(
-                observation.policy_input, policy_episode_seed=policy_episode_seed,
-                replan_index=index, audit_model_input=index == 0,
-            )
-        finally:
-            completed_mono, completed_ros = monotonic(), ros_now()
-            completed_utc = utc_now()
-            write_json(sample_dir / "request_timing.json", {
-                "request_started_utc": start_utc,
-                "request_started_ros_seconds": start_ros,
-                "request_started_monotonic_seconds": start_mono,
-                "observation_age_at_request_seconds": age,
-                "call_ended_utc": completed_utc,
-                "call_ended_monotonic_seconds": completed_mono,
-                "call_ended_ros_seconds": completed_ros,
-            })
-        # Save even an unexpected finite horizon before rejecting it.
-        action_path = sample_dir / "actions.npz"
-        np.savez_compressed(action_path, actions=response.actions)
-        result = {
-            "request_index": index, "replan_index": index, "chunk_index": index,
-            "request_started_utc": start_utc,
-            "request_started_ros_seconds": start_ros,
-            "request_started_monotonic_seconds": start_mono,
-            "observation_age_at_request_seconds": age,
-            "response_completed_utc": completed_utc,
-            "response_completed_ros_seconds": completed_ros,
-            "response_completed_monotonic_seconds": completed_mono,
-            "observation_age_at_response_seconds": (
-                completed_ros - observation.timing.oldest_source_ros_seconds
-            ),
-            "client_round_trip_seconds": response.client_round_trip_seconds,
-            "policy_timing": response.policy_timing, "server_timing": response.server_timing,
-            "sampling_metadata": response.sampling_metadata,
-            "response_keys": response.response_keys,
-            "action": array_evidence(response.actions), "finite": True,
-            "action_bundle": file_evidence(action_path),
-            "per_dimension_summary": summarize_action_chunk(response.actions),
-            "returned_horizon": response.actions.shape[0],
-            "reference_future_open_loop_horizon": 8, "policy_actions_executed": 0,
-        }
-        write_json(sample_dir / "response.json", result)
-        if response.actions.shape != ACTION_SHAPE:
-            raise ValueError(f"P0 requires native [15, 8], got {response.actions.shape}.")
-        sampling = response.sampling_metadata or {}
-        digest = sampling.get("noise_sha256", "")
-        if (not isinstance(digest, str) or len(digest) != 64
-                or any(char not in "0123456789abcdef" for char in digest)):
-            raise ValueError("P0 requires the seeded noise SHA-256.")
-        if response.policy_timing is None or response.server_timing is None:
-            raise ValueError("P0 requires model and server timing evidence.")
-        if index == 0:
-            audit_record = save_model_audit(
-                response.model_input_audit, observation.policy_input,
-                sample_dir / "model_audit",
-            )
-            write_json(sample_dir / "model_audit.json", audit_record)
+        round_trip = infer_live_request(
+            observation=observation, sample_dir=sample_dir, policy=policy,
+            index=index, policy_episode_seed=policy_episode_seed,
+            ros_now=ros_now, config=config, monotonic=monotonic,
+        )
         record["completed_requests"] = index + 1
         record["duplicate_or_nonadvancing_pair_checks"] = gate.rejected_checks
         print(f"shadow {index + 1}/{request_count}: [15, 8], "
-              f"{response.client_round_trip_seconds:.3f}s, executed=0", flush=True)
+              f"{round_trip:.3f}s, executed=0", flush=True)

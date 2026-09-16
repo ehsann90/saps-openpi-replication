@@ -66,6 +66,8 @@ PHYSICAL_PROMPT ?=
 PHYSICAL_REQUESTS ?= 10
 PHYSICAL_PYTHON ?= $(CURDIR)/.venv-physical/bin/python
 PHYSICAL_CONFIG ?= configs/physical_pi05_fr3.json
+C1C1_APPLICATION_CONFIRMATION_TIMEOUT ?= 0.25
+export C1C1_APPLICATION_CONFIRMATION_TIMEOUT
 export PHYSICAL_RUN_ID PHYSICAL_PROMPT PHYSICAL_REQUESTS PHYSICAL_PYTHON
 export PHYSICAL_CONFIG DROID_POLICY_SEED
 M3_OBSERVATIONS ?= 5
@@ -126,6 +128,7 @@ help:
 	@echo "  make physical-pi05-target-verify PHYSICAL_RUN_ID=<unique> PHYSICAL_PROMPT=<instruction>"
 	@echo "  make physical-pi05-shadow PHYSICAL_RUN_ID=<unique> PHYSICAL_PROMPT=<instruction>"
 	@echo "  make physical-m3-spacemouse  # subscriber/spnavd log only"
+	@echo "  make physical-c1c1 PHYSICAL_RUN_ID=<unique> PHYSICAL_PROMPT=<instruction>"
 	@echo "  make autonomous-smoke"
 	@echo "  make autonomous-sweep NUM_TRIALS=20"
 	@echo "  make teleop CONDITION=nominal TRIAL=0"
@@ -371,6 +374,21 @@ physical-m3-compare:
 		{ echo "Set M3_SPACEMOUSE_OUTPUT=<spnav.json>."; exit 2; }
 	$(RUNTIME) /bin/bash -lc \
 		'source /.venv/bin/activate && python /workspace/tools/analysis/compare_physical_m3_actions.py --projection-path $(M3_PROJECTION) --spnav-path $(M3_SPACEMOUSE_OUTPUT) --output-path $(M3_COMPARISON_OUTPUT)'
+
+.PHONY: physical-c1c1
+physical-c1c1:
+	@test -n "$$PHYSICAL_RUN_ID" -a -n "$$PHYSICAL_PROMPT" || \
+		{ echo "Set an explicit PHYSICAL_RUN_ID and PHYSICAL_PROMPT."; exit 2; }
+	bash -c 'source /opt/ros/jazzy/setup.bash && \
+		source "$$FRANKA_ROS2_INSTALL/setup.bash" && \
+		export PYTHONPATH="$$PWD/src:$$PWD/third_party/openpi/packages/openpi-client/src:$${PYTHONPATH}" && \
+		"$$PHYSICAL_PYTHON" scripts/physical_live_inference_hold.py \
+		--execute \
+		--config "$$PHYSICAL_CONFIG" \
+		--output-dir "outputs/physical_c1c1/$$PHYSICAL_RUN_ID" \
+		--prompt "$$PHYSICAL_PROMPT" \
+		--policy-episode-seed "$$DROID_POLICY_SEED" \
+		--application-confirmation-timeout "$$C1C1_APPLICATION_CONFIRMATION_TIMEOUT"'
 
 .PHONY: operator-smoke
 operator-smoke:

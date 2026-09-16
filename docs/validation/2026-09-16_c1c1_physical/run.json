@@ -1,0 +1,1695 @@
+{
+  "schema_version": 1,
+  "milestone": "physical_c1c1",
+  "run": "aaf87d8e-bab0-45b9-b595-446a8e5a79b8",
+  "status": "success",
+  "rows": [
+    {
+      "type": "pre_inference_hold",
+      "action_index": null,
+      "raw_policy_action": null,
+      "q_ref": [
+        -0.07627193760666154,
+        -0.01750551675098022,
+        -0.02913180578378648,
+        -2.2938807782025465,
+        -0.11211837071530134,
+        2.1303592147059343,
+        0.9354817054145123
+      ],
+      "dq_ref": [
+        8.125473010087191e-05,
+        0.0016758246468965418,
+        -0.0004222847246718547,
+        -0.00040333890073779896,
+        -0.00022372775260053214,
+        -0.0006226577547555332,
+        -0.000394683155535209
+      ],
+      "q_ref_source_stamp_ns": 1789564792758177752,
+      "q_ref_receive_monotonic_ns": 22286945613212,
+      "q_ref_age_at_mapping_seconds": 0.000575146,
+      "q_ref_receive_age_at_mapping_seconds": 0.000787123,
+      "mapped_delta": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "q_target": [
+        -0.07627193760666154,
+        -0.01750551675098022,
+        -0.02913180578378648,
+        -2.2938807782025465,
+        -0.11211837071530134,
+        2.1303592147059343,
+        0.9354817054145123
+      ],
+      "safety_gate": {
+        "state_age_seconds": 0.000575146,
+        "receive_age_seconds": 0.000787123,
+        "action_age_seconds": 0.0,
+        "joint_margin_rad": 0.1,
+        "raw_policy_action": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "clipped_u": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "measured_q_rad": [
+          -0.07627193760666154,
+          -0.01750551675098022,
+          -0.02913180578378648,
+          -2.2938807782025465,
+          -0.11211837071530134,
+          2.1303592147059343,
+          0.9354817054145123
+        ],
+        "delta_q_rad": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "proposed_q_target_rad": [
+          -0.07627193760666154,
+          -0.01750551675098022,
+          -0.02913180578378648,
+          -2.2938807782025465,
+          -0.11211837071530134,
+          2.1303592147059343,
+          0.9354817054145123
+        ],
+        "joint_names": [
+          "fr3_joint1",
+          "fr3_joint2",
+          "fr3_joint3",
+          "fr3_joint4",
+          "fr3_joint5",
+          "fr3_joint6",
+          "fr3_joint7"
+        ],
+        "joint_position_limits": {
+          "joint_names": [
+            "fr3_joint1",
+            "fr3_joint2",
+            "fr3_joint3",
+            "fr3_joint4",
+            "fr3_joint5",
+            "fr3_joint6",
+            "fr3_joint7"
+          ],
+          "lower_rad": [
+            -2.7437,
+            -1.7837,
+            -2.9007,
+            -3.0421,
+            -2.8065,
+            0.5445,
+            -3.0159
+          ],
+          "upper_rad": [
+            2.7437,
+            1.7837,
+            2.9007,
+            -0.1518,
+            2.8065,
+            4.5169,
+            3.0159
+          ],
+          "robot_description_sha256": "70ebca8364603cc7b0279907e10ca9be2456dc0996b2898d309462f7815fc4dd"
+        },
+        "target_lower_margin_rad": [
+          2.6674280623933386,
+          1.76619448324902,
+          2.8715681942162137,
+          0.7482192217974535,
+          2.694381629284699,
+          1.5858592147059343,
+          3.951381705414512
+        ],
+        "target_upper_margin_rad": [
+          2.8199719376066614,
+          1.8012055167509802,
+          2.9298318057837864,
+          2.1420807782025464,
+          2.9186183707153015,
+          2.3865407852940654,
+          2.0804182945854874
+        ],
+        "measured_lower_margin_rad": [
+          2.6674280623933386,
+          1.76619448324902,
+          2.8715681942162137,
+          0.7482192217974535,
+          2.694381629284699,
+          1.5858592147059343,
+          3.951381705414512
+        ],
+        "measured_upper_margin_rad": [
+          2.8199719376066614,
+          1.8012055167509802,
+          2.9298318057837864,
+          2.1420807782025464,
+          2.9186183707153015,
+          2.3865407852940654,
+          2.0804182945854874
+        ],
+        "minimum_target_margin_rad": 0.7482192217974535,
+        "position_gate_accepted": true,
+        "rejection_reasons": [],
+        "rate_equivalent_diagnostic_rad_s": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "controller_acceptance_tested": false,
+        "safe_to_execute": false,
+        "policy_actions_executed": 0,
+        "gripper_commands_issued": 0,
+        "raw_gripper_policy_value": 0.0,
+        "measured_singularity": {
+          "condition_number": 8.73704825356732,
+          "singular_values": [
+            1.9302067004931451,
+            1.8402239646727028,
+            0.7790256717679148,
+            0.40125332254241636,
+            0.3047337173821209,
+            0.22092206022841246
+          ],
+          "base": "fr3_link0",
+          "tip": "fr3_link8",
+          "lower_threshold": 17.0,
+          "hard_threshold": 30.0,
+          "rejected": false
+        },
+        "target_singularity": {
+          "condition_number": 8.73704825356732,
+          "singular_values": [
+            1.9302067004931451,
+            1.8402239646727028,
+            0.7790256717679148,
+            0.40125332254241636,
+            0.3047337173821209,
+            0.22092206022841246
+          ],
+          "base": "fr3_link0",
+          "tip": "fr3_link8",
+          "lower_threshold": 17.0,
+          "hard_threshold": 30.0,
+          "rejected": false
+        },
+        "accepted": true
+      },
+      "scheduled_monotonic_ns": 22286946400335,
+      "actual_publish_t0_ns": 22286948010758,
+      "schedule_lateness_ns": 1610423,
+      "hold_requested_monotonic_ns": 22286935626508,
+      "publish_readiness_reasons": [],
+      "run": "aaf87d8e-bab0-45b9-b595-446a8e5a79b8",
+      "source_stamp_ns": 1789564792760512860,
+      "q_ref_age_at_publish_seconds": 0.00244818,
+      "q_ref_receive_age_at_publish_seconds": 0.002382537,
+      "publication_call_end_ns": 22286948076551,
+      "publication_call_outcome": "returned",
+      "timing": {
+        "source_stamp_ns": 1789564792760512860,
+        "status": "applied",
+        "sent_target": [
+          -0.07627193760666154,
+          -0.01750551675098022,
+          -0.02913180578378648,
+          -2.2938807782025465,
+          -0.11211837071530134,
+          2.1303592147059343,
+          0.9354817054145123
+        ],
+        "forwarder_records": 1,
+        "callback_records": 1,
+        "application_records": 1,
+        "instance": "60141-21689313392677",
+        "activation": 21848350486110,
+        "sequence": 1,
+        "q_desired": [
+          -0.07627193760666154,
+          -0.01750551675098022,
+          -0.02913180578378648,
+          -2.2938807782025465,
+          -0.11211837071530134,
+          2.1303592147059343,
+          0.9354817054145123
+        ],
+        "intervals_ns": {
+          "t0_t1": 315690,
+          "t1_t2": 38071,
+          "t2_t3": 220663,
+          "t3_t4": 921574,
+          "t0_t4": 1495998
+        },
+        "t0_ns": 22286948010758,
+        "t1_ns": 22286948326448,
+        "t2_ns": 22286948364519,
+        "t3_ns": 22286948585182,
+        "t4_ns": 22286949506756,
+        "forwarder_outcome": "forwarded",
+        "controller_callback_outcome": "accepted"
+      },
+      "last_application_validation": {
+        "accepted": false,
+        "reasons": [
+          "row_0_status_'unmatched'",
+          "row_0_forwarder_records_0",
+          "row_0_callback_records_0",
+          "row_0_application_records_0",
+          "row_0_forwarder_outcome_None",
+          "row_0_callback_outcome_None",
+          "row_0_invalid_sequence",
+          "row_0_invalid_controller_identity",
+          "row_0_invalid_target_evidence",
+          "row_0_missing_intervals",
+          "row_0_invalid_event_order",
+          "unexpected_controller_instance_or_activation"
+        ],
+        "expected_targets": 1,
+        "analyzed_targets": 1,
+        "source_stamps": [
+          1789564792760512860
+        ],
+        "controller_sequences": [],
+        "controller_identity": null,
+        "timing_summary": {
+          "targets": [
+            {
+              "source_stamp_ns": 1789564792760512860,
+              "status": "unmatched",
+              "sent_target": [
+                -0.07627193760666154,
+                -0.01750551675098022,
+                -0.02913180578378648,
+                -2.2938807782025465,
+                -0.11211837071530134,
+                2.1303592147059343,
+                0.9354817054145123
+              ],
+              "forwarder_records": 0,
+              "callback_records": 0,
+              "application_records": 0,
+              "t0_ns": 22286948010758,
+              "t1_ns": null,
+              "t2_ns": null,
+              "t3_ns": null,
+              "t4_ns": null,
+              "forwarder_outcome": null,
+              "controller_callback_outcome": null
+            }
+          ],
+          "controller_publication_errors_cumulative": {
+            "60141-21689313392677": 0
+          },
+          "periods": [
+            {
+              "instance": "60141-21689313392677",
+              "activation": 21848350486110,
+              "count": 140,
+              "nominal_ns": 1000000,
+              "thresholds_ns": [
+                1500000,
+                2000000
+              ],
+              "long_period_counts": {
+                "1500000": 0,
+                "2000000": 0
+              },
+              "percentile_method": "nearest rank ceil(p*N), one-based",
+              "mean_ns": 999643.7357142858,
+              "median_ns": 1000707.0,
+              "p95_ns": 1104577,
+              "p99_ns": 1159169,
+              "maximum_ns": 1171562,
+              "mean_deviation_ns": -356.2642857142491,
+              "maximum_absolute_deviation_ns": 175707
+            }
+          ],
+          "evidence_id_gaps": {
+            "controller:60141-21689313392677": 0
+          },
+          "rt_overflow_cumulative": {
+            "60141-21689313392677": {
+              "dropped_period_samples": 0,
+              "dropped_application_records": 0
+            }
+          },
+          "capture_boundaries": "Loss before first/after last evidence ID is unknown; unresolved is not proof of rejection or supersession.",
+          "unmatched_forwarder_records": 0,
+          "unmatched_callback_records": 0,
+          "unmatched_application_records": 0
+        }
+      },
+      "application_confirmation": {
+        "accepted": true,
+        "reasons": [],
+        "expected_targets": 1,
+        "analyzed_targets": 1,
+        "source_stamps": [
+          1789564792760512860
+        ],
+        "controller_sequences": [
+          1
+        ],
+        "controller_identity": [
+          "60141-21689313392677",
+          21848350486110
+        ],
+        "timing_summary": {
+          "targets": [
+            {
+              "source_stamp_ns": 1789564792760512860,
+              "status": "applied",
+              "sent_target": [
+                -0.07627193760666154,
+                -0.01750551675098022,
+                -0.02913180578378648,
+                -2.2938807782025465,
+                -0.11211837071530134,
+                2.1303592147059343,
+                0.9354817054145123
+              ],
+              "forwarder_records": 1,
+              "callback_records": 1,
+              "application_records": 1,
+              "instance": "60141-21689313392677",
+              "activation": 21848350486110,
+              "sequence": 1,
+              "q_desired": [
+                -0.07627193760666154,
+                -0.01750551675098022,
+                -0.02913180578378648,
+                -2.2938807782025465,
+                -0.11211837071530134,
+                2.1303592147059343,
+                0.9354817054145123
+              ],
+              "intervals_ns": {
+                "t0_t1": 315690,
+                "t1_t2": 38071,
+                "t2_t3": 220663,
+                "t3_t4": 921574,
+                "t0_t4": 1495998
+              },
+              "t0_ns": 22286948010758,
+              "t1_ns": 22286948326448,
+              "t2_ns": 22286948364519,
+              "t3_ns": 22286948585182,
+              "t4_ns": 22286949506756,
+              "forwarder_outcome": "forwarded",
+              "controller_callback_outcome": "accepted"
+            }
+          ],
+          "controller_publication_errors_cumulative": {
+            "60141-21689313392677": 0
+          },
+          "periods": [
+            {
+              "instance": "60141-21689313392677",
+              "activation": 21848350486110,
+              "count": 160,
+              "nominal_ns": 1000000,
+              "thresholds_ns": [
+                1500000,
+                2000000
+              ],
+              "long_period_counts": {
+                "1500000": 0,
+                "2000000": 0
+              },
+              "percentile_method": "nearest rank ceil(p*N), one-based",
+              "mean_ns": 999895.33125,
+              "median_ns": 1000767.0,
+              "p95_ns": 1104536,
+              "p99_ns": 1159169,
+              "maximum_ns": 1171562,
+              "mean_deviation_ns": -104.66874999995343,
+              "maximum_absolute_deviation_ns": 175707
+            }
+          ],
+          "evidence_id_gaps": {
+            "controller:60141-21689313392677": 0,
+            "forwarder:c2c71e0d-a03e-45e9-864e-d8c0cb6f639f": 0
+          },
+          "rt_overflow_cumulative": {
+            "60141-21689313392677": {
+              "dropped_period_samples": 0,
+              "dropped_application_records": 0
+            }
+          },
+          "capture_boundaries": "Loss before first/after last evidence ID is unknown; unresolved is not proof of rejection or supersession.",
+          "unmatched_forwarder_records": 0,
+          "unmatched_callback_records": 0,
+          "unmatched_application_records": 0
+        }
+      },
+      "confirmation_monotonic_ns": 22286964419797
+    },
+    {
+      "type": "post_inference_hold",
+      "action_index": null,
+      "raw_policy_action": null,
+      "q_ref": [
+        -0.07626891116738403,
+        -0.017472423474244107,
+        -0.029133261708323425,
+        -2.293904991361211,
+        -0.11211718037457706,
+        2.1303583966707658,
+        0.9354809032195757
+      ],
+      "dq_ref": [
+        0.0005457764919491381,
+        -0.000376484396723783,
+        -0.0008507008123988477,
+        0.0014559205124830246,
+        0.0001623564675878708,
+        0.0001955952292355991,
+        0.0007124624763645936
+      ],
+      "q_ref_source_stamp_ns": 1789564796059193799,
+      "q_ref_receive_monotonic_ns": 22290246627036,
+      "q_ref_age_at_mapping_seconds": 0.000269976,
+      "q_ref_receive_age_at_mapping_seconds": 0.000376053,
+      "mapped_delta": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "q_target": [
+        -0.07626891116738403,
+        -0.017472423474244107,
+        -0.029133261708323425,
+        -2.293904991361211,
+        -0.11211718037457706,
+        2.1303583966707658,
+        0.9354809032195757
+      ],
+      "safety_gate": {
+        "state_age_seconds": 0.000269976,
+        "receive_age_seconds": 0.000376053,
+        "action_age_seconds": 0.0,
+        "joint_margin_rad": 0.1,
+        "raw_policy_action": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "clipped_u": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "measured_q_rad": [
+          -0.07626891116738403,
+          -0.017472423474244107,
+          -0.029133261708323425,
+          -2.293904991361211,
+          -0.11211718037457706,
+          2.1303583966707658,
+          0.9354809032195757
+        ],
+        "delta_q_rad": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "proposed_q_target_rad": [
+          -0.07626891116738403,
+          -0.017472423474244107,
+          -0.029133261708323425,
+          -2.293904991361211,
+          -0.11211718037457706,
+          2.1303583966707658,
+          0.9354809032195757
+        ],
+        "joint_names": [
+          "fr3_joint1",
+          "fr3_joint2",
+          "fr3_joint3",
+          "fr3_joint4",
+          "fr3_joint5",
+          "fr3_joint6",
+          "fr3_joint7"
+        ],
+        "joint_position_limits": {
+          "joint_names": [
+            "fr3_joint1",
+            "fr3_joint2",
+            "fr3_joint3",
+            "fr3_joint4",
+            "fr3_joint5",
+            "fr3_joint6",
+            "fr3_joint7"
+          ],
+          "lower_rad": [
+            -2.7437,
+            -1.7837,
+            -2.9007,
+            -3.0421,
+            -2.8065,
+            0.5445,
+            -3.0159
+          ],
+          "upper_rad": [
+            2.7437,
+            1.7837,
+            2.9007,
+            -0.1518,
+            2.8065,
+            4.5169,
+            3.0159
+          ],
+          "robot_description_sha256": "70ebca8364603cc7b0279907e10ca9be2456dc0996b2898d309462f7815fc4dd"
+        },
+        "target_lower_margin_rad": [
+          2.667431088832616,
+          1.766227576525756,
+          2.8715667382916767,
+          0.7481950086387892,
+          2.694382819625423,
+          1.5858583966707658,
+          3.9513809032195755
+        ],
+        "target_upper_margin_rad": [
+          2.819968911167384,
+          1.801172423474244,
+          2.9298332617083234,
+          2.1421049913612107,
+          2.9186171803745773,
+          2.386541603329234,
+          2.080419096780424
+        ],
+        "measured_lower_margin_rad": [
+          2.667431088832616,
+          1.766227576525756,
+          2.8715667382916767,
+          0.7481950086387892,
+          2.694382819625423,
+          1.5858583966707658,
+          3.9513809032195755
+        ],
+        "measured_upper_margin_rad": [
+          2.819968911167384,
+          1.801172423474244,
+          2.9298332617083234,
+          2.1421049913612107,
+          2.9186171803745773,
+          2.386541603329234,
+          2.080419096780424
+        ],
+        "minimum_target_margin_rad": 0.7481950086387892,
+        "position_gate_accepted": true,
+        "rejection_reasons": [],
+        "rate_equivalent_diagnostic_rad_s": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "controller_acceptance_tested": false,
+        "safe_to_execute": false,
+        "policy_actions_executed": 0,
+        "gripper_commands_issued": 0,
+        "raw_gripper_policy_value": 0.0,
+        "measured_singularity": {
+          "condition_number": 8.736994286049669,
+          "singular_values": [
+            1.9302090544329853,
+            1.8402223324940392,
+            0.7790082676681205,
+            0.4012576310873021,
+            0.304729775418291,
+            0.22092369426347733
+          ],
+          "base": "fr3_link0",
+          "tip": "fr3_link8",
+          "lower_threshold": 17.0,
+          "hard_threshold": 30.0,
+          "rejected": false
+        },
+        "target_singularity": {
+          "condition_number": 8.736994286049669,
+          "singular_values": [
+            1.9302090544329853,
+            1.8402223324940392,
+            0.7790082676681205,
+            0.4012576310873021,
+            0.304729775418291,
+            0.22092369426347733
+          ],
+          "base": "fr3_link0",
+          "tip": "fr3_link8",
+          "lower_threshold": 17.0,
+          "hard_threshold": 30.0,
+          "rejected": false
+        },
+        "accepted": true
+      },
+      "scheduled_monotonic_ns": 22290247003089,
+      "actual_publish_t0_ns": 22290248420411,
+      "schedule_lateness_ns": 1417322,
+      "hold_requested_monotonic_ns": 22290236404821,
+      "publish_readiness_reasons": [],
+      "run": "aaf87d8e-bab0-45b9-b595-446a8e5a79b8",
+      "source_stamp_ns": 1789564796060944425,
+      "q_ref_age_at_publish_seconds": 0.001852236,
+      "q_ref_receive_age_at_publish_seconds": 0.001788826,
+      "publication_call_end_ns": 22290248494870,
+      "publication_call_outcome": "returned",
+      "timing": {
+        "source_stamp_ns": 1789564796060944425,
+        "status": "applied",
+        "sent_target": [
+          -0.07626891116738403,
+          -0.017472423474244107,
+          -0.029133261708323425,
+          -2.293904991361211,
+          -0.11211718037457706,
+          2.1303583966707658,
+          0.9354809032195757
+        ],
+        "forwarder_records": 1,
+        "callback_records": 1,
+        "application_records": 1,
+        "instance": "60141-21689313392677",
+        "activation": 21848350486110,
+        "sequence": 2,
+        "q_desired": [
+          -0.07626891116738403,
+          -0.017472423474244107,
+          -0.029133261708323425,
+          -2.293904991361211,
+          -0.11211718037457706,
+          2.1303583966707658,
+          0.9354809032195757
+        ],
+        "intervals_ns": {
+          "t0_t1": 188903,
+          "t1_t2": 28203,
+          "t2_t3": 155351,
+          "t3_t4": 646930,
+          "t0_t4": 1019387
+        },
+        "t0_ns": 22290248420411,
+        "t1_ns": 22290248609314,
+        "t2_ns": 22290248637517,
+        "t3_ns": 22290248792868,
+        "t4_ns": 22290249439798,
+        "forwarder_outcome": "forwarded",
+        "controller_callback_outcome": "accepted"
+      },
+      "last_application_validation": {
+        "accepted": false,
+        "reasons": [
+          "row_1_status_'unmatched'",
+          "row_1_forwarder_records_0",
+          "row_1_callback_records_0",
+          "row_1_application_records_0",
+          "row_1_forwarder_outcome_None",
+          "row_1_callback_outcome_None",
+          "row_1_invalid_sequence",
+          "row_1_invalid_controller_identity",
+          "row_1_invalid_target_evidence",
+          "row_1_missing_intervals",
+          "row_1_invalid_event_order"
+        ],
+        "expected_targets": 2,
+        "analyzed_targets": 2,
+        "source_stamps": [
+          1789564792760512860,
+          1789564796060944425
+        ],
+        "controller_sequences": [
+          1
+        ],
+        "controller_identity": [
+          "60141-21689313392677",
+          21848350486110
+        ],
+        "timing_summary": {
+          "targets": [
+            {
+              "source_stamp_ns": 1789564792760512860,
+              "status": "applied",
+              "sent_target": [
+                -0.07627193760666154,
+                -0.01750551675098022,
+                -0.02913180578378648,
+                -2.2938807782025465,
+                -0.11211837071530134,
+                2.1303592147059343,
+                0.9354817054145123
+              ],
+              "forwarder_records": 1,
+              "callback_records": 1,
+              "application_records": 1,
+              "instance": "60141-21689313392677",
+              "activation": 21848350486110,
+              "sequence": 1,
+              "q_desired": [
+                -0.07627193760666154,
+                -0.01750551675098022,
+                -0.02913180578378648,
+                -2.2938807782025465,
+                -0.11211837071530134,
+                2.1303592147059343,
+                0.9354817054145123
+              ],
+              "intervals_ns": {
+                "t0_t1": 315690,
+                "t1_t2": 38071,
+                "t2_t3": 220663,
+                "t3_t4": 921574,
+                "t0_t4": 1495998
+              },
+              "t0_ns": 22286948010758,
+              "t1_ns": 22286948326448,
+              "t2_ns": 22286948364519,
+              "t3_ns": 22286948585182,
+              "t4_ns": 22286949506756,
+              "forwarder_outcome": "forwarded",
+              "controller_callback_outcome": "accepted"
+            },
+            {
+              "source_stamp_ns": 1789564796060944425,
+              "status": "unmatched",
+              "sent_target": [
+                -0.07626891116738403,
+                -0.017472423474244107,
+                -0.029133261708323425,
+                -2.293904991361211,
+                -0.11211718037457706,
+                2.1303583966707658,
+                0.9354809032195757
+              ],
+              "forwarder_records": 0,
+              "callback_records": 0,
+              "application_records": 0,
+              "t0_ns": 22290248420411,
+              "t1_ns": null,
+              "t2_ns": null,
+              "t3_ns": null,
+              "t4_ns": null,
+              "forwarder_outcome": null,
+              "controller_callback_outcome": null
+            }
+          ],
+          "controller_publication_errors_cumulative": {
+            "60141-21689313392677": 0
+          },
+          "periods": [
+            {
+              "instance": "60141-21689313392677",
+              "activation": 21848350486110,
+              "count": 3440,
+              "nominal_ns": 1000000,
+              "thresholds_ns": [
+                1500000,
+                2000000
+              ],
+              "long_period_counts": {
+                "1500000": 0,
+                "2000000": 0
+              },
+              "percentile_method": "nearest rank ceil(p*N), one-based",
+              "mean_ns": 1000002.0834302326,
+              "median_ns": 1000106.5,
+              "p95_ns": 1098916,
+              "p99_ns": 1142858,
+              "maximum_ns": 1189966,
+              "mean_deviation_ns": 2.0834302325965837,
+              "maximum_absolute_deviation_ns": 189966
+            }
+          ],
+          "evidence_id_gaps": {
+            "controller:60141-21689313392677": 0,
+            "forwarder:c2c71e0d-a03e-45e9-864e-d8c0cb6f639f": 0
+          },
+          "rt_overflow_cumulative": {
+            "60141-21689313392677": {
+              "dropped_period_samples": 0,
+              "dropped_application_records": 0
+            }
+          },
+          "capture_boundaries": "Loss before first/after last evidence ID is unknown; unresolved is not proof of rejection or supersession.",
+          "unmatched_forwarder_records": 0,
+          "unmatched_callback_records": 0,
+          "unmatched_application_records": 0
+        }
+      },
+      "application_confirmation": {
+        "accepted": true,
+        "reasons": [],
+        "expected_targets": 2,
+        "analyzed_targets": 2,
+        "source_stamps": [
+          1789564792760512860,
+          1789564796060944425
+        ],
+        "controller_sequences": [
+          1,
+          2
+        ],
+        "controller_identity": [
+          "60141-21689313392677",
+          21848350486110
+        ],
+        "timing_summary": {
+          "targets": [
+            {
+              "source_stamp_ns": 1789564792760512860,
+              "status": "applied",
+              "sent_target": [
+                -0.07627193760666154,
+                -0.01750551675098022,
+                -0.02913180578378648,
+                -2.2938807782025465,
+                -0.11211837071530134,
+                2.1303592147059343,
+                0.9354817054145123
+              ],
+              "forwarder_records": 1,
+              "callback_records": 1,
+              "application_records": 1,
+              "instance": "60141-21689313392677",
+              "activation": 21848350486110,
+              "sequence": 1,
+              "q_desired": [
+                -0.07627193760666154,
+                -0.01750551675098022,
+                -0.02913180578378648,
+                -2.2938807782025465,
+                -0.11211837071530134,
+                2.1303592147059343,
+                0.9354817054145123
+              ],
+              "intervals_ns": {
+                "t0_t1": 315690,
+                "t1_t2": 38071,
+                "t2_t3": 220663,
+                "t3_t4": 921574,
+                "t0_t4": 1495998
+              },
+              "t0_ns": 22286948010758,
+              "t1_ns": 22286948326448,
+              "t2_ns": 22286948364519,
+              "t3_ns": 22286948585182,
+              "t4_ns": 22286949506756,
+              "forwarder_outcome": "forwarded",
+              "controller_callback_outcome": "accepted"
+            },
+            {
+              "source_stamp_ns": 1789564796060944425,
+              "status": "applied",
+              "sent_target": [
+                -0.07626891116738403,
+                -0.017472423474244107,
+                -0.029133261708323425,
+                -2.293904991361211,
+                -0.11211718037457706,
+                2.1303583966707658,
+                0.9354809032195757
+              ],
+              "forwarder_records": 1,
+              "callback_records": 1,
+              "application_records": 1,
+              "instance": "60141-21689313392677",
+              "activation": 21848350486110,
+              "sequence": 2,
+              "q_desired": [
+                -0.07626891116738403,
+                -0.017472423474244107,
+                -0.029133261708323425,
+                -2.293904991361211,
+                -0.11211718037457706,
+                2.1303583966707658,
+                0.9354809032195757
+              ],
+              "intervals_ns": {
+                "t0_t1": 188903,
+                "t1_t2": 28203,
+                "t2_t3": 155351,
+                "t3_t4": 646930,
+                "t0_t4": 1019387
+              },
+              "t0_ns": 22290248420411,
+              "t1_ns": 22290248609314,
+              "t2_ns": 22290248637517,
+              "t3_ns": 22290248792868,
+              "t4_ns": 22290249439798,
+              "forwarder_outcome": "forwarded",
+              "controller_callback_outcome": "accepted"
+            }
+          ],
+          "controller_publication_errors_cumulative": {
+            "60141-21689313392677": 0
+          },
+          "periods": [
+            {
+              "instance": "60141-21689313392677",
+              "activation": 21848350486110,
+              "count": 3540,
+              "nominal_ns": 1000000,
+              "thresholds_ns": [
+                1500000,
+                2000000
+              ],
+              "long_period_counts": {
+                "1500000": 0,
+                "2000000": 0
+              },
+              "percentile_method": "nearest rank ceil(p*N), one-based",
+              "mean_ns": 999988.0663841808,
+              "median_ns": 1000121.5,
+              "p95_ns": 1098896,
+              "p99_ns": 1142858,
+              "maximum_ns": 1189966,
+              "mean_deviation_ns": -11.933615819201805,
+              "maximum_absolute_deviation_ns": 189966
+            }
+          ],
+          "evidence_id_gaps": {
+            "controller:60141-21689313392677": 0,
+            "forwarder:c2c71e0d-a03e-45e9-864e-d8c0cb6f639f": 0
+          },
+          "rt_overflow_cumulative": {
+            "60141-21689313392677": {
+              "dropped_period_samples": 0,
+              "dropped_application_records": 0
+            }
+          },
+          "capture_boundaries": "Loss before first/after last evidence ID is unknown; unresolved is not proof of rejection or supersession.",
+          "unmatched_forwarder_records": 0,
+          "unmatched_callback_records": 0,
+          "unmatched_application_records": 0
+        }
+      },
+      "confirmation_monotonic_ns": 22290434951022
+    }
+  ],
+  "start_utc": "2026-09-16T13:19:46.180955+00:00",
+  "policy_actions_executed": 0,
+  "gripper_commands_issued": 0,
+  "completed_requests": 1,
+  "config": {
+    "schema_version": 1,
+    "milestone": "physical_pi05_droid_p0",
+    "execution_enabled": false,
+    "policy": {
+      "config": "pi05_droid",
+      "checkpoint": "gs://openpi-assets/checkpoints/pi05_droid",
+      "openpi_commit": "15a9616a00943ada6c20a0f158e3adb39df2ccac",
+      "action_shape": [
+        15,
+        8
+      ],
+      "reference_future_open_loop_horizon": 8
+    },
+    "wrist_camera": {
+      "role": "wrist",
+      "serial": "342222073510",
+      "model": "Intel RealSense D435I",
+      "topic": "/camera/wrist_camera/color/image_raw",
+      "node": "/camera/wrist_camera"
+    },
+    "exterior_camera": {
+      "role": "exterior",
+      "serial": "244222076317",
+      "model": "Intel RealSense D435I",
+      "topic": "/camera/external_camera/color/image_raw",
+      "node": "/camera/external_camera"
+    },
+    "robot": {
+      "joint_state_topic": "/franka/joint_states",
+      "gripper_state_topic": "/franka_gripper/joint_states",
+      "maximum_finger_position_m": 0.04,
+      "base_frame": "fr3_link0",
+      "tcp_frame": "fr3_hand_tcp"
+    },
+    "native_images": {
+      "shape": [
+        720,
+        1280,
+        3
+      ],
+      "encoding": "rgb8",
+      "expected_rate_hz": 30,
+      "hardware_synchronized": false
+    },
+    "client_images": {
+      "shape": [
+        180,
+        320,
+        3
+      ],
+      "dtype": "uint8",
+      "color_order": "RGB",
+      "preprocessing": "existing centre crop to 16:9 then OpenCV INTER_AREA downsize; INTER_LINEAR for upsize"
+    },
+    "freshness": {
+      "maximum_source_age_seconds": 0.5,
+      "maximum_cross_source_skew_seconds": 0.25
+    }
+  },
+  "prompt": "Pick up the object",
+  "policy_episode_seed": 20260827,
+  "timeouts_seconds": {
+    "observation": 30,
+    "policy": 120,
+    "application_confirmation": 0.25
+  },
+  "provenance": {
+    "repository": {
+      "path": "/home/hvl-robotics2404/saps-openpi-replication",
+      "available": true,
+      "branch": "experiment/physical-fr3-saps",
+      "commit": "dc5ce5e1ee038d793f7b672cc72a5fffce8d06c2",
+      "status": [
+        "M Makefile",
+        " A docs/physical_c1c1.md",
+        " A scripts/physical_live_inference_hold.py",
+        " A src/saps/physical/live_inference_hold.py",
+        " A src/saps/physical/live_inference_hold_ros.py",
+        " M src/saps/physical/live_shadow.py",
+        " M src/saps/physical/streaming_ros.py",
+        " A tests/unit/test_live_inference_hold.py"
+      ],
+      "dirty": true
+    },
+    "openpi": {
+      "path": "/home/hvl-robotics2404/saps-openpi-replication/third_party/openpi",
+      "available": true,
+      "branch": "",
+      "commit": "15a9616a00943ada6c20a0f158e3adb39df2ccac",
+      "status": [],
+      "dirty": false
+    },
+    "fr3_lab_stack": {
+      "path": "/home/hvl-robotics2404/franka_ros2_ws/src/fr3_lab_stack",
+      "available": true,
+      "branch": "main",
+      "commit": "9e535b665626cf8f3894fc4d2ef9136790abad92",
+      "status": [],
+      "dirty": false
+    },
+    "igd_fr3_control": {
+      "path": "/home/hvl-robotics2404/franka_ros2_ws/src/igd_fr3_control",
+      "available": true,
+      "branch": "commissioning/fr3-spacemouse",
+      "commit": "438e4ae3145944042033395940848bf107cb9965",
+      "status": [
+        "M igd_fr3_control/view_capture.py",
+        "?? igd_fr3_control/display_grasp_rviz.py",
+        "?? igd_fr3_control/test_grasp.py",
+        "?? igd_fr3_control/view_capture2.py"
+      ],
+      "dirty": true
+    },
+    "c1b_base_commit": "dc5ce5e1ee038d793f7b672cc72a5fffce8d06c2",
+    "clock": {
+      "clock": "CLOCK_MONOTONIC",
+      "hostname": "hvl-robotics2404",
+      "boot_id": "86683708-73c3-4834-8a2a-476b17ec267f",
+      "time_namespace": "time:[4026531834]",
+      "python_clock_implementation": "clock_gettime(CLOCK_MONOTONIC)",
+      "clock_verified": true
+    }
+  },
+  "initial_ros_graph": {
+    "joint_state": {
+      "topic": "/franka/joint_states",
+      "node": "/joint_state_broadcaster",
+      "type": "sensor_msgs/msg/JointState",
+      "publisher_gid": [
+        1,
+        15,
+        245,
+        116,
+        237,
+        234,
+        181,
+        62,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        180,
+        3
+      ]
+    },
+    "gripper_state": {
+      "topic": "/franka_gripper/joint_states",
+      "node": "/franka_gripper",
+      "type": "sensor_msgs/msg/JointState",
+      "publisher_gid": [
+        1,
+        15,
+        245,
+        116,
+        240,
+        234,
+        228,
+        75,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        54,
+        3
+      ]
+    },
+    "wrist_camera": {
+      "topic": "/camera/wrist_camera/color/image_raw",
+      "node": "/camera/wrist_camera",
+      "type": "sensor_msgs/msg/Image",
+      "publisher_gid": [
+        1,
+        15,
+        245,
+        116,
+        77,
+        5,
+        126,
+        43,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        53,
+        3
+      ]
+    },
+    "exterior_camera": {
+      "topic": "/camera/external_camera/color/image_raw",
+      "node": "/camera/external_camera",
+      "type": "sensor_msgs/msg/Image",
+      "publisher_gid": [
+        1,
+        15,
+        245,
+        116,
+        78,
+        5,
+        135,
+        138,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        24,
+        3
+      ]
+    }
+  },
+  "initial_observation_interfaces": {
+    "published_topics": [
+      "/parameter_events"
+    ],
+    "service_clients": [],
+    "robot_command_publishers": 0
+  },
+  "camera_identity": {
+    "wrist_camera": {
+      "command": [
+        "ros2",
+        "param",
+        "get",
+        "--hide-type",
+        "/camera/wrist_camera",
+        "serial_no"
+      ],
+      "raw_parameter": "_342222073510",
+      "serial": "342222073510",
+      "read_utc": "2026-09-16T13:19:48.677386+00:00",
+      "identity_source": "RealSense serial_no parameter"
+    },
+    "exterior_camera": {
+      "command": [
+        "ros2",
+        "param",
+        "get",
+        "--hide-type",
+        "/camera/external_camera",
+        "serial_no"
+      ],
+      "raw_parameter": "_244222076317",
+      "serial": "244222076317",
+      "read_utc": "2026-09-16T13:19:50.542835+00:00",
+      "identity_source": "RealSense serial_no parameter"
+    }
+  },
+  "server_metadata": {
+    "saps_seeded_sampling": {
+      "protocol_version": 1,
+      "action_horizon": 15,
+      "latent_action_dim": 32,
+      "policy_config_name": "pi05_droid",
+      "policy_checkpoint": "gs://openpi-assets/checkpoints/pi05_droid"
+    },
+    "saps_model_input_audit": {
+      "schema_version": 1,
+      "runtime": {
+        "python": "3.11.9 (main, Aug 14 2024, 05:07:28) [Clang 18.1.8 ]",
+        "jax": "0.5.3",
+        "numpy": "1.26.4"
+      },
+      "openpi_commit": "15a9616a00943ada6c20a0f158e3adb39df2ccac"
+    }
+  },
+  "expected_controller_identity": [
+    "60141-21689313392677",
+    21848350486110
+  ],
+  "duplicate_or_nonadvancing_pair_checks": 0,
+  "last_rejected_observation": "stale physical observation sources: {'exterior_image': 5.153865098953247}",
+  "inference_attempts": 1,
+  "policy_inference": {
+    "request_start_monotonic_ns": 22286964455444,
+    "response_completion_monotonic_ns": 22290202331894
+  },
+  "final_ros_graph": {
+    "joint_state": {
+      "topic": "/franka/joint_states",
+      "node": "/joint_state_broadcaster",
+      "type": "sensor_msgs/msg/JointState",
+      "publisher_gid": [
+        1,
+        15,
+        245,
+        116,
+        237,
+        234,
+        181,
+        62,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        180,
+        3
+      ]
+    },
+    "gripper_state": {
+      "topic": "/franka_gripper/joint_states",
+      "node": "/franka_gripper",
+      "type": "sensor_msgs/msg/JointState",
+      "publisher_gid": [
+        1,
+        15,
+        245,
+        116,
+        240,
+        234,
+        228,
+        75,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        54,
+        3
+      ]
+    },
+    "wrist_camera": {
+      "topic": "/camera/wrist_camera/color/image_raw",
+      "node": "/camera/wrist_camera",
+      "type": "sensor_msgs/msg/Image",
+      "publisher_gid": [
+        1,
+        15,
+        245,
+        116,
+        77,
+        5,
+        126,
+        43,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        53,
+        3
+      ]
+    },
+    "exterior_camera": {
+      "topic": "/camera/external_camera/color/image_raw",
+      "node": "/camera/external_camera",
+      "type": "sensor_msgs/msg/Image",
+      "publisher_gid": [
+        1,
+        15,
+        245,
+        116,
+        78,
+        5,
+        135,
+        138,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        24,
+        3
+      ]
+    }
+  },
+  "final_observation_interfaces": {
+    "published_topics": [
+      "/parameter_events"
+    ],
+    "service_clients": [],
+    "robot_command_publishers": 0
+  },
+  "final_camera_identity": {
+    "wrist_camera": {
+      "command": [
+        "ros2",
+        "param",
+        "get",
+        "--hide-type",
+        "/camera/wrist_camera",
+        "serial_no"
+      ],
+      "raw_parameter": "_342222073510",
+      "serial": "342222073510",
+      "read_utc": "2026-09-16T13:19:59.129869+00:00",
+      "identity_source": "RealSense serial_no parameter"
+    },
+    "exterior_camera": {
+      "command": [
+        "ros2",
+        "param",
+        "get",
+        "--hide-type",
+        "/camera/external_camera",
+        "serial_no"
+      ],
+      "raw_parameter": "_244222076317",
+      "serial": "244222076317",
+      "read_utc": "2026-09-16T13:19:59.993854+00:00",
+      "identity_source": "RealSense serial_no parameter"
+    }
+  },
+  "analysis_start_record": 4310,
+  "delivery_validation": {
+    "accepted": true,
+    "reasons": [],
+    "expected_targets": 2,
+    "analyzed_targets": 2,
+    "source_stamps": [
+      1789564792760512860,
+      1789564796060944425
+    ],
+    "controller_sequences": [
+      1,
+      2
+    ],
+    "controller_identity": [
+      "60141-21689313392677",
+      21848350486110
+    ],
+    "timing_summary": {
+      "targets": [
+        {
+          "source_stamp_ns": 1789564792760512860,
+          "status": "applied",
+          "sent_target": [
+            -0.07627193760666154,
+            -0.01750551675098022,
+            -0.02913180578378648,
+            -2.2938807782025465,
+            -0.11211837071530134,
+            2.1303592147059343,
+            0.9354817054145123
+          ],
+          "forwarder_records": 1,
+          "callback_records": 1,
+          "application_records": 1,
+          "instance": "60141-21689313392677",
+          "activation": 21848350486110,
+          "sequence": 1,
+          "q_desired": [
+            -0.07627193760666154,
+            -0.01750551675098022,
+            -0.02913180578378648,
+            -2.2938807782025465,
+            -0.11211837071530134,
+            2.1303592147059343,
+            0.9354817054145123
+          ],
+          "intervals_ns": {
+            "t0_t1": 315690,
+            "t1_t2": 38071,
+            "t2_t3": 220663,
+            "t3_t4": 921574,
+            "t0_t4": 1495998
+          },
+          "t0_ns": 22286948010758,
+          "t1_ns": 22286948326448,
+          "t2_ns": 22286948364519,
+          "t3_ns": 22286948585182,
+          "t4_ns": 22286949506756,
+          "forwarder_outcome": "forwarded",
+          "controller_callback_outcome": "accepted"
+        },
+        {
+          "source_stamp_ns": 1789564796060944425,
+          "status": "applied",
+          "sent_target": [
+            -0.07626891116738403,
+            -0.017472423474244107,
+            -0.029133261708323425,
+            -2.293904991361211,
+            -0.11211718037457706,
+            2.1303583966707658,
+            0.9354809032195757
+          ],
+          "forwarder_records": 1,
+          "callback_records": 1,
+          "application_records": 1,
+          "instance": "60141-21689313392677",
+          "activation": 21848350486110,
+          "sequence": 2,
+          "q_desired": [
+            -0.07626891116738403,
+            -0.017472423474244107,
+            -0.029133261708323425,
+            -2.293904991361211,
+            -0.11211718037457706,
+            2.1303583966707658,
+            0.9354809032195757
+          ],
+          "intervals_ns": {
+            "t0_t1": 188903,
+            "t1_t2": 28203,
+            "t2_t3": 155351,
+            "t3_t4": 646930,
+            "t0_t4": 1019387
+          },
+          "t0_ns": 22290248420411,
+          "t1_ns": 22290248609314,
+          "t2_ns": 22290248637517,
+          "t3_ns": 22290248792868,
+          "t4_ns": 22290249439798,
+          "forwarder_outcome": "forwarded",
+          "controller_callback_outcome": "accepted"
+        }
+      ],
+      "controller_publication_errors_cumulative": {
+        "60141-21689313392677": 0
+      },
+      "periods": [
+        {
+          "instance": "60141-21689313392677",
+          "activation": 21848350486110,
+          "count": 7380,
+          "nominal_ns": 1000000,
+          "thresholds_ns": [
+            1500000,
+            2000000
+          ],
+          "long_period_counts": {
+            "1500000": 0,
+            "2000000": 0
+          },
+          "percentile_method": "nearest rank ceil(p*N), one-based",
+          "mean_ns": 999998.2380758808,
+          "median_ns": 999890.0,
+          "p95_ns": 1097023,
+          "p99_ns": 1139993,
+          "maximum_ns": 1196238,
+          "mean_deviation_ns": -1.7619241192005575,
+          "maximum_absolute_deviation_ns": 196238
+        }
+      ],
+      "evidence_id_gaps": {
+        "controller:60141-21689313392677": 0,
+        "forwarder:c2c71e0d-a03e-45e9-864e-d8c0cb6f639f": 0
+      },
+      "rt_overflow_cumulative": {
+        "60141-21689313392677": {
+          "dropped_period_samples": 0,
+          "dropped_application_records": 0
+        }
+      },
+      "capture_boundaries": "Loss before first/after last evidence ID is unknown; unresolved is not proof of rejection or supersession.",
+      "unmatched_forwarder_records": 0,
+      "unmatched_callback_records": 0,
+      "unmatched_application_records": 0
+    }
+  },
+  "health_evidence_after_monotonic_ns": 22290249439798,
+  "runtime_health_validation": {
+    "accepted": true,
+    "reasons": [],
+    "franka_samples": 7212,
+    "franka_health_violation_count": 0,
+    "post_hold_franka_samples": 3765,
+    "post_hold_controller_readiness_samples": 39,
+    "post_hold_controller_state_samples": 366,
+    "post_hold_joint_samples": 3767
+  },
+  "publication_audit": {
+    "sent_targets": [
+      {
+        "run": "aaf87d8e-bab0-45b9-b595-446a8e5a79b8",
+        "source_stamp_ns": 1789564792760512860,
+        "t0_ns": 22286948010758,
+        "q": [
+          -0.07627193760666154,
+          -0.01750551675098022,
+          -0.02913180578378648,
+          -2.2938807782025465,
+          -0.11211837071530134,
+          2.1303592147059343,
+          0.9354817054145123
+        ]
+      },
+      {
+        "run": "aaf87d8e-bab0-45b9-b595-446a8e5a79b8",
+        "source_stamp_ns": 1789564796060944425,
+        "t0_ns": 22290248420411,
+        "q": [
+          -0.07626891116738403,
+          -0.017472423474244107,
+          -0.029133261708323425,
+          -2.293904991361211,
+          -0.11211718037457706,
+          2.1303583966707658,
+          0.9354809032195757
+        ]
+      }
+    ],
+    "no_publication_during_inference": true,
+    "pre_t4_inference_post_hold_order_valid": true
+  },
+  "boundary_errors": {},
+  "source_rates": {
+    "joint_state": {
+      "message_count": 6820,
+      "first_source_ros_seconds": 1789564787.5492475,
+      "latest_source_ros_seconds": 1789564799.9921122,
+      "source_duration_seconds": 12.442864656448364,
+      "source_rate_hz": 548.0249274001494,
+      "receive_duration_seconds": 12.442753950002952,
+      "receive_rate_hz": 548.0298033216659
+    },
+    "gripper_state": {
+      "message_count": 110,
+      "first_source_ros_seconds": 1789564787.4533331,
+      "latest_source_ros_seconds": 1789564799.921502,
+      "source_duration_seconds": 12.46816897392273,
+      "source_rate_hz": 8.742262013610365,
+      "receive_duration_seconds": 12.468110730998887,
+      "receive_rate_hz": 8.742302851786384
+    },
+    "wrist_image": {
+      "message_count": 214,
+      "first_source_ros_seconds": 1789564787.4705718,
+      "latest_source_ros_seconds": 1789564799.9470053,
+      "source_duration_seconds": 12.476433515548706,
+      "source_rate_hz": 17.072186513441487,
+      "receive_duration_seconds": 12.473704044998158,
+      "receive_rate_hz": 17.075922214573552
+    },
+    "exterior_image": {
+      "message_count": 210,
+      "first_source_ros_seconds": 1789564787.483536,
+      "latest_source_ros_seconds": 1789564799.9590712,
+      "source_duration_seconds": 12.475535154342651,
+      "source_rate_hz": 16.75278835050603,
+      "receive_duration_seconds": 12.473151090998726,
+      "receive_rate_hz": 16.755990404928653
+    }
+  },
+  "observation_callback_errors": {},
+  "observation_executor_errors": [],
+  "cleanup_errors": [],
+  "end_utc": "2026-09-16T13:20:00.360901+00:00"
+}

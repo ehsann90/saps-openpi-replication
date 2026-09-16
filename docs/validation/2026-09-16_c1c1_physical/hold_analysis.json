@@ -1,0 +1,31 @@
+{
+  "source_run": "outputs/physical_c1c1/c1c1_20260916T131945Z",
+  "source_file": "timing.jsonl",
+  "analysis_scope": "controller_state samples whose receive_monotonic_ns lies within the recorded policy inference interval",
+  "inference_controller_samples": 307,
+  "inference_duration_s": 3.23787645,
+  "unique_target_sequences": [
+    1.0
+  ],
+  "max_abs_tracking_error_rad": 3.8485954616640505e-05,
+  "max_abs_tracking_error_mrad": 0.038485954616640505,
+  "per_joint_max_abs_error_mrad": [
+    0.00573464357671305,
+    0.038485954616640505,
+    0.009029628022190483,
+    0.03060910296559527,
+    0.005619136116283285,
+    0.007263292738368676,
+    0.008175072291227714
+  ],
+  "max_abs_dq_rad_s": 0.003944330795423518,
+  "per_joint_q_desired_span_rad": [
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0,
+    0.0
+  ]
+}

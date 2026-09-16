@@ -81,23 +81,35 @@ def correlate(records: list[dict[str, Any]], rows: list[dict[str, Any]],
 
 
 def validate_c1b_delivery(
+    rows: list[dict[str, Any]], summary: dict[str, Any],
+) -> dict[str, Any]:
+    """Require the unchanged eight C1-B policy targets and terminal hold."""
+    return validate_streaming_delivery(
+        rows, summary, expected_types=["policy_action"] * 8 + ["terminal_hold"],
+        expected_indices=list(range(8)) + [None],
+    )
+
+
+def validate_streaming_delivery(
     rows: list[dict[str, Any]],
     summary: dict[str, Any],
+    *, expected_types: list[str], expected_indices: list[int | None],
 ) -> dict[str, Any]:
-    """Require complete, ordered C1-B delivery for all eight actions plus hold."""
+    """Require complete ordered delivery using unchanged C1-A2 evidence."""
 
     reasons: list[str] = []
 
-    expected_types = ["policy_action"] * 8 + ["terminal_hold"]
-    expected_indices = list(range(8)) + [None]
+    count = len(expected_types)
+    if not count or len(expected_indices) != count:
+        raise ValueError("Expected target types and indices must align")
 
-    if len(rows) != 9:
-        reasons.append(f"expected_9_rows_received_{len(rows)}")
+    if len(rows) != count:
+        reasons.append(f"expected_{count}_rows_received_{len(rows)}")
 
     targets = summary.get("targets", [])
-    if len(targets) != 9:
+    if len(targets) != count:
         reasons.append(
-            f"expected_9_analyzed_targets_received_{len(targets)}"
+            f"expected_{count}_analyzed_targets_received_{len(targets)}"
         )
 
     source_stamps: list[int] = []
@@ -105,7 +117,7 @@ def validate_c1b_delivery(
     identities: list[tuple[str, int]] = []
     application_times: list[int] = []
 
-    for position, row in enumerate(rows[:9]):
+    for position, row in enumerate(rows[:count]):
         expected_type = expected_types[position]
         expected_index = expected_indices[position]
 
@@ -246,23 +258,23 @@ def validate_c1b_delivery(
         else:
             application_times.append(times[-1])
 
-    if len(source_stamps) == 9:
-        if len(set(source_stamps)) != 9:
+    if len(source_stamps) == count:
+        if len(set(source_stamps)) != count:
             reasons.append("source_stamps_not_unique")
         if any(
             b <= a for a, b in zip(source_stamps, source_stamps[1:])
         ):
             reasons.append("source_stamps_not_strictly_increasing")
 
-    if len(sequences) == 9 and any(
+    if len(sequences) == count and any(
         b != a + 1 for a, b in zip(sequences, sequences[1:])
     ):
         reasons.append("controller_sequences_not_consecutive")
 
-    if len(identities) == 9 and len(set(identities)) != 1:
+    if len(identities) == count and len(set(identities)) != 1:
         reasons.append("controller_instance_or_activation_changed")
 
-    if len(application_times) == 9 and any(
+    if len(application_times) == count and any(
         b <= a
         for a, b in zip(application_times, application_times[1:])
     ):
@@ -306,7 +318,7 @@ def validate_c1b_delivery(
     return {
         "accepted": not reasons,
         "reasons": reasons,
-        "expected_targets": 9,
+        "expected_targets": count,
         "analyzed_targets": len(targets),
         "source_stamps": source_stamps,
         "controller_sequences": sequences,
@@ -319,8 +331,18 @@ def validate_c1b_delivery(
 
 
 def validate_c1b_runtime_health(
+    records: list[dict[str, Any]], rows: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Preserve C1-B terminal-hold health validation."""
+    return validate_streaming_runtime_health(
+        records, rows, hold_type="terminal_hold",
+    )
+
+
+def validate_streaming_runtime_health(
     records: list[dict[str, Any]],
     rows: list[dict[str, Any]],
+    *, hold_type: str, after_monotonic_ns: int | None = None,
 ) -> dict[str, Any]:
     """Require healthy robot/controller evidence through the post-hold drain."""
 
@@ -328,12 +350,12 @@ def validate_c1b_runtime_health(
 
     holds = [
         row for row in rows
-        if row.get("type") == "terminal_hold"
+        if row.get("type") == hold_type
     ]
     if len(holds) != 1:
         return {
             "accepted": False,
-            "reasons": ["expected_exactly_one_terminal_hold"],
+            "reasons": [f"expected_exactly_one_{hold_type}"],
         }
 
     hold_t0 = holds[0].get("actual_publish_t0_ns")
@@ -344,8 +366,11 @@ def validate_c1b_runtime_health(
     ):
         return {
             "accepted": False,
-            "reasons": ["terminal_hold_missing_actual_t0"],
+            "reasons": [f"{hold_type}_missing_actual_t0"],
         }
+
+    if after_monotonic_ns is not None:
+        hold_t0 = max(hold_t0, after_monotonic_ns)
 
     franka = [
         record for record in records
