@@ -83,6 +83,14 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=Path.home() / "franka_ros2_ws/src/fr3_lab_stack",
     )
+    parser.add_argument(
+        "--execute",
+        action="store_true",
+        help=(
+            "Explicitly permit exactly one physical trajectory execution; "
+            "the joint-target server must independently report execute=true."
+        ),
+    )
     return parser.parse_args()
 
 
@@ -184,10 +192,10 @@ def run(args: argparse.Namespace) -> None:
     started = time.monotonic()
     record: dict[str, Any] = {
         "schema_version": 1,
-        "milestone": "physical_pi05_droid_p1b_plan_only",
+        "milestone": "physical_pi05_droid_p1b_single_action",
         "run_id": args.output_dir.name,
         "start_utc": utc_now(),
-        "execution_enabled": False,
+        "execution_enabled": bool(args.execute),
         "selected_action_index": 0,
         "policy_actions_selected": 0,
         "policy_actions_executed": 0,
@@ -233,7 +241,7 @@ def run(args: argparse.Namespace) -> None:
         rclpy.init(args=[])
         initialized = True
         node = rclpy.create_node(
-            "saps_physical_pi05_p1b_plan_only",
+            "saps_physical_pi05_p1b_single_action",
             enable_rosout=False,
             start_parameter_services=False,
         )
@@ -277,9 +285,11 @@ def run(args: argparse.Namespace) -> None:
         joint_target_client = JointTargetActionClient()
         server_execute = joint_target_client.server_execute_enabled(timeout=5.0)
         record["joint_target_server_execute"] = server_execute
-        if server_execute:
+        if server_execute != args.execute:
             raise RuntimeError(
-                "P1-B plan-only requires /fr3_joint_target execute=false."
+                "P1-B execution-mode mismatch: "
+                f"script --execute={args.execute}, "
+                f"joint-target server execute={server_execute}."
             )
 
         policy_transport = BoundedWebsocketClient(
@@ -423,6 +433,7 @@ def run(args: argparse.Namespace) -> None:
         send_started = time.monotonic()
         send_action_age = send_started - request_start
         record["policy_action_age_at_goal_send_start_seconds"] = send_action_age
+
         if send_action_age > ACTION_AGE:
             record["termination_reason"] = "action_expired_before_goal_send"
             print(
@@ -433,38 +444,144 @@ def run(args: argparse.Namespace) -> None:
 
         request_id = f"{args.output_dir.name}-action0"
         record["joint_target_goal_calls_started"] = 1
+
         result = joint_target_client.send_once(
             request_id=request_id,
             reference_q=joint.position_rad,
             target_q=gate["proposed_q_target_rad"],
             reference_ros_seconds=joint.stamp.ros_seconds,
-            expect_execute=False,
+            expect_execute=args.execute,
             timeout=args.joint_target_timeout,
+        )
+
+        send_finished = time.monotonic()
+        record["joint_target_round_trip_seconds"] = (
+            send_finished - send_started
         )
         record["joint_target_results_received"] = 1
         write_json(args.output_dir / "joint_target_result.json", result)
 
-        if not _plan_only_result_ok(result):
+        if not args.execute:
+            if not _plan_only_result_ok(result):
+                raise RuntimeError(
+                    "Joint-target server did not satisfy the P1-B "
+                    "plan-only contract."
+                )
+
+            record["plan_only_validated"] = True
+            record["termination_reason"] = "plan_only_validated"
+
+            print(
+                "P1-B real policy action[0] plan-only validation passed.",
+                flush=True,
+            )
+            print(
+                "raw action[0]: "
+                f"{np.asarray(action, dtype=float).tolist()}",
+                flush=True,
+            )
+            print(
+                "q_target: "
+                f"{np.asarray(gate['proposed_q_target_rad'], dtype=float).tolist()}",
+                flush=True,
+            )
+            print(
+                "execution_attempts: "
+                f"{result['server_evidence']['execution_attempts']}",
+                flush=True,
+            )
+            return
+
+        target = np.asarray(
+            gate["proposed_q_target_rad"],
+            dtype=np.float64,
+        )
+        final_q = np.asarray(result["final_q"], dtype=np.float64)
+        final_dq = np.asarray(result["final_dq"], dtype=np.float64)
+
+        if (
+            target.shape != (7,)
+            or final_q.shape != (7,)
+            or final_dq.shape != (7,)
+            or not np.all(np.isfinite(target))
+            or not np.all(np.isfinite(final_q))
+            or not np.all(np.isfinite(final_dq))
+        ):
             raise RuntimeError(
-                "Joint-target server did not satisfy the P1-B plan-only contract."
+                "Invalid final execution state returned by joint-target server."
             )
 
-        record["plan_only_validated"] = True
-        record["termination_reason"] = "plan_only_validated"
-        print("P1-B real policy action[0] plan-only validation passed.", flush=True)
+        tracking_error = final_q - target
+        max_tracking_error = float(np.max(np.abs(tracking_error)))
+        max_final_speed = float(np.max(np.abs(final_dq)))
+
+        evidence = result["server_evidence"]
+
+        if not (
+            result["success"] is True
+            and result["outcome"] == "execution_succeeded"
+            and result["planning_error_code"] == 1
+            and result["execution_attempted"] is True
+            and result["execution_action_status"] == 4
+            and result["execution_error_code"] == 1
+            and evidence.get("execution_attempts") == 1
+            and max_tracking_error <= 0.01
+            and max_final_speed <= 0.02
+        ):
+            raise RuntimeError(
+                "Physical P1-B execution did not satisfy the "
+                "single-action acceptance contract."
+            )
+
+        planned = evidence.get("planned", {})
+
+        record["execution_accuracy"] = {
+            "final_tracking_error_rad": tracking_error,
+            "maximum_absolute_tracking_error_rad": max_tracking_error,
+            "maximum_absolute_final_velocity_rad_s": max_final_speed,
+        }
+
+        record["timing_assessment"] = {
+            "nominal_policy_frequency_hz": 15.0,
+            "nominal_action_period_seconds": 1.0 / 15.0,
+            "eight_action_window_seconds": 8.0 / 15.0,
+            "joint_target_round_trip_seconds": (
+                send_finished - send_started
+            ),
+            "moveit_planning_time_seconds": planned.get(
+                "planning_time_s"
+            ),
+            "planned_trajectory_duration_seconds": planned.get(
+                "duration_s"
+            ),
+        }
+
+        record["policy_actions_executed"] = 1
+        record["physical_execution_validated"] = True
+        record["termination_reason"] = "execution_succeeded"
+
         print(
-            "raw action[0]: "
-            f"{np.asarray(action, dtype=float).tolist()}",
+            "P1-B real policy action[0] physical execution passed.",
             flush=True,
         )
         print(
-            "q_target: "
-            f"{np.asarray(gate['proposed_q_target_rad'], dtype=float).tolist()}",
+            "max final tracking error [rad]: "
+            f"{max_tracking_error:.6f}",
             flush=True,
         )
         print(
-            "execution_attempts: "
-            f"{result['server_evidence']['execution_attempts']}",
+            "max final |dq| [rad/s]: "
+            f"{max_final_speed:.6f}",
+            flush=True,
+        )
+        print(
+            "joint-target round trip [s]: "
+            f"{send_finished - send_started:.6f}",
+            flush=True,
+        )
+        print(
+            "planned trajectory duration [s]: "
+            f"{planned.get('duration_s')}",
             flush=True,
         )
 
