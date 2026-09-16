@@ -1,0 +1,50 @@
+{
+  "run": "b79d5e15-7bb1-493a-955d-a89024121709",
+  "repository": {
+    "path": "/home/hvl-robotics2404/saps-openpi-replication",
+    "available": true,
+    "branch": "experiment/physical-fr3-saps",
+    "commit": "b442c551df9d2609bdcab8c3a7335b25497a039e",
+    "status": [
+      "A docs/physical_c1b.md",
+      " A scripts/physical_prerecorded_chunk.py",
+      " A src/saps/physical/streaming_playback.py",
+      " A src/saps/physical/streaming_ros.py",
+      " A tests/unit/test_streaming_playback.py"
+    ],
+    "dirty": true
+  },
+  "lab_stack": {
+    "path": "/home/hvl-robotics2404/franka_ros2_ws/src/fr3_lab_stack",
+    "available": true,
+    "branch": "main",
+    "commit": "9e535b665626cf8f3894fc4d2ef9136790abad92",
+    "status": [],
+    "dirty": false
+  },
+  "artifact": "/home/hvl-robotics2404/saps-openpi-replication/outputs/physical_pi05_droid_p1b/p1b_execute_20260914T113026Z/actions.npz",
+  "artifact_sha256": "0a9079ad0b429d16c18f1ef294cf66bced70d727db127a30cd9f7a5180d8dec0",
+  "selected_action_indices": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7
+  ],
+  "full_chunk_shape": [
+    15,
+    8
+  ],
+  "execute": true,
+  "clock": {
+    "clock": "CLOCK_MONOTONIC",
+    "hostname": "hvl-robotics2404",
+    "boot_id": "86683708-73c3-4834-8a2a-476b17ec267f",
+    "time_namespace": "time:[4026531834]",
+    "python_clock_implementation": "clock_gettime(CLOCK_MONOTONIC)",
+    "clock_verified": true
+  }
+}
