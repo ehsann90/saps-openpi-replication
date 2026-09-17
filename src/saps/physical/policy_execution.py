@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 from enum import Enum
 import json
 from pathlib import Path
@@ -36,6 +37,19 @@ class TaskOutcome(str, Enum):
 def unevaluated_outcome(replan: dict[str, Any]) -> TaskOutcome:
     """Validation-only provider; no physical success detector is installed."""
     return TaskOutcome.CONTINUE
+
+
+def execution_evidence_snapshot(
+    boundary: Any, start: int,
+) -> list[dict[str, Any]]:
+    """Isolate C1-C2 evidence without blocking callbacks during deep copy.
+
+    The boundary appends completed records and never mutates saved records.
+    Capture the prefix under its lock, then detach nested data outside it.
+    """
+    with boundary.lock:
+        records = boundary.records[start:]
+    return copy.deepcopy(records)
 
 
 def validate_execution_delivery(
@@ -157,30 +171,40 @@ def run_policy_episode(
     monotonic = lambda: now() / 1e9
     current: dict[str, Any] | None = None
     phase = "warmup"
+    confirmation_start: int | None = None
 
     def evidence() -> list[dict[str, Any]]:
-        return captured_records(boundary, analysis_start)
+        return execution_evidence_snapshot(boundary, analysis_start)
 
     def delivery() -> dict[str, Any]:
         return validate_execution_delivery(evidence(), rows, analyzer,
                                            expected_identity)
 
     def confirm() -> None:
+        if confirmation_start is None:
+            raise RuntimeError("missing_hold_evidence_cursor")
+        row = rows[-1]
         deadline = now() + int(application_timeout * 1e9)
         while now() < deadline:
-            validation = delivery()
-            rows[-1]["last_application_validation"] = validation
+            # Copy and join only evidence acquired since this hold's publish
+            # boundary. Full-prefix audits remain outside the online deadline.
+            validation = validate_execution_delivery(
+                captured_records(boundary, confirmation_start), [row],
+                analyzer, expected_identity,
+            )
+            row["last_application_validation"] = validation
             if validation["accepted"] and now() < deadline:
-                if rows[-1]["timing"]["t4_ns"] > now():
+                if row["timing"]["t4_ns"] > now():
                     raise RuntimeError("controller_application_is_in_the_future")
-                rows[-1]["application_confirmation"] = validation
-                rows[-1]["confirmation_monotonic_ns"] = now()
+                row["application_confirmation"] = validation
+                row["confirmation_monotonic_ns"] = now()
                 return
             sleep(.01)
         raise TimeoutError("hold_application_confirmation_timeout")
 
     def send(action: Any, index: int | None, kind: str,
              eligible: int, scheduled: int, origin: int) -> dict[str, Any]:
+        nonlocal confirmation_start
         if kind != "abort_hold":
             check_runtime()
         previous = rows[-1]["q_ref_source_stamp_ns"] if rows else 0
@@ -214,12 +238,34 @@ def run_policy_episode(
             raise RuntimeError("safety_gate_rejected")
         if now() - scheduled >= PERIOD_NS:
             raise RuntimeError("missed_complete_action_interval")
+        if kind in ("pre_inference_hold", "terminal_hold"):
+            with boundary.lock:
+                confirmation_start = len(boundary.records)
         boundary.publish(row, state, origin)
         return row
 
     def hold(kind: str) -> dict[str, Any]:
         requested = now()
         return send(None, None, kind, requested, requested, requested)
+
+    def reacquire_readiness(record: dict[str, Any]) -> None:
+        start = now()
+        deadline = start + int(application_timeout * 1e9)
+        record.update(start_monotonic_ns=start, checks=0, accepted=False)
+        try:
+            while now() < deadline:
+                record["checks"] += 1
+                reasons = boundary.snapshot().readiness_reasons
+                record["last_readiness_reasons"] = list(reasons)
+                if not reasons and now() < deadline:
+                    record["accepted"] = True
+                    return
+                remaining = deadline - now()
+                if remaining > 0:
+                    sleep(min(.01, remaining / 1e9))
+            raise TimeoutError("readiness_reacquisition_timeout")
+        finally:
+            record["end_monotonic_ns"] = now()
 
     try:
         readiness = boundary.snapshot().readiness_reasons
@@ -293,15 +339,22 @@ def run_policy_episode(
             result["terminal_holds_applied"] += 1
             phase = "delivery_validation"
             sleep(POST_HOLD_DRAIN_SECONDS)
+            timing = {"drain_completion_monotonic_ns": now()}
+            current["post_chunk_timing"] = timing
             check_runtime()
-            current["delivery_validation"] = delivery()
+            timing["evidence_snapshot_start_monotonic_ns"] = now()
+            records = evidence()
+            timing["evidence_snapshot_end_monotonic_ns"] = now()
+            current["delivery_validation"] = validate_execution_delivery(
+                records, rows, analyzer, expected_identity)
             current["inference"]["hold_audit"] = audit_inference_hold(
-                evidence(), current["pre_hold"], current["inference"])
+                records, current["pre_hold"], current["inference"])
             current["runtime_health"] = validate_streaming_runtime_health(
-                evidence(), current["actions"] + [current["terminal_hold"]],
+                records, current["actions"] + [current["terminal_hold"]],
                 hold_type="terminal_hold",
                 after_monotonic_ns=current["terminal_hold"]["timing"]["t4_ns"],
             )
+            timing["validation_completion_monotonic_ns"] = now()
             if (not current["delivery_validation"]["accepted"]
                     or not current["inference"]["hold_audit"]["accepted"]
                     or not current["runtime_health"]["accepted"]):
@@ -320,6 +373,10 @@ def run_policy_episode(
                     and result["completed_main_replans"] >= max_executed_policy_chunks):
                 result["termination"]["termination_reason"] = "test_chunk_limit_reached"
                 break
+            if index + 1 < max_replans:
+                phase = "readiness_reacquisition"
+                current["readiness_reacquisition"] = {}
+                reacquire_readiness(current["readiness_reacquisition"])
         else:
             result["termination"]["termination_reason"] = "safety_replan_limit_reached"
         result["status"] = "success"  # Software validation only.
@@ -329,8 +386,10 @@ def run_policy_episode(
         result["termination"].update(termination_reason="runtime_abort",
                                      task_outcome="abort")
         # Exactly one best-effort fresh hold; no remaining action is attempted.
+        # During readiness reacquisition the confirmed terminal hold remains
+        # installed; the command-free barrier must not attempt another hold.
         # A terminal-hold failure has already consumed that hold attempt.
-        if phase != "terminal_hold":
+        if phase not in ("terminal_hold", "readiness_reacquisition"):
             try:
                 with boundary.lock:
                     abort_start = len(boundary.records)

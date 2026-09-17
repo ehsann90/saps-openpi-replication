@@ -49,6 +49,35 @@ includes state acquisition and preparation latency. This Python/ROS runtime
 does not guarantee zero physical publication jitter: it records actual T0 and
 lateness and rejects a whole missed interval, as C1-B does.
 
+Pre-hold and terminal-hold confirmation use an evidence cursor captured just
+before publication. Within the unchanged 0.25-second default deadline, only
+that target and evidence acquired from its cursor onward are validated,
+including run/source stamp, T0, desired q, controller identity, and unique
+forwarder/callback/application evidence. Confirmation cost therefore does not
+grow with prior episode telemetry. The confirmation's target counts describe
+one hold; they are not a full-prefix audit. After the terminal hold and drain,
+the unchanged full-prefix delivery audit remains authoritative for sequence
+continuity, gaps, publication errors, application order, identity, and all prior
+targets; it must pass before another replan.
+
+Post-chunk delivery, inference-hold, and health validation share one detached
+evidence snapshot taken after the drain. C1-C2 copies the append-only record
+references under the boundary lock, then deep-copies outside it so callbacks
+can refresh readiness during expensive history processing. The full audit
+still grows with the recorded prefix; it is outside the bounded online waits.
+After a successful audit and CONTINUE, if another replan is permitted, a
+command-free readiness barrier waits up to the application-confirmation bound
+(default 0.25 s) for all snapshot readiness reasons to clear. The 300 ms active
+evidence TTL and publication safety checks remain unchanged. Timeout stops the
+episode with the confirmed terminal hold in place, without another hold or
+inference request.
+
+Each replan records `post_chunk_timing` with drain completion, evidence-snapshot
+start/end, and validation completion in monotonic nanoseconds. When another
+replan is allowed, `readiness_reacquisition` records start/end monotonic times,
+check count, acceptance, and the last readiness reasons. These are additive
+diagnostic fields; outcome and action semantics are unchanged.
+
 Unique terminal T4 confirmation and the unchanged two-second evidence drain
 precede delivery/health validation and outcome evaluation. There is no
 convergence wait. CONTINUE establishes a new pre-hold; SUCCESS, FAILURE and
@@ -163,6 +192,43 @@ unimplemented. Repeated replanning also remains to be physically validated.
 Frozen evidence is archived under:
 
 `docs/validation/2026-09-17_c1c2_test1/`
+
+### Repeated-runtime cold-start validation — 2026-09-17
+
+The repeated arm runtime was physically validated under a deliberately
+reproduced cold inference-server condition using run
+`c1c2_2chunk_cold_20260917T114502Z`.
+
+The discarded startup warm-up incurred a 3.364 s client round trip. The two
+subsequent action-producing requests completed in 127.8 ms and 114.2 ms,
+respectively. The runtime completed `replan_index = 0` and `1`, executed
+exactly 16 policy arm actions, applied two terminal measured-q holds, and
+terminated with `task_outcome = continue` and
+`termination_reason = test_chunk_limit_reached`.
+
+The qualifying run followed two informative failed two-chunk attempts. The
+first exposed full-history work inside the bounded T4 confirmation path and
+motivated target-local cursor confirmation. A later cold-server run completed
+chunk 0 but rejected the next pre-hold because controller-active evidence had
+expired during post-chunk history processing. This motivated the shared
+detached evidence snapshot and explicit command-free readiness reacquisition
+barrier.
+
+In the qualifying cold run, replan 0's post-chunk evidence snapshot required
+211.6 ms and shared validation another 15.5 ms. The runtime then explicitly
+reacquired current readiness before publishing the replan-1 pre-hold. The
+final full-prefix delivery audit accepted all 20 targets with one continuous
+controller application sequence, and both per-replan runtime-health checks
+reported zero Franka health violations.
+
+This closes the C1-C2 repeated arm-runtime validation gate. It does not
+validate physical gripper actuation, manipulation-task success, a task
+SUCCESS/FAILURE detector, or the observed task-level direction of policy
+motion.
+
+Frozen evidence is archived under:
+
+`docs/validation/2026-09-17_c1c2_repeated_cold/`
 
 ## Evidence
 

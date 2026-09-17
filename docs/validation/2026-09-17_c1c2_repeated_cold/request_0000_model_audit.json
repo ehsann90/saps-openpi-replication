@@ -1,0 +1,158 @@
+{
+  "boundary": "actual OpenPI Policy._sample_actions observation",
+  "prompt": "Pick up the object",
+  "image_mapping": {
+    "observation/exterior_image_1_left": "base_0_rgb",
+    "observation/wrist_image_left": "left_wrist_0_rgb"
+  },
+  "image_masks": {
+    "base_0_rgb": true,
+    "left_wrist_0_rgb": true,
+    "right_wrist_0_rgb": false
+  },
+  "canonical_arrays": {
+    "observation/exterior_image_1_left": {
+      "shape": [
+        180,
+        320,
+        3
+      ],
+      "dtype": "uint8",
+      "sha256": "733e7f96adfd3f8598ffe18805af4d80646a40d534f0626db1827d1838bd16db"
+    },
+    "observation/wrist_image_left": {
+      "shape": [
+        180,
+        320,
+        3
+      ],
+      "dtype": "uint8",
+      "sha256": "d751d97b2ec5a3761c98ef847ce51354d151d243c4a5c4c43fea2c3cae059a6c"
+    },
+    "observation/joint_position": {
+      "shape": [
+        7
+      ],
+      "dtype": "float32",
+      "sha256": "c3ac4f9e90d2ac31fdd50d9421ac328d7f724563757f660632b5887313f91486"
+    },
+    "observation/gripper_position": {
+      "shape": [
+        1
+      ],
+      "dtype": "float32",
+      "sha256": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119"
+    }
+  },
+  "arrays": {
+    "transformed/base_0_rgb": {
+      "shape": [
+        224,
+        224,
+        3
+      ],
+      "dtype": "uint8",
+      "sha256": "9fac1fa9588e214559045f5bc0fa0381b4ffa2b17fe5a655df4705074dc82ab8"
+    },
+    "model/base_0_rgb": {
+      "shape": [
+        1,
+        224,
+        224,
+        3
+      ],
+      "dtype": "float32",
+      "sha256": "aa2a6f7850d1ced641d81c564138e23e7b0275fea9af77114cc91000f63cc367"
+    },
+    "mask/base_0_rgb": {
+      "shape": [
+        1
+      ],
+      "dtype": "bool",
+      "sha256": "4bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a"
+    },
+    "transformed/left_wrist_0_rgb": {
+      "shape": [
+        224,
+        224,
+        3
+      ],
+      "dtype": "uint8",
+      "sha256": "0313b039febcc5bf545d338482014a7d0def9e131a1a67d7d7f3f0743c152ec0"
+    },
+    "model/left_wrist_0_rgb": {
+      "shape": [
+        1,
+        224,
+        224,
+        3
+      ],
+      "dtype": "float32",
+      "sha256": "4092ff2de39ab31636f77859bad00689a9c76536a0f1e5ff0ca6e843632ffd76"
+    },
+    "mask/left_wrist_0_rgb": {
+      "shape": [
+        1
+      ],
+      "dtype": "bool",
+      "sha256": "4bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a"
+    },
+    "transformed/right_wrist_0_rgb": {
+      "shape": [
+        224,
+        224,
+        3
+      ],
+      "dtype": "uint8",
+      "sha256": "0a3f0ee9e3cbab26f89ed53b7b20e22cb985b650fd4c52ef57e4aeb27560d773"
+    },
+    "model/right_wrist_0_rgb": {
+      "shape": [
+        1,
+        224,
+        224,
+        3
+      ],
+      "dtype": "float32",
+      "sha256": "811b0abfb7b806545700b3a1b9513d4ff52fd7da3ac337ae9ca69772f74e8415"
+    },
+    "mask/right_wrist_0_rgb": {
+      "shape": [
+        1
+      ],
+      "dtype": "bool",
+      "sha256": "6e340b9cffb37a989ca544e6bb780a2c78901d3fb33738768511a30617afa01d"
+    },
+    "state": {
+      "shape": [
+        1,
+        32
+      ],
+      "dtype": "float32",
+      "sha256": "6313701360ab2b43cafdb0dbbd21289d4dc7a072393eb9a1e506dc44f3417821"
+    },
+    "tokenized_prompt": {
+      "shape": [
+        1,
+        200
+      ],
+      "dtype": "int32",
+      "sha256": "a92d71581dc22193a0fe4e4d3bb5656a85b505b376cbe2a6ef55e0d84437b2c7"
+    },
+    "tokenized_prompt_mask": {
+      "shape": [
+        1,
+        200
+      ],
+      "dtype": "bool",
+      "sha256": "ac4a8ca732492d7115351ca17af5603e3729d486c37aaa49cd0a37bfdd1fa752"
+    }
+  },
+  "bundle": "model_audit/model_input.npz",
+  "visual_images": [
+    "model_audit/base_0_rgb.png",
+    "model_audit/left_wrist_0_rgb.png",
+    "model_audit/right_wrist_0_rgb.png"
+  ],
+  "token_count": 43
+}
