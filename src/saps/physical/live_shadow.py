@@ -144,9 +144,13 @@ def prepare_live_request(
     spin_once: Callable[[], None], config: dict[str, Any],
     record: dict[str, Any], gate: CameraPairGate,
     monotonic: Callable[[], float] = time.monotonic,
+    source_barrier_ros_seconds: float | None = None,
 ) -> tuple[Any, Path]:
     """Acquire, validate and persist a fresh observation; no command interface."""
 
+    if (source_barrier_ros_seconds is not None
+            and not np.isfinite(source_barrier_ros_seconds)):
+        raise ValueError("Source timestamp barrier must be finite")
     deadline = monotonic() + observation_timeout
     last_error = None
     while True:
@@ -162,6 +166,15 @@ def prepare_live_request(
             continue
         try:
             observation = collector.assemble()
+            if source_barrier_ros_seconds is not None:
+                sources = (
+                    observation.wrist_frame, observation.exterior_frame,
+                    observation.joint_snapshot, observation.gripper_snapshot,
+                )
+                # Receive times cannot exclude old messages queued during infer.
+                if not all(source.stamp.ros_seconds > source_barrier_ros_seconds
+                           for source in sources):
+                    raise ValueError("Source timestamps must exceed warm-up response barrier")
         except ValueError as error:
             last_error = str(error)
             record["last_rejected_observation"] = last_error
@@ -207,9 +220,11 @@ def infer_live_request(
     monotonic: Callable[[], float] = time.monotonic,
     call_timing: dict[str, Any] | None = None,
     monotonic_ns: Callable[[], int] = time.monotonic_ns,
+    audit_model_input: bool | None = None,
 ) -> float:
     """Submit once and retain the existing native response and model audit."""
 
+    audit_requested = index == 0 if audit_model_input is None else audit_model_input
     start_ros, start_mono, start_utc = ros_now(), monotonic(), utc_now()
     age = start_ros - observation.timing.oldest_source_ros_seconds
     if age < 0 or age > config["freshness"]["maximum_source_age_seconds"]:
@@ -219,7 +234,7 @@ def infer_live_request(
     try:
         response = policy.infer(
             observation.policy_input, policy_episode_seed=policy_episode_seed,
-            replan_index=index, audit_model_input=index == 0,
+            replan_index=index, audit_model_input=audit_requested,
         )
     finally:
         if call_timing is not None:
@@ -270,7 +285,7 @@ def infer_live_request(
         raise ValueError("P0 requires the seeded noise SHA-256.")
     if response.policy_timing is None or response.server_timing is None:
         raise ValueError("P0 requires model and server timing evidence.")
-    if index == 0:
+    if audit_requested:
         audit_record = save_model_audit(
             response.model_input_audit, observation.policy_input,
             sample_dir / "model_audit",

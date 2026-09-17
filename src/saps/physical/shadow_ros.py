@@ -128,7 +128,7 @@ def node_interface_evidence(node: Any) -> dict[str, Any]:
     }
 
 
-def run_shadow(args: Any) -> None:
+def run_shadow(args: Any, *, warmup_policy_seed: int | None = None) -> None:
     """Allocate a unique run, preflight, infer finitely, and always finalize."""
 
     if (not isinstance(args.prompt, str) or not args.prompt.strip()
@@ -137,6 +137,13 @@ def run_shadow(args: Any) -> None:
                 args.observation_timeout, args.policy_timeout,
             ))):
         raise ValueError("Positive finite counts/timeouts and a valid episode seed are required.")
+    warmup = None
+    if warmup_policy_seed is not None:
+        from saps.physical.policy_warmup import PolicyWarmup
+        warmup = PolicyWarmup(
+            warmup_policy_seed=warmup_policy_seed,
+            policy_episode_seed=args.policy_episode_seed,
+        )
     config = load_shadow_config(args.config)
     args.output_dir.mkdir(parents=True, exist_ok=False)
     started = time.monotonic()
@@ -155,6 +162,12 @@ def run_shadow(args: Any) -> None:
             "platform": platform.platform(), "numpy": np.__version__, "opencv": cv2.__version__,
         },
     }
+    if warmup is not None:
+        record.update(
+            milestone="physical_c1c2_warmup", requested_requests=0,
+            warmup=warmup.record, policy_actions_executed=0,
+            gripper_commands_issued=0, post_warmup_observation_acquired=False,
+        )
     node = None
     transport = None
     collector = None
@@ -207,20 +220,34 @@ def run_shadow(args: Any) -> None:
         record["camera_identity"] = camera_serial_evidence(config)
         transport = BoundedWebsocketClient(args.host, args.port, args.policy_timeout)
         policy = OpenPiDroidPolicy(client=transport)
-        run_live_loop(
-            collector=collector, policy=policy, output_dir=args.output_dir,
-            request_count=args.requests, policy_episode_seed=args.policy_episode_seed,
-            observation_timeout=args.observation_timeout,
-            spin_once=lambda: rclpy.spin_once(node, timeout_sec=0.05),
-            ros_now=lambda: node.get_clock().now().nanoseconds / 1e9,
-            config=config, record=record,
-        )
+        if warmup is None:
+            run_live_loop(
+                collector=collector, policy=policy, output_dir=args.output_dir,
+                request_count=args.requests, policy_episode_seed=args.policy_episode_seed,
+                observation_timeout=args.observation_timeout,
+                spin_once=lambda: rclpy.spin_once(node, timeout_sec=0.05),
+                ros_now=lambda: node.get_clock().now().nanoseconds / 1e9,
+                config=config, record=record,
+            )
+        else:
+            from saps.physical.policy_warmup import prepare_warmed_observation
+            prepare_warmed_observation(
+                warmup=warmup, collector=collector, policy=policy,
+                output_dir=args.output_dir,
+                observation_timeout=args.observation_timeout,
+                spin_once=lambda: rclpy.spin_once(node, timeout_sec=0.05),
+                ros_now=lambda: node.get_clock().now().nanoseconds / 1e9,
+                config=config, record=record,
+            )
         record["final_ros_graph"] = validate_graph(node, config)
         record["final_node_interfaces"] = node_interface_evidence(node)
         record["final_camera_identity"] = camera_serial_evidence(config)
         if record["final_ros_graph"] != record["initial_ros_graph"]:
             raise RuntimeError("Source publisher endpoints changed during the run.")
-        record["termination_reason"] = "request_count_reached"
+        record["termination_reason"] = (
+            "request_count_reached" if warmup is None
+            else "warmup_validated_new_observation_acquired"
+        )
     except BaseException as error:
         record["termination_reason"] = (
             "interrupted" if isinstance(error, KeyboardInterrupt) else "error"

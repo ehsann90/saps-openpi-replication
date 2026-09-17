@@ -1,0 +1,501 @@
+{
+  "schema_version": 1,
+  "milestone": "physical_c1c2_warmup",
+  "run_id": "c1c2w_20260917T073653Z",
+  "start_utc": "2026-09-17T07:36:53.675676+00:00",
+  "execution_enabled": false,
+  "actuation": {
+    "published_robot_command_topics": [],
+    "called_robot_services": [],
+    "called_robot_actions": [],
+    "policy_actions_executed": 0,
+    "gripper_commands_issued": 0,
+    "robot_command_action_clients": 0
+  },
+  "config": {
+    "schema_version": 1,
+    "milestone": "physical_pi05_droid_p0",
+    "execution_enabled": false,
+    "policy": {
+      "config": "pi05_droid",
+      "checkpoint": "gs://openpi-assets/checkpoints/pi05_droid",
+      "openpi_commit": "15a9616a00943ada6c20a0f158e3adb39df2ccac",
+      "action_shape": [
+        15,
+        8
+      ],
+      "reference_future_open_loop_horizon": 8
+    },
+    "wrist_camera": {
+      "role": "wrist",
+      "serial": "342222073510",
+      "model": "Intel RealSense D435I",
+      "topic": "/camera/wrist_camera/color/image_raw",
+      "node": "/camera/wrist_camera"
+    },
+    "exterior_camera": {
+      "role": "exterior",
+      "serial": "244222076317",
+      "model": "Intel RealSense D435I",
+      "topic": "/camera/external_camera/color/image_raw",
+      "node": "/camera/external_camera"
+    },
+    "robot": {
+      "joint_state_topic": "/franka/joint_states",
+      "gripper_state_topic": "/franka_gripper/joint_states",
+      "maximum_finger_position_m": 0.04,
+      "base_frame": "fr3_link0",
+      "tcp_frame": "fr3_hand_tcp"
+    },
+    "native_images": {
+      "shape": [
+        720,
+        1280,
+        3
+      ],
+      "encoding": "rgb8",
+      "expected_rate_hz": 30,
+      "hardware_synchronized": false
+    },
+    "client_images": {
+      "shape": [
+        180,
+        320,
+        3
+      ],
+      "dtype": "uint8",
+      "color_order": "RGB",
+      "preprocessing": "existing centre crop to 16:9 then OpenCV INTER_AREA downsize; INTER_LINEAR for upsize"
+    },
+    "freshness": {
+      "maximum_source_age_seconds": 0.5,
+      "maximum_cross_source_skew_seconds": 0.25
+    }
+  },
+  "prompt": "Pick up the object",
+  "policy_episode_seed": 20260827,
+  "requested_requests": 0,
+  "completed_requests": 0,
+  "timeouts_seconds": {
+    "observation": 30,
+    "policy": 120
+  },
+  "runtime": {
+    "ros_distro": "jazzy",
+    "python": "3.12.3 (main, Aug 31 2026, 10:18:26) [GCC 13.3.0]",
+    "platform": "Linux-6.8.1-1048-realtime-x86_64-with-glibc2.39",
+    "numpy": "1.26.4",
+    "opencv": "4.6.0"
+  },
+  "warmup": {
+    "attempted": true,
+    "completed": true,
+    "request_count": 1,
+    "policy_seed": 20260917,
+    "replan_index": 0,
+    "audit_model_input": false,
+    "actions_executed": 0,
+    "policy_actions_executed": 0,
+    "gripper_commands_issued": 0,
+    "target_publications": 0,
+    "response_discarded": true,
+    "excluded_from_episode_timing": true,
+    "duplicate_or_nonadvancing_pair_checks": 0,
+    "last_rejected_observation": "stale physical observation sources: {'exterior_image': 6.123610734939575}",
+    "server_metadata": {
+      "saps_seeded_sampling": {
+        "protocol_version": 1,
+        "action_horizon": 15,
+        "latent_action_dim": 32,
+        "policy_config_name": "pi05_droid",
+        "policy_checkpoint": "gs://openpi-assets/checkpoints/pi05_droid"
+      },
+      "saps_model_input_audit": {
+        "schema_version": 1,
+        "runtime": {
+          "python": "3.11.9 (main, Aug 14 2024, 05:07:28) [Clang 18.1.8 ]",
+          "jax": "0.5.3",
+          "numpy": "1.26.4"
+        },
+        "openpi_commit": "15a9616a00943ada6c20a0f158e3adb39df2ccac"
+      }
+    },
+    "request_started_monotonic_seconds": 3644.930514615,
+    "response_completed_monotonic_seconds": 3645.049520416,
+    "response_completed_ros_seconds": 1789630620.3672678,
+    "client_round_trip_seconds": 0.11888232100000096,
+    "server_timing": {
+      "infer_ms": 113.03492100023504
+    },
+    "policy_timing": {
+      "infer_ms": 91.19772199983345
+    },
+    "observation_age_at_request_seconds": 0.16560745239257812,
+    "observation_age_at_response_seconds": 0.28464627265930176,
+    "actions_returned_shape": [
+      15,
+      8
+    ],
+    "request_start_monotonic_ns": 3644930529453,
+    "response_completion_monotonic_ns": 3645049519715
+  },
+  "policy_actions_executed": 0,
+  "gripper_commands_issued": 0,
+  "post_warmup_observation_acquired": true,
+  "provenance": {
+    "repository": {
+      "path": "/home/hvl-robotics2404/saps-openpi-replication",
+      "available": true,
+      "branch": "experiment/physical-fr3-saps",
+      "commit": "35fcecc0239640cee9fc5be59c2fc46767318b77",
+      "status": [
+        "M Makefile",
+        " A docs/physical_c1c2_warmup.md",
+        " A scripts/physical_policy_warmup.py",
+        " M src/saps/physical/live_shadow.py",
+        " A src/saps/physical/policy_warmup.py",
+        " M src/saps/physical/shadow_ros.py",
+        " A tests/unit/test_physical_policy_warmup.py"
+      ],
+      "dirty": true
+    },
+    "openpi": {
+      "path": "/home/hvl-robotics2404/saps-openpi-replication/third_party/openpi",
+      "available": true,
+      "branch": "",
+      "commit": "15a9616a00943ada6c20a0f158e3adb39df2ccac",
+      "status": [],
+      "dirty": false
+    },
+    "fr3_lab_stack": {
+      "path": "/home/hvl-robotics2404/franka_ros2_ws/src/fr3_lab_stack",
+      "available": true,
+      "branch": "main",
+      "commit": "9e535b665626cf8f3894fc4d2ef9136790abad92",
+      "status": [],
+      "dirty": false
+    },
+    "igd_fr3_control": {
+      "path": "/home/hvl-robotics2404/franka_ros2_ws/src/igd_fr3_control",
+      "available": true,
+      "branch": "commissioning/fr3-spacemouse",
+      "commit": "438e4ae3145944042033395940848bf107cb9965",
+      "status": [
+        "M igd_fr3_control/view_capture.py",
+        "?? igd_fr3_control/display_grasp_rviz.py",
+        "?? igd_fr3_control/test_grasp.py",
+        "?? igd_fr3_control/view_capture2.py"
+      ],
+      "dirty": true,
+      "expected_branch": "commissioning/fr3-spacemouse"
+    }
+  },
+  "initial_node_interfaces": {
+    "published_topics": [
+      "/parameter_events"
+    ],
+    "service_clients": [],
+    "robot_command_publishers": 0
+  },
+  "initial_ros_graph": {
+    "joint_state": {
+      "topic": "/franka/joint_states",
+      "node": "/joint_state_broadcaster",
+      "type": "sensor_msgs/msg/JointState",
+      "publisher_gid": [
+        1,
+        15,
+        245,
+        116,
+        173,
+        41,
+        244,
+        94,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        214,
+        3
+      ]
+    },
+    "gripper_state": {
+      "topic": "/franka_gripper/joint_states",
+      "node": "/franka_gripper",
+      "type": "sensor_msgs/msg/JointState",
+      "publisher_gid": [
+        1,
+        15,
+        245,
+        116,
+        176,
+        41,
+        233,
+        169,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        54,
+        3
+      ]
+    },
+    "wrist_camera": {
+      "topic": "/camera/wrist_camera/color/image_raw",
+      "node": "/camera/wrist_camera",
+      "type": "sensor_msgs/msg/Image",
+      "publisher_gid": [
+        1,
+        15,
+        245,
+        116,
+        60,
+        66,
+        49,
+        167,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        53,
+        3
+      ]
+    },
+    "exterior_camera": {
+      "topic": "/camera/external_camera/color/image_raw",
+      "node": "/camera/external_camera",
+      "type": "sensor_msgs/msg/Image",
+      "publisher_gid": [
+        1,
+        15,
+        245,
+        116,
+        61,
+        66,
+        51,
+        168,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        53,
+        3
+      ]
+    }
+  },
+  "camera_identity": {
+    "wrist_camera": {
+      "command": [
+        "ros2",
+        "param",
+        "get",
+        "--hide-type",
+        "/camera/wrist_camera",
+        "serial_no"
+      ],
+      "raw_parameter": "_342222073510",
+      "serial": "342222073510",
+      "read_utc": "2026-09-17T07:36:56.697142+00:00",
+      "identity_source": "RealSense serial_no parameter"
+    },
+    "exterior_camera": {
+      "command": [
+        "ros2",
+        "param",
+        "get",
+        "--hide-type",
+        "/camera/external_camera",
+        "serial_no"
+      ],
+      "raw_parameter": "_244222076317",
+      "serial": "244222076317",
+      "read_utc": "2026-09-17T07:37:00.125011+00:00",
+      "identity_source": "RealSense serial_no parameter"
+    }
+  },
+  "post_warmup_source_barrier_ros_seconds": 1789630620.3672678,
+  "duplicate_or_nonadvancing_pair_checks": 3,
+  "last_rejected_observation": "Source timestamps must exceed warm-up response barrier",
+  "first_real_replan_index": 0,
+  "final_ros_graph": {
+    "joint_state": {
+      "topic": "/franka/joint_states",
+      "node": "/joint_state_broadcaster",
+      "type": "sensor_msgs/msg/JointState",
+      "publisher_gid": [
+        1,
+        15,
+        245,
+        116,
+        173,
+        41,
+        244,
+        94,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        214,
+        3
+      ]
+    },
+    "gripper_state": {
+      "topic": "/franka_gripper/joint_states",
+      "node": "/franka_gripper",
+      "type": "sensor_msgs/msg/JointState",
+      "publisher_gid": [
+        1,
+        15,
+        245,
+        116,
+        176,
+        41,
+        233,
+        169,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        54,
+        3
+      ]
+    },
+    "wrist_camera": {
+      "topic": "/camera/wrist_camera/color/image_raw",
+      "node": "/camera/wrist_camera",
+      "type": "sensor_msgs/msg/Image",
+      "publisher_gid": [
+        1,
+        15,
+        245,
+        116,
+        60,
+        66,
+        49,
+        167,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        53,
+        3
+      ]
+    },
+    "exterior_camera": {
+      "topic": "/camera/external_camera/color/image_raw",
+      "node": "/camera/external_camera",
+      "type": "sensor_msgs/msg/Image",
+      "publisher_gid": [
+        1,
+        15,
+        245,
+        116,
+        61,
+        66,
+        51,
+        168,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        53,
+        3
+      ]
+    }
+  },
+  "final_node_interfaces": {
+    "published_topics": [
+      "/parameter_events"
+    ],
+    "service_clients": [],
+    "robot_command_publishers": 0
+  },
+  "final_camera_identity": {
+    "wrist_camera": {
+      "command": [
+        "ros2",
+        "param",
+        "get",
+        "--hide-type",
+        "/camera/wrist_camera",
+        "serial_no"
+      ],
+      "raw_parameter": "_342222073510",
+      "serial": "342222073510",
+      "read_utc": "2026-09-17T07:37:01.410241+00:00",
+      "identity_source": "RealSense serial_no parameter"
+    },
+    "exterior_camera": {
+      "command": [
+        "ros2",
+        "param",
+        "get",
+        "--hide-type",
+        "/camera/external_camera",
+        "serial_no"
+      ],
+      "raw_parameter": "_244222076317",
+      "serial": "244222076317",
+      "read_utc": "2026-09-17T07:37:02.269889+00:00",
+      "identity_source": "RealSense serial_no parameter"
+    }
+  },
+  "termination_reason": "warmup_validated_new_observation_acquired",
+  "end_utc": "2026-09-17T07:37:02.269908+00:00",
+  "wall_clock_duration_seconds": 8.594239155000196,
+  "source_rates": {
+    "joint_state": {
+      "message_count": 58,
+      "first_source_ros_seconds": 1789630614.0806646,
+      "latest_source_ros_seconds": 1789630620.42568,
+      "source_duration_seconds": 6.345015287399292,
+      "source_rate_hz": 8.983429892312092,
+      "receive_duration_seconds": 6.344903237999915,
+      "receive_rate_hz": 8.983588537430231
+    },
+    "gripper_state": {
+      "message_count": 3,
+      "first_source_ros_seconds": 1789630620.1139593,
+      "latest_source_ros_seconds": 1789630620.4142838,
+      "source_duration_seconds": 0.3003244400024414,
+      "source_rate_hz": 6.659464677545862,
+      "receive_duration_seconds": 0.27037485099981495,
+      "receive_rate_hz": 7.397137687193284
+    },
+    "wrist_image": {
+      "message_count": 4,
+      "first_source_ros_seconds": 1789630620.0826216,
+      "latest_source_ros_seconds": 1789630620.3828363,
+      "source_duration_seconds": 0.3002147674560547,
+      "source_rate_hz": 9.99284620613854,
+      "receive_duration_seconds": 0.2713415109997186,
+      "receive_rate_hz": 11.056177836361762
+    },
+    "exterior_image": {
+      "message_count": 6,
+      "first_source_ros_seconds": 1789630613.9895604,
+      "latest_source_ros_seconds": 1789630620.392379,
+      "source_duration_seconds": 6.40281867980957,
+      "source_rate_hz": 0.7809060743461047,
+      "receive_duration_seconds": 6.40207048000002,
+      "receive_rate_hz": 0.7809973375988176
+    }
+  },
+  "callback_errors": {}
+}

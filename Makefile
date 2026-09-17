@@ -64,6 +64,7 @@ M3_PROMPT ?= pick up the object
 PHYSICAL_RUN_ID ?=
 PHYSICAL_PROMPT ?=
 PHYSICAL_REQUESTS ?= 10
+PHYSICAL_WARMUP_POLICY_SEED ?= 20260917
 PHYSICAL_PYTHON ?= $(CURDIR)/.venv-physical/bin/python
 PHYSICAL_CONFIG ?= configs/physical_pi05_fr3.json
 C1C1_APPLICATION_CONFIRMATION_TIMEOUT ?= 0.25
@@ -128,6 +129,7 @@ help:
 	@echo "  make physical-pi05-target-verify PHYSICAL_RUN_ID=<unique> PHYSICAL_PROMPT=<instruction>"
 	@echo "  make physical-pi05-shadow PHYSICAL_RUN_ID=<unique> PHYSICAL_PROMPT=<instruction>"
 	@echo "  make physical-m3-spacemouse  # subscriber/spnavd log only"
+	@echo "  make physical-c1c2-warmup PHYSICAL_RUN_ID=<unique> PHYSICAL_PROMPT=<instruction>"
 	@echo "  make physical-c1c1 PHYSICAL_RUN_ID=<unique> PHYSICAL_PROMPT=<instruction>"
 	@echo "  make autonomous-smoke"
 	@echo "  make autonomous-sweep NUM_TRIALS=20"
@@ -301,6 +303,20 @@ physical-pi05-shadow:
 		--config "$$PHYSICAL_CONFIG" \
 		--output-dir "outputs/physical_pi05_droid_p0/$$PHYSICAL_RUN_ID" \
 		--prompt "$$PHYSICAL_PROMPT" --requests "$$PHYSICAL_REQUESTS" \
+		--policy-episode-seed "$$DROID_POLICY_SEED"'
+
+.PHONY: physical-c1c2-warmup
+physical-c1c2-warmup: export PHYSICAL_WARMUP_POLICY_SEED := $(PHYSICAL_WARMUP_POLICY_SEED)
+physical-c1c2-warmup:
+	@test -n "$$PHYSICAL_RUN_ID" -a -n "$$PHYSICAL_PROMPT" || \
+		{ echo "Set an explicit PHYSICAL_RUN_ID and PHYSICAL_PROMPT."; exit 2; }
+	bash -c 'source /opt/ros/jazzy/setup.bash && \
+		source "$$FRANKA_ROS2_INSTALL/setup.bash" && \
+		export PYTHONPATH="$$PWD/src:$$PWD/third_party/openpi/packages/openpi-client/src:$${PYTHONPATH}" && \
+		"$$PHYSICAL_PYTHON" scripts/physical_policy_warmup.py \
+		--config "$$PHYSICAL_CONFIG" \
+		--output-dir "outputs/physical_c1c2_warmup/$$PHYSICAL_RUN_ID" \
+		--prompt "$$PHYSICAL_PROMPT" --warmup-policy-seed "$$PHYSICAL_WARMUP_POLICY_SEED" \
 		--policy-episode-seed "$$DROID_POLICY_SEED"'
 
 P1A_REQUESTS ?= 1
