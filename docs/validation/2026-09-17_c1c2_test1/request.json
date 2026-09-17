@@ -1,0 +1,239 @@
+{
+  "assembly_utc": "2026-09-17T09:23:14.824128+00:00",
+  "timing": {
+    "assembly_ros_seconds": 1789636994.8202136,
+    "assembly_monotonic_seconds": 10019.50248915,
+    "source_ros_seconds": {
+      "wrist_image": 1789636994.7858365,
+      "exterior_image": 1789636994.7883737,
+      "joint_state": 1789636994.8186476,
+      "gripper_state": 1789636994.8101404
+    },
+    "source_age_seconds": {
+      "wrist_image": 0.034377098083496094,
+      "exterior_image": 0.031839847564697266,
+      "joint_state": 0.0015659332275390625,
+      "gripper_state": 0.010073184967041016
+    },
+    "receive_age_seconds": {
+      "wrist_image": 0.0021766049994766945,
+      "exterior_image": 0.029159988000174053,
+      "joint_state": 0.0013929180004197406,
+      "gripper_state": 0.009887682999760727
+    },
+    "oldest_source_ros_seconds": 1789636994.7858365,
+    "newest_source_ros_seconds": 1789636994.8186476,
+    "cross_source_skew_seconds": 0.03281116485595703
+  },
+  "cameras": {
+    "wrist": {
+      "serial": "342222073510",
+      "model": "Intel RealSense D435I",
+      "topic": "/camera/wrist_camera/color/image_raw",
+      "source_encoding": "rgb8",
+      "native_shape": [
+        720,
+        1280,
+        3
+      ],
+      "preprocessing": "no crop (native 16:9); resize 1280x720->320x180 with INTER_AREA",
+      "stamp": {
+        "ros_seconds": 1789636994.7858365,
+        "receive_monotonic_seconds": 10019.500312545
+      },
+      "client_image": {
+        "shape": [
+          180,
+          320,
+          3
+        ],
+        "dtype": "uint8",
+        "sha256": "8055d6ef3dab44f7e3bf16989ce511df6fdd364901e40c13bddc01ef57dbd525"
+      },
+      "native_decoded_rgb": {
+        "shape": [
+          720,
+          1280,
+          3
+        ],
+        "dtype": "uint8",
+        "sha256": "38badfa00229aa7d76e13b71491caa312cd98ba614a80ed7b27c4278a180f965"
+      }
+    },
+    "exterior": {
+      "serial": "244222076317",
+      "model": "Intel RealSense D435I",
+      "topic": "/camera/external_camera/color/image_raw",
+      "source_encoding": "rgb8",
+      "native_shape": [
+        720,
+        1280,
+        3
+      ],
+      "preprocessing": "no crop (native 16:9); resize 1280x720->320x180 with INTER_AREA",
+      "stamp": {
+        "ros_seconds": 1789636994.7883737,
+        "receive_monotonic_seconds": 10019.473329162
+      },
+      "client_image": {
+        "shape": [
+          180,
+          320,
+          3
+        ],
+        "dtype": "uint8",
+        "sha256": "25572c1ee6dfcec772d92bc87a310269ed4f4d81ca3fdad31792b476d81ff524"
+      },
+      "native_decoded_rgb": {
+        "shape": [
+          720,
+          1280,
+          3
+        ],
+        "dtype": "uint8",
+        "sha256": "ed9415a519729a5a675f8863b67e1d42a5cda82dd2ac895d72e019ef9d16dd22"
+      }
+    }
+  },
+  "joint_names": [
+    "fr3_joint1",
+    "fr3_joint2",
+    "fr3_joint3",
+    "fr3_joint4",
+    "fr3_joint5",
+    "fr3_joint6",
+    "fr3_joint7"
+  ],
+  "joint_positions": [
+    -0.08928585797548294,
+    -0.12964920699596405,
+    -0.04572213813662529,
+    -2.4603610038757324,
+    -0.06058220937848091,
+    2.2852141857147217,
+    0.8704096078872681
+  ],
+  "joint_stamp": {
+    "ros_seconds": 1789636994.8186476,
+    "receive_monotonic_seconds": 10019.501096232
+  },
+  "gripper": {
+    "joint_names": [
+      "fr3_finger_joint1",
+      "fr3_finger_joint2"
+    ],
+    "finger_position_m": [
+      0.04003302752971649,
+      0.04003302752971649
+    ],
+    "width_m": 0.08006605505943298,
+    "maximum_width_m": 0.08,
+    "unclipped_closure": -0.0008256882429122925,
+    "closure": 0.0,
+    "closure_clipped": true,
+    "stamp": {
+      "ros_seconds": 1789636994.8101404,
+      "receive_monotonic_seconds": 10019.492601467
+    },
+    "finger_position_order": [
+      "fr3_finger_joint1",
+      "fr3_finger_joint2"
+    ]
+  },
+  "prompt": "Pick up the object",
+  "canonical_schema": {
+    "observation/exterior_image_1_left": {
+      "shape": [
+        180,
+        320,
+        3
+      ],
+      "dtype": "uint8",
+      "sha256": "25572c1ee6dfcec772d92bc87a310269ed4f4d81ca3fdad31792b476d81ff524"
+    },
+    "observation/wrist_image_left": {
+      "shape": [
+        180,
+        320,
+        3
+      ],
+      "dtype": "uint8",
+      "sha256": "8055d6ef3dab44f7e3bf16989ce511df6fdd364901e40c13bddc01ef57dbd525"
+    },
+    "observation/joint_position": {
+      "shape": [
+        7
+      ],
+      "dtype": "float32",
+      "sha256": "cd63f80254e9821b330ec782793aee4619e6ff5a5714e3223d40b14f9fc63326"
+    },
+    "observation/gripper_position": {
+      "shape": [
+        1
+      ],
+      "dtype": "float32",
+      "sha256": "df3f619804a92fdb4057192dc43dd748ea778adc52bc498ce80524c014b81119"
+    },
+    "prompt": {
+      "type": "str",
+      "value": "Pick up the object"
+    }
+  },
+  "request_index": 0,
+  "chunk_index": 0,
+  "replan_index": 0,
+  "policy_episode_seed": 20260827,
+  "observation_bundle": {
+    "path": "observation.npz",
+    "sha256": "798b98e1613610879b52a3cb10090506d3ff85b40a981431f699ae32a6bb7f5b"
+  },
+  "native_rgb_bundle": {
+    "path": "native_rgb.npz",
+    "sha256": "58953272b85178420255b222e69698effccd5677eaf7f8e007a5535b58e513e5"
+  },
+  "camera_pair_source_stamps": [
+    1789636994.7858365,
+    1789636994.7883737
+  ],
+  "source_rates": {
+    "joint_state": {
+      "message_count": 583,
+      "first_source_ros_seconds": 1789636990.4556923,
+      "latest_source_ros_seconds": 1789636994.9346316,
+      "source_duration_seconds": 4.4789392948150635,
+      "source_rate_hz": 129.94147982173777,
+      "receive_duration_seconds": 4.47919586900025,
+      "receive_rate_hz": 129.93403660418662
+    },
+    "gripper_state": {
+      "message_count": 11,
+      "first_source_ros_seconds": 1789636994.2219074,
+      "latest_source_ros_seconds": 1789636994.9099631,
+      "source_duration_seconds": 0.6880557537078857,
+      "source_rate_hz": 14.533705947680371,
+      "receive_duration_seconds": 0.6101550990006217,
+      "receive_rate_hz": 16.389275475004776
+    },
+    "wrist_image": {
+      "message_count": 20,
+      "first_source_ros_seconds": 1789636994.2527275,
+      "latest_source_ros_seconds": 1789636994.8857524,
+      "source_duration_seconds": 0.6330249309539795,
+      "source_rate_hz": 30.014615650866503,
+      "receive_duration_seconds": 0.6164370799997414,
+      "receive_rate_hz": 30.822286031216635
+    },
+    "exterior_image": {
+      "message_count": 19,
+      "first_source_ros_seconds": 1789636994.2880113,
+      "latest_source_ros_seconds": 1789636994.921803,
+      "source_duration_seconds": 0.6337916851043701,
+      "source_rate_hz": 28.400498812217513,
+      "receive_duration_seconds": 0.6168239750004432,
+      "receive_rate_hz": 29.18174508373652
+    }
+  },
+  "duplicate_or_nonadvancing_pair_checks": 0,
+  "reference_future_open_loop_horizon": 8,
+  "policy_actions_executed": 0
+}

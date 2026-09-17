@@ -1,0 +1,110 @@
+{
+  "request_index": 0,
+  "replan_index": 0,
+  "chunk_index": 0,
+  "request_started_utc": "2026-09-17T09:23:14.936642+00:00",
+  "request_started_ros_seconds": 1789636994.9366274,
+  "request_started_monotonic_seconds": 10019.618907256,
+  "observation_age_at_request_seconds": 0.15079092979431152,
+  "response_completed_utc": "2026-09-17T09:23:15.061994+00:00",
+  "response_completed_ros_seconds": 1789636995.0619786,
+  "response_completed_monotonic_seconds": 10019.744239824,
+  "observation_age_at_response_seconds": 0.2761421203613281,
+  "client_round_trip_seconds": 0.12526064200028486,
+  "policy_timing": {
+    "infer_ms": 95.214606000809
+  },
+  "server_timing": {
+    "infer_ms": 114.47561900058645,
+    "prev_total_ms": 2333.059782999044
+  },
+  "sampling_metadata": {
+    "protocol_version": 1,
+    "policy_episode_seed": 20260827,
+    "replan_index": 0,
+    "noise_sha256": "99c02c45985012fdceb1895f4919ddbe7c1e8c59adf0d6cc7c4cddb1fb518e0f",
+    "action_horizon": 15,
+    "latent_action_dim": 32
+  },
+  "response_keys": [
+    "actions",
+    "policy_timing",
+    "saps_model_input_audit",
+    "saps_sampling",
+    "server_timing"
+  ],
+  "action": {
+    "shape": [
+      15,
+      8
+    ],
+    "dtype": "float64",
+    "sha256": "8f8f91cdd66e4a482cdb1981d6a8f31767e852a2179f93da122b73a7dfa1b6f7"
+  },
+  "finite": true,
+  "action_bundle": {
+    "path": "actions.npz",
+    "sha256": "803290c73a754189ec183adbc8274c0e505a26ceaef750785969a61ddb62a8c2"
+  },
+  "per_dimension_summary": [
+    {
+      "dimension": 0,
+      "minimum": -0.09732112491384143,
+      "maximum": 0.004739365955352792,
+      "mean": -0.041364815146487925,
+      "standard_deviation": 0.03700403936648412
+    },
+    {
+      "dimension": 1,
+      "minimum": -0.04197676149755725,
+      "maximum": 0.011222920039951734,
+      "mean": -0.005240892361801896,
+      "standard_deviation": 0.014750857633891827
+    },
+    {
+      "dimension": 2,
+      "minimum": -0.053621973099857445,
+      "maximum": -0.03795727781450736,
+      "mean": -0.04787840178731668,
+      "standard_deviation": 0.0052825488163412634
+    },
+    {
+      "dimension": 3,
+      "minimum": -0.12467987762826682,
+      "maximum": 0.037612093192338936,
+      "mean": -0.056422676866859166,
+      "standard_deviation": 0.0539862674024729
+    },
+    {
+      "dimension": 4,
+      "minimum": -0.10365634316766259,
+      "maximum": 0.13800813211071494,
+      "mean": -0.00414476189743079,
+      "standard_deviation": 0.09728054463191946
+    },
+    {
+      "dimension": 5,
+      "minimum": -0.09308109552031751,
+      "maximum": 0.11386133916890628,
+      "mean": 0.036577737842726735,
+      "standard_deviation": 0.06616236574264156
+    },
+    {
+      "dimension": 6,
+      "minimum": -0.7807168579095602,
+      "maximum": -0.034397721185564945,
+      "mean": -0.3080210859245717,
+      "standard_deviation": 0.2877046381663689
+    },
+    {
+      "dimension": 7,
+      "minimum": 0.020484512772649528,
+      "maximum": 0.06100995943433047,
+      "mean": 0.035708947341996436,
+      "standard_deviation": 0.013528600998010053
+    }
+  ],
+  "returned_horizon": 15,
+  "reference_future_open_loop_horizon": 8,
+  "policy_actions_executed": 0
+}

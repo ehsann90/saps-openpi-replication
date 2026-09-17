@@ -36,7 +36,7 @@ from saps.policies.openpi_droid import OpenPiDroidPolicy
 C1B_BASE_COMMIT = "dc5ce5e1ee038d793f7b672cc72a5fffce8d06c2"
 
 
-def run_inference_hold(args: Any) -> int:
+def run_inference_hold(args: Any, *, policy_execution: bool = False) -> int:
     """Require explicit execution, preserve failure artifacts, never retry."""
     if (not args.execute or not args.prompt.strip()
             or not 0 <= args.policy_episode_seed <= 0x7fffffff
@@ -60,6 +60,12 @@ def run_inference_hold(args: Any) -> int:
             "application_confirmation": args.application_confirmation_timeout,
         },
     }
+    if policy_execution:
+        result.update(milestone="physical_c1c2", warmup={}, episode={},
+                      replans=[], termination={"task_outcome": "not_evaluated"},
+                      runtime_health={}, warmup_requests=0,
+                      main_policy_requests=0, completed_main_replans=0,
+                      policy_actions_scheduled=0, terminal_holds_applied=0)
     boundary = node = executor = transport = thread = collector = None
     initialized = False
     analysis_start = 0
@@ -103,7 +109,8 @@ def run_inference_hold(args: Any) -> int:
 
         rclpy.init(args=[])
         initialized = True
-        node = rclpy.create_node("saps_physical_c1c1_observation",
+        node = rclpy.create_node("saps_physical_c1c2_observation" if policy_execution
+                                 else "saps_physical_c1c1_observation",
                                  enable_rosout=False,
                                  start_parameter_services=False)
         executor = SingleThreadedExecutor()
@@ -149,13 +156,14 @@ def run_inference_hold(args: Any) -> int:
                     raise
                 time.sleep(0.01)
         result["expected_controller_identity"] = expected_identity
-        observation, sample_dir = prepare_live_request(
-            collector=collector, output_dir=args.output_dir, index=0,
-            policy_episode_seed=args.policy_episode_seed,
-            observation_timeout=args.observation_timeout,
-            spin_once=lambda: executor.spin_once(timeout_sec=0.05),
-            config=config, record=result, gate=CameraPairGate(),
-        )
+        if not policy_execution:
+            observation, sample_dir = prepare_live_request(
+                collector=collector, output_dir=args.output_dir, index=0,
+                policy_episode_seed=args.policy_episode_seed,
+                observation_timeout=args.observation_timeout,
+                spin_once=lambda: executor.spin_once(timeout_sec=0.05),
+                config=config, record=result, gate=CameraPairGate(),
+            )
 
         def observe() -> None:
             try:
@@ -168,18 +176,48 @@ def run_inference_hold(args: Any) -> int:
         # StreamingBoundary has its own executor thread; neither blocks on infer.
         thread = threading.Thread(target=observe, daemon=True)
         thread.start()
-        run_hold_sequence(
-            boundary=boundary, limits=limits, analyzer=timing.analyze,
-            expected_identity=expected_identity, analysis_start=analysis_start,
-            application_timeout=args.application_confirmation_timeout,
-            observation_timeout=args.observation_timeout, result=result,
-            inference_arguments=dict(
-                observation=observation, sample_dir=sample_dir, policy=policy,
-                index=0, policy_episode_seed=args.policy_episode_seed,
+        if policy_execution:
+            from saps.physical.policy_execution import run_policy_episode
+
+            def check_runtime() -> None:
+                if observer_errors or collector.errors or boundary.errors:
+                    raise RuntimeError("Physical callback or boundary error")
+
+            def check_observers() -> None:
+                check_runtime()
+                if validate_graph(node, config) != result["initial_ros_graph"]:
+                    raise RuntimeError("Source publisher endpoints changed")
+                time.sleep(.01)
+
+            run_policy_episode(
+                boundary=boundary, collector=collector, policy=policy,
+                config=config, output_dir=args.output_dir, limits=limits,
+                analyzer=timing.analyze, expected_identity=expected_identity,
+                analysis_start=analysis_start,
+                application_timeout=args.application_confirmation_timeout,
+                observation_timeout=args.observation_timeout,
+                policy_episode_seed=args.policy_episode_seed,
+                warmup_policy_seed=args.warmup_policy_seed,
+                max_replans=args.max_replans,
+                max_executed_policy_chunks=args.max_executed_policy_chunks,
+                spin_once=check_observers,
+                check_runtime=check_runtime,
                 ros_now=lambda: node.get_clock().now().nanoseconds / 1e9,
-                config=config,
-            ),
-        )
+                result=result,
+            )
+        else:
+            run_hold_sequence(
+                boundary=boundary, limits=limits, analyzer=timing.analyze,
+                expected_identity=expected_identity, analysis_start=analysis_start,
+                application_timeout=args.application_confirmation_timeout,
+                observation_timeout=args.observation_timeout, result=result,
+                inference_arguments=dict(
+                    observation=observation, sample_dir=sample_dir, policy=policy,
+                    index=0, policy_episode_seed=args.policy_episode_seed,
+                    ros_now=lambda: node.get_clock().now().nanoseconds / 1e9,
+                    config=config,
+                ),
+            )
         result["final_ros_graph"] = validate_graph(node, config)
         result["final_observation_interfaces"] = node_interface_evidence(node)
         result["final_camera_identity"] = camera_serial_evidence(config)
@@ -205,7 +243,28 @@ def run_inference_hold(args: Any) -> int:
                     output.write(json.dumps(record, allow_nan=False) + "\n")
             result["analysis_start_record"] = analysis_start
             try:
-                if expected_identity is not None:
+                if (policy_execution and expected_identity is not None
+                        and result["rows"]):
+                    from saps.physical.policy_execution import (
+                        audit_inference_hold, validate_execution_delivery,
+                    )
+                    validation = validate_execution_delivery(
+                        records[analysis_start:], result["rows"], timing.analyze,
+                        expected_identity,
+                    )
+                    result["runtime_health"]["final_delivery_validation"] = validation
+                    if not validation["accepted"]:
+                        result["status"] = "failed"
+                    for replan in result["replans"]:
+                        if "hold_audit" in replan["inference"]:
+                            audit = audit_inference_hold(
+                                records[analysis_start:], replan["pre_hold"],
+                                replan["inference"],
+                            )
+                            replan["inference"]["hold_audit"] = audit
+                            if not audit["accepted"]:
+                                result["status"] = "failed"
+                elif not policy_execution and expected_identity is not None:
                     finalize_hold_sequence(
                         records=records[analysis_start:], result=result,
                         analyzer=timing.analyze, expected_identity=expected_identity,
@@ -238,5 +297,10 @@ def run_inference_hold(args: Any) -> int:
             cleanup_errors.append(str(error))
             result["status"] = "failed"
         result["end_utc"] = utc_now()
+        if policy_execution:
+            result["runtime_validation_status"] = (
+                "passed" if result["status"] == "success" else "failed")
+            if result["status"] != "success":
+                result["termination"]["termination_reason"] = "runtime_abort"
         write_json(args.output_dir / "run.json", result)
     return 0 if result["status"] == "success" else 1

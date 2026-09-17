@@ -68,6 +68,11 @@ PHYSICAL_WARMUP_POLICY_SEED ?= 20260917
 PHYSICAL_PYTHON ?= $(CURDIR)/.venv-physical/bin/python
 PHYSICAL_CONFIG ?= configs/physical_pi05_fr3.json
 C1C1_APPLICATION_CONFIRMATION_TIMEOUT ?= 0.25
+C1C2_APPLICATION_CONFIRMATION_TIMEOUT ?= 0.25
+C1C2_MAX_EXECUTED_POLICY_CHUNKS ?= 1
+C1C2_MAX_REPLANS ?= 100
+export C1C2_APPLICATION_CONFIRMATION_TIMEOUT C1C2_MAX_EXECUTED_POLICY_CHUNKS
+export C1C2_MAX_REPLANS
 export C1C1_APPLICATION_CONFIRMATION_TIMEOUT
 export PHYSICAL_RUN_ID PHYSICAL_PROMPT PHYSICAL_REQUESTS PHYSICAL_PYTHON
 export PHYSICAL_CONFIG DROID_POLICY_SEED
@@ -130,6 +135,7 @@ help:
 	@echo "  make physical-pi05-shadow PHYSICAL_RUN_ID=<unique> PHYSICAL_PROMPT=<instruction>"
 	@echo "  make physical-m3-spacemouse  # subscriber/spnavd log only"
 	@echo "  make physical-c1c2-warmup PHYSICAL_RUN_ID=<unique> PHYSICAL_PROMPT=<instruction>"
+	@echo "  make physical-c1c2 PHYSICAL_RUN_ID=<unique> PHYSICAL_PROMPT=<instruction> (arm execution, test cap 1)"
 	@echo "  make physical-c1c1 PHYSICAL_RUN_ID=<unique> PHYSICAL_PROMPT=<instruction>"
 	@echo "  make autonomous-smoke"
 	@echo "  make autonomous-sweep NUM_TRIALS=20"
@@ -405,6 +411,23 @@ physical-c1c1:
 		--prompt "$$PHYSICAL_PROMPT" \
 		--policy-episode-seed "$$DROID_POLICY_SEED" \
 		--application-confirmation-timeout "$$C1C1_APPLICATION_CONFIRMATION_TIMEOUT"'
+
+.PHONY: physical-c1c2
+physical-c1c2: export PHYSICAL_WARMUP_POLICY_SEED := $(PHYSICAL_WARMUP_POLICY_SEED)
+physical-c1c2:
+	@test -n "$$PHYSICAL_RUN_ID" -a -n "$$PHYSICAL_PROMPT" || \
+		{ echo "Set an explicit PHYSICAL_RUN_ID and PHYSICAL_PROMPT."; exit 2; }
+	bash -c 'source /opt/ros/jazzy/setup.bash && \
+		source "$$FRANKA_ROS2_INSTALL/setup.bash" && \
+		export PYTHONPATH="$$PWD/src:$$PWD/third_party/openpi/packages/openpi-client/src:$${PYTHONPATH}" && \
+		"$$PHYSICAL_PYTHON" scripts/physical_policy_execution.py \
+		--execute --config "$$PHYSICAL_CONFIG" \
+		--output-dir "outputs/physical_c1c2/$$PHYSICAL_RUN_ID" \
+		--prompt "$$PHYSICAL_PROMPT" \
+		--warmup-policy-seed "$$PHYSICAL_WARMUP_POLICY_SEED" \
+		--max-replans "$$C1C2_MAX_REPLANS" \
+		--max-executed-policy-chunks "$$C1C2_MAX_EXECUTED_POLICY_CHUNKS" \
+		--application-confirmation-timeout "$$C1C2_APPLICATION_CONFIRMATION_TIMEOUT"'
 
 .PHONY: operator-smoke
 operator-smoke:
