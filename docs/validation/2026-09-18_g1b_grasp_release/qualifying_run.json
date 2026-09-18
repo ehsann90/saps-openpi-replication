@@ -1,0 +1,931 @@
+{
+  "mode": "grasp-release",
+  "status": "passed",
+  "run": "a1319691-4dda-4707-8cfe-4d804fb0862d",
+  "rows": [
+    {
+      "type": "pre_inference_hold",
+      "action_index": null,
+      "raw_policy_action": null,
+      "q_ref": [
+        -0.11165977892006686,
+        -0.12699320312333195,
+        0.07648957588249092,
+        -2.418953787454884,
+        -0.0019942859106992345,
+        2.2647408707060483,
+        0.7357833664368347
+      ],
+      "dq_ref": [
+        -0.0006799826187805178,
+        0.0007592394745260443,
+        -0.0008911787641611268,
+        -0.001723539200685536,
+        0.0001863708545047009,
+        -0.0009753725460480789,
+        0.0006108360381928306
+      ],
+      "q_ref_source_stamp_ns": 1789735496366933119,
+      "q_ref_receive_monotonic_ns": 17804204743699,
+      "q_ref_age_at_mapping_seconds": 0.00382274,
+      "q_ref_receive_age_at_mapping_seconds": 0.000363902,
+      "mapped_delta": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      "q_target": [
+        -0.11165977892006686,
+        -0.12699320312333195,
+        0.07648957588249092,
+        -2.418953787454884,
+        -0.0019942859106992345,
+        2.2647408707060483,
+        0.7357833664368347
+      ],
+      "safety_gate": {
+        "state_age_seconds": 0.00382274,
+        "receive_age_seconds": 0.000363902,
+        "action_age_seconds": 0.0,
+        "joint_margin_rad": 0.1,
+        "raw_policy_action": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "clipped_u": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "measured_q_rad": [
+          -0.11165977892006686,
+          -0.12699320312333195,
+          0.07648957588249092,
+          -2.418953787454884,
+          -0.0019942859106992345,
+          2.2647408707060483,
+          0.7357833664368347
+        ],
+        "delta_q_rad": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "proposed_q_target_rad": [
+          -0.11165977892006686,
+          -0.12699320312333195,
+          0.07648957588249092,
+          -2.418953787454884,
+          -0.0019942859106992345,
+          2.2647408707060483,
+          0.7357833664368347
+        ],
+        "joint_names": [
+          "fr3_joint1",
+          "fr3_joint2",
+          "fr3_joint3",
+          "fr3_joint4",
+          "fr3_joint5",
+          "fr3_joint6",
+          "fr3_joint7"
+        ],
+        "joint_position_limits": {
+          "joint_names": [
+            "fr3_joint1",
+            "fr3_joint2",
+            "fr3_joint3",
+            "fr3_joint4",
+            "fr3_joint5",
+            "fr3_joint6",
+            "fr3_joint7"
+          ],
+          "lower_rad": [
+            -2.7437,
+            -1.7837,
+            -2.9007,
+            -3.0421,
+            -2.8065,
+            0.5445,
+            -3.0159
+          ],
+          "upper_rad": [
+            2.7437,
+            1.7837,
+            2.9007,
+            -0.1518,
+            2.8065,
+            4.5169,
+            3.0159
+          ],
+          "robot_description_sha256": "70ebca8364603cc7b0279907e10ca9be2456dc0996b2898d309462f7815fc4dd"
+        },
+        "target_lower_margin_rad": [
+          2.632040221079933,
+          1.656706796876668,
+          2.977189575882491,
+          0.6231462125451159,
+          2.804505714089301,
+          1.7202408707060484,
+          3.7516833664368345
+        ],
+        "target_upper_margin_rad": [
+          2.855359778920067,
+          1.9106932031233321,
+          2.824210424117509,
+          2.267153787454884,
+          2.8084942859106996,
+          2.2521591292939513,
+          2.280116633563165
+        ],
+        "measured_lower_margin_rad": [
+          2.632040221079933,
+          1.656706796876668,
+          2.977189575882491,
+          0.6231462125451159,
+          2.804505714089301,
+          1.7202408707060484,
+          3.7516833664368345
+        ],
+        "measured_upper_margin_rad": [
+          2.855359778920067,
+          1.9106932031233321,
+          2.824210424117509,
+          2.267153787454884,
+          2.8084942859106996,
+          2.2521591292939513,
+          2.280116633563165
+        ],
+        "minimum_target_margin_rad": 0.6231462125451159,
+        "position_gate_accepted": true,
+        "rejection_reasons": [],
+        "rate_equivalent_diagnostic_rad_s": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ],
+        "controller_acceptance_tested": false,
+        "safe_to_execute": false,
+        "policy_actions_executed": 0,
+        "gripper_commands_issued": 0,
+        "raw_gripper_policy_value": 0.0,
+        "measured_singularity": {
+          "condition_number": 8.571168257616616,
+          "singular_values": [
+            1.9457473379887777,
+            1.8374703944913628,
+            0.7226706885661112,
+            0.37144568833468744,
+            0.28277022181605005,
+            0.22701075040263316
+          ],
+          "base": "fr3_link0",
+          "tip": "fr3_link8",
+          "lower_threshold": 17.0,
+          "hard_threshold": 30.0,
+          "rejected": false
+        },
+        "target_singularity": {
+          "condition_number": 8.571168257616616,
+          "singular_values": [
+            1.9457473379887777,
+            1.8374703944913628,
+            0.7226706885661112,
+            0.37144568833468744,
+            0.28277022181605005,
+            0.22701075040263316
+          ],
+          "base": "fr3_link0",
+          "tip": "fr3_link8",
+          "lower_threshold": 17.0,
+          "hard_threshold": 30.0,
+          "rejected": false
+        },
+        "accepted": true
+      },
+      "scheduled_monotonic_ns": 17804205107601,
+      "actual_publish_t0_ns": 17804206230734,
+      "schedule_lateness_ns": 1123133,
+      "publish_readiness_reasons": [],
+      "run": "a1319691-4dda-4707-8cfe-4d804fb0862d",
+      "source_stamp_ns": 1789735496371983649,
+      "q_ref_age_at_publish_seconds": 0.005159724,
+      "q_ref_receive_age_at_publish_seconds": 0.001481365,
+      "publication_call_end_ns": 17804206298972,
+      "publication_call_outcome": "returned",
+      "timing": {
+        "source_stamp_ns": 1789735496371983649,
+        "status": "applied",
+        "sent_target": [
+          -0.11165977892006686,
+          -0.12699320312333195,
+          0.07648957588249092,
+          -2.418953787454884,
+          -0.0019942859106992345,
+          2.2647408707060483,
+          0.7357833664368347
+        ],
+        "forwarder_records": 1,
+        "callback_records": 1,
+        "application_records": 1,
+        "instance": "48679-17137297458679",
+        "activation": 17774593336869,
+        "sequence": 1,
+        "q_desired": [
+          -0.11165977892006686,
+          -0.12699320312333195,
+          0.07648957588249092,
+          -2.418953787454884,
+          -0.0019942859106992345,
+          2.2647408707060483,
+          0.7357833664368347
+        ],
+        "intervals_ns": {
+          "t0_t1": 404588,
+          "t1_t2": 47058,
+          "t2_t3": 162605,
+          "t3_t4": 223859,
+          "t0_t4": 838110
+        },
+        "t0_ns": 17804206230734,
+        "t1_ns": 17804206635322,
+        "t2_ns": 17804206682380,
+        "t3_ns": 17804206844985,
+        "t4_ns": 17804207068844,
+        "forwarder_outcome": "forwarded",
+        "controller_callback_outcome": "accepted"
+      },
+      "last_application_validation": {
+        "accepted": false,
+        "reasons": [
+          "row_0_status_'accepted_application_unresolved'",
+          "row_0_application_records_0",
+          "row_0_invalid_sequence",
+          "row_0_invalid_controller_identity",
+          "row_0_invalid_target_evidence",
+          "row_0_missing_intervals",
+          "row_0_invalid_event_order",
+          "no_controller_period_evidence",
+          "unexpected_controller_instance_or_activation",
+          "missing_or_changing_controller_identity"
+        ],
+        "expected_targets": 1,
+        "analyzed_targets": 1,
+        "source_stamps": [
+          1789735496371983649
+        ],
+        "controller_sequences": [],
+        "controller_identity": null,
+        "timing_summary": {
+          "targets": [
+            {
+              "source_stamp_ns": 1789735496371983649,
+              "status": "accepted_application_unresolved",
+              "sent_target": [
+                -0.11165977892006686,
+                -0.12699320312333195,
+                0.07648957588249092,
+                -2.418953787454884,
+                -0.0019942859106992345,
+                2.2647408707060483,
+                0.7357833664368347
+              ],
+              "forwarder_records": 1,
+              "callback_records": 1,
+              "application_records": 0,
+              "unresolved_reason": "no_proof_of_application_or_supersession",
+              "t0_ns": 17804206230734,
+              "t1_ns": 17804206635322,
+              "t2_ns": 17804206682380,
+              "t3_ns": 17804206844985,
+              "t4_ns": null,
+              "forwarder_outcome": "forwarded",
+              "controller_callback_outcome": "accepted"
+            }
+          ],
+          "controller_publication_errors_cumulative": {
+            "48679-17137297458679": 0
+          },
+          "periods": [],
+          "evidence_id_gaps": {
+            "controller:48679-17137297458679": 0,
+            "forwarder:07ce0239-0392-4ada-b3df-624da80931d5": 0
+          },
+          "rt_overflow_cumulative": {},
+          "capture_boundaries": "Loss before first/after last evidence ID is unknown; unresolved is not proof of rejection or supersession.",
+          "unmatched_forwarder_records": 0,
+          "unmatched_callback_records": 0,
+          "unmatched_application_records": 0
+        }
+      },
+      "application_confirmation": {
+        "accepted": true,
+        "reasons": [],
+        "expected_targets": 1,
+        "analyzed_targets": 1,
+        "source_stamps": [
+          1789735496371983649
+        ],
+        "controller_sequences": [
+          1
+        ],
+        "controller_identity": [
+          "48679-17137297458679",
+          17774593336869
+        ],
+        "timing_summary": {
+          "targets": [
+            {
+              "source_stamp_ns": 1789735496371983649,
+              "status": "applied",
+              "sent_target": [
+                -0.11165977892006686,
+                -0.12699320312333195,
+                0.07648957588249092,
+                -2.418953787454884,
+                -0.0019942859106992345,
+                2.2647408707060483,
+                0.7357833664368347
+              ],
+              "forwarder_records": 1,
+              "callback_records": 1,
+              "application_records": 1,
+              "instance": "48679-17137297458679",
+              "activation": 17774593336869,
+              "sequence": 1,
+              "q_desired": [
+                -0.11165977892006686,
+                -0.12699320312333195,
+                0.07648957588249092,
+                -2.418953787454884,
+                -0.0019942859106992345,
+                2.2647408707060483,
+                0.7357833664368347
+              ],
+              "intervals_ns": {
+                "t0_t1": 404588,
+                "t1_t2": 47058,
+                "t2_t3": 162605,
+                "t3_t4": 223859,
+                "t0_t4": 838110
+              },
+              "t0_ns": 17804206230734,
+              "t1_ns": 17804206635322,
+              "t2_ns": 17804206682380,
+              "t3_ns": 17804206844985,
+              "t4_ns": 17804207068844,
+              "forwarder_outcome": "forwarded",
+              "controller_callback_outcome": "accepted"
+            }
+          ],
+          "controller_publication_errors_cumulative": {
+            "48679-17137297458679": 0
+          },
+          "periods": [
+            {
+              "instance": "48679-17137297458679",
+              "activation": 17774593336869,
+              "count": 20,
+              "nominal_ns": 1000000,
+              "thresholds_ns": [
+                1500000,
+                2000000
+              ],
+              "long_period_counts": {
+                "1500000": 0,
+                "2000000": 0
+              },
+              "percentile_method": "nearest rank ceil(p*N), one-based",
+              "mean_ns": 1001373.45,
+              "median_ns": 1001470.5,
+              "p95_ns": 1063311,
+              "p99_ns": 1134114,
+              "maximum_ns": 1134114,
+              "mean_deviation_ns": 1373.4499999999534,
+              "maximum_absolute_deviation_ns": 134114
+            }
+          ],
+          "evidence_id_gaps": {
+            "controller:48679-17137297458679": 0,
+            "forwarder:07ce0239-0392-4ada-b3df-624da80931d5": 0
+          },
+          "rt_overflow_cumulative": {
+            "48679-17137297458679": {
+              "dropped_period_samples": 0,
+              "dropped_application_records": 0
+            }
+          },
+          "capture_boundaries": "Loss before first/after last evidence ID is unknown; unresolved is not proof of rejection or supersession.",
+          "unmatched_forwarder_records": 0,
+          "unmatched_callback_records": 0,
+          "unmatched_application_records": 0
+        }
+      },
+      "confirmation_monotonic_ns": 17804227689274
+    }
+  ],
+  "steps": [
+    {
+      "raw_policy_value": 0.0,
+      "binary_closure": 0.0,
+      "measured_before": {
+        "width_m": 0.07997477799654007,
+        "closure": 0.00031527504324913025,
+        "source_ros_seconds": 1789735496.32815,
+        "receive_monotonic_seconds": 17804.16251532
+      },
+      "request_id": 0,
+      "command_type": "move",
+      "target_width_m": 0.08,
+      "speed_m_s": 0.1,
+      "force_n": null,
+      "epsilon_inner_m": null,
+      "epsilon_outer_m": null,
+      "requested_monotonic_seconds": 17804.227726203,
+      "disposition": "completed",
+      "command_issued": true,
+      "issue_monotonic_seconds": 17804.22809848,
+      "confirmed_measured": {
+        "width_m": 0.07997477799654007,
+        "closure": 0.00031527504324913025,
+        "source_ros_seconds": 1789735497.1281238,
+        "receive_monotonic_seconds": 17804.962561353
+      },
+      "confirmation_monotonic_seconds": 17804.963094952,
+      "lifecycle_events": [
+        {
+          "kind": "move_requested",
+          "monotonic_seconds": 17804.228101055,
+          "request_id": 0,
+          "width": 0.08,
+          "speed": 0.1
+        },
+        {
+          "kind": "goal_response",
+          "monotonic_seconds": 17804.277598899,
+          "request_id": 0,
+          "accepted": true
+        },
+        {
+          "kind": "result",
+          "monotonic_seconds": 17804.962996298,
+          "request_id": 0,
+          "status": 4,
+          "success": true,
+          "error": ""
+        }
+      ]
+    },
+    {
+      "raw_policy_value": 1.0,
+      "binary_closure": 1.0,
+      "measured_before": {
+        "width_m": 0.07997477799654007,
+        "closure": 0.00031527504324913025,
+        "source_ros_seconds": 1789735497.1281238,
+        "receive_monotonic_seconds": 17804.962561353
+      },
+      "request_id": 1,
+      "command_type": "grasp",
+      "target_width_m": 0.0,
+      "speed_m_s": 0.1,
+      "force_n": 20.0,
+      "epsilon_inner_m": 0.001,
+      "epsilon_outer_m": 0.08,
+      "requested_monotonic_seconds": 17804.963112185,
+      "disposition": "completed",
+      "command_issued": true,
+      "issue_monotonic_seconds": 17804.967608726,
+      "confirmed_measured": {
+        "width_m": 0.04625231772661209,
+        "closure": 0.42184602841734886,
+        "source_ros_seconds": 1789735499.3121254,
+        "receive_monotonic_seconds": 17807.146559973
+      },
+      "confirmation_monotonic_seconds": 17807.148177803,
+      "grasp_dwell": {
+        "duration_seconds": 3.0046386630019697,
+        "sample_count": 646,
+        "initial_width_m": 0.04625231772661209,
+        "final_width_m": 0.046321265399456024,
+        "minimum_width_m": 0.04625231772661209,
+        "maximum_width_m": 0.046321265399456024,
+        "width_span_m": 6.89476728439331e-05
+      },
+      "lifecycle_events": [
+        {
+          "kind": "grasp_requested",
+          "monotonic_seconds": 17804.96761096,
+          "request_id": 1,
+          "width": 0.0,
+          "speed": 0.1,
+          "force": 20.0,
+          "epsilon_inner": 0.001,
+          "epsilon_outer": 0.08
+        },
+        {
+          "kind": "goal_response",
+          "monotonic_seconds": 17805.077813236,
+          "request_id": 1,
+          "accepted": true
+        },
+        {
+          "kind": "result",
+          "monotonic_seconds": 17807.14797868,
+          "request_id": 1,
+          "status": 4,
+          "success": true,
+          "error": ""
+        }
+      ]
+    },
+    {
+      "raw_policy_value": 0.0,
+      "binary_closure": 0.0,
+      "measured_before": {
+        "width_m": 0.046321265399456024,
+        "closure": 0.4209841825067997,
+        "source_ros_seconds": 1789735502.3121445,
+        "receive_monotonic_seconds": 17810.146668041
+      },
+      "request_id": 2,
+      "command_type": "move",
+      "target_width_m": 0.08,
+      "speed_m_s": 0.1,
+      "force_n": null,
+      "epsilon_inner_m": null,
+      "epsilon_outer_m": null,
+      "requested_monotonic_seconds": 17810.152841823,
+      "disposition": "completed",
+      "command_issued": true,
+      "issue_monotonic_seconds": 17810.542672368,
+      "confirmed_measured": {
+        "width_m": 0.07979944348335266,
+        "closure": 0.002506956458091736,
+        "source_ros_seconds": 1789735504.0001056,
+        "receive_monotonic_seconds": 17811.834536099
+      },
+      "confirmation_monotonic_seconds": 17811.837744728,
+      "lifecycle_events": [
+        {
+          "kind": "move_requested",
+          "monotonic_seconds": 17810.542673771,
+          "request_id": 2,
+          "width": 0.08,
+          "speed": 0.1
+        },
+        {
+          "kind": "goal_response",
+          "monotonic_seconds": 17810.652618684,
+          "request_id": 2,
+          "accepted": true
+        },
+        {
+          "kind": "result",
+          "monotonic_seconds": 17811.837598945,
+          "request_id": 2,
+          "status": 4,
+          "success": true,
+          "error": ""
+        }
+      ]
+    }
+  ],
+  "policy_arm_actions": 0,
+  "lab": {
+    "path": "/home/hvl-robotics2404/franka_ros2_ws/src/fr3_lab_stack",
+    "available": true,
+    "branch": "main",
+    "commit": "9e535b665626cf8f3894fc4d2ef9136790abad92",
+    "status": [
+      "M CMakeLists.txt",
+      " M package.xml",
+      "?? docs/franka_hand.md",
+      "?? fr3_lab_stack_runtime/franka_hand.py",
+      "?? test/test_franka_hand.py"
+    ],
+    "dirty": true,
+    "arm_baseline": "9e535b665626cf8f3894fc4d2ef9136790abad92",
+    "extension_sha256": {
+      "CMakeLists.txt": "43b5e6965d6fe4ad123e117cb70817c969072cad6c739d695454d27f4e846c67",
+      "docs/franka_hand.md": "f5c18bda268b6654ba26788ddb5f3da993d4c1e9e484daa007efac37277b1741",
+      "fr3_lab_stack_runtime/franka_hand.py": "b800befcd62447f6a29a867276e89793c5bfe2cb5adc089fde554fa0cb37c399",
+      "package.xml": "98473ff596b13344be042e914d3e2cb7c34381f84206f359351af0100f8059d0",
+      "test/test_franka_hand.py": "7103f8d3b0c4b874a062b42340f2b990a237a8f740ddac422d1b1b66ae01ad3b"
+    }
+  },
+  "saps": {
+    "path": "/home/hvl-robotics2404/saps-openpi-replication",
+    "available": true,
+    "branch": "experiment/physical-fr3-saps",
+    "commit": "e408cd4e955dd7ef90b80011fb4ce8034698311f",
+    "status": [
+      "M docs/physical_c1c2_runtime.md",
+      " M scripts/physical_policy_execution.py",
+      " M src/saps/physical/live_inference_hold_ros.py",
+      " M src/saps/physical/policy_execution.py",
+      " M tests/unit/test_physical_policy_execution.py",
+      "?? docs/physical_g1b_gripper.md",
+      "?? docs/validation/2026-09-18_g1b_software/",
+      "?? src/saps/physical/droid_gripper.py",
+      "?? src/saps/physical/gripper_ros.py",
+      "?? src/saps/physical/gripper_validation.py",
+      "?? tests/manual/physical_gripper_validation.py",
+      "?? tests/unit/test_droid_gripper.py",
+      "?? tests/unit/test_gripper_ros.py",
+      "?? tests/unit/test_gripper_validation.py"
+    ],
+    "dirty": true
+  },
+  "gripper_contract": {
+    "policy_semantics": "droid_binary_absolute_closure",
+    "open_primitive": "move",
+    "close_primitive": "grasp",
+    "maximum_width_m": 0.08,
+    "speed_m_s": 0.1,
+    "grasp_width_m": 0.0,
+    "grasp_force_n": 20.0,
+    "grasp_epsilon_inner_m": 0.001,
+    "grasp_epsilon_outer_m": 0.08,
+    "grasp_dwell_seconds": 3.0,
+    "width_tolerance_m": 0.002,
+    "dwell_span_tolerance_m": 0.002,
+    "object_width_supplied": false
+  },
+  "lifecycle_timeout_seconds": 3.0,
+  "retention_visual_confirmation_required": true,
+  "release_stop_confirmed": true,
+  "hold_validation": {
+    "accepted": true,
+    "reasons": [],
+    "expected_targets": 1,
+    "analyzed_targets": 1,
+    "source_stamps": [
+      1789735496371983649
+    ],
+    "controller_sequences": [
+      1
+    ],
+    "controller_identity": [
+      "48679-17137297458679",
+      17774593336869
+    ],
+    "timing_summary": {
+      "targets": [
+        {
+          "source_stamp_ns": 1789735496371983649,
+          "status": "applied",
+          "sent_target": [
+            -0.11165977892006686,
+            -0.12699320312333195,
+            0.07648957588249092,
+            -2.418953787454884,
+            -0.0019942859106992345,
+            2.2647408707060483,
+            0.7357833664368347
+          ],
+          "forwarder_records": 1,
+          "callback_records": 1,
+          "application_records": 1,
+          "instance": "48679-17137297458679",
+          "activation": 17774593336869,
+          "sequence": 1,
+          "q_desired": [
+            -0.11165977892006686,
+            -0.12699320312333195,
+            0.07648957588249092,
+            -2.418953787454884,
+            -0.0019942859106992345,
+            2.2647408707060483,
+            0.7357833664368347
+          ],
+          "intervals_ns": {
+            "t0_t1": 404588,
+            "t1_t2": 47058,
+            "t2_t3": 162605,
+            "t3_t4": 223859,
+            "t0_t4": 838110
+          },
+          "t0_ns": 17804206230734,
+          "t1_ns": 17804206635322,
+          "t2_ns": 17804206682380,
+          "t3_ns": 17804206844985,
+          "t4_ns": 17804207068844,
+          "forwarder_outcome": "forwarded",
+          "controller_callback_outcome": "accepted"
+        }
+      ],
+      "controller_publication_errors_cumulative": {
+        "48679-17137297458679": 0
+      },
+      "periods": [
+        {
+          "instance": "48679-17137297458679",
+          "activation": 17774593336869,
+          "count": 9640,
+          "nominal_ns": 1000000,
+          "thresholds_ns": [
+            1500000,
+            2000000
+          ],
+          "long_period_counts": {
+            "1500000": 0,
+            "2000000": 0
+          },
+          "percentile_method": "nearest rank ceil(p*N), one-based",
+          "mean_ns": 999998.9072614108,
+          "median_ns": 999672.0,
+          "p95_ns": 1100070,
+          "p99_ns": 1151417,
+          "maximum_ns": 1228171,
+          "mean_deviation_ns": -1.0927385891554877,
+          "maximum_absolute_deviation_ns": 228171
+        }
+      ],
+      "evidence_id_gaps": {
+        "controller:48679-17137297458679": 0,
+        "forwarder:07ce0239-0392-4ada-b3df-624da80931d5": 0
+      },
+      "rt_overflow_cumulative": {
+        "48679-17137297458679": {
+          "dropped_period_samples": 0,
+          "dropped_application_records": 0
+        }
+      },
+      "capture_boundaries": "Loss before first/after last evidence ID is unknown; unresolved is not proof of rejection or supersession.",
+      "unmatched_forwarder_records": 0,
+      "unmatched_callback_records": 0,
+      "unmatched_application_records": 0
+    }
+  },
+  "arm_health": {
+    "accepted": true,
+    "reasons": [],
+    "franka_samples": 9611,
+    "franka_health_violation_count": 0,
+    "post_hold_franka_samples": 9611,
+    "post_hold_controller_readiness_samples": 96,
+    "post_hold_controller_state_samples": 912,
+    "post_hold_joint_samples": 9610
+  },
+  "hold_unchanged": true,
+  "gripper": {
+    "requests": [
+      {
+        "request_id": 0,
+        "command_type": "move",
+        "target_width_m": 0.08,
+        "speed_m_s": 0.1,
+        "force_n": null,
+        "epsilon_inner_m": null,
+        "epsilon_outer_m": null,
+        "requested_monotonic_seconds": 17804.227726203,
+        "disposition": "completed",
+        "command_issued": true,
+        "issue_monotonic_seconds": 17804.22809848
+      },
+      {
+        "request_id": 1,
+        "command_type": "grasp",
+        "target_width_m": 0.0,
+        "speed_m_s": 0.1,
+        "force_n": 20.0,
+        "epsilon_inner_m": 0.001,
+        "epsilon_outer_m": 0.08,
+        "requested_monotonic_seconds": 17804.963112185,
+        "disposition": "completed",
+        "command_issued": true,
+        "issue_monotonic_seconds": 17804.967608726
+      },
+      {
+        "request_id": 2,
+        "command_type": "move",
+        "target_width_m": 0.08,
+        "speed_m_s": 0.1,
+        "force_n": null,
+        "epsilon_inner_m": null,
+        "epsilon_outer_m": null,
+        "requested_monotonic_seconds": 17810.152841823,
+        "disposition": "completed",
+        "command_issued": true,
+        "issue_monotonic_seconds": 17810.542672368
+      }
+    ],
+    "events": [
+      {
+        "kind": "move_requested",
+        "monotonic_seconds": 17804.228101055,
+        "request_id": 0,
+        "width": 0.08,
+        "speed": 0.1
+      },
+      {
+        "kind": "goal_response",
+        "monotonic_seconds": 17804.277598899,
+        "request_id": 0,
+        "accepted": true
+      },
+      {
+        "kind": "result",
+        "monotonic_seconds": 17804.962996298,
+        "request_id": 0,
+        "status": 4,
+        "success": true,
+        "error": ""
+      },
+      {
+        "kind": "grasp_requested",
+        "monotonic_seconds": 17804.96761096,
+        "request_id": 1,
+        "width": 0.0,
+        "speed": 0.1,
+        "force": 20.0,
+        "epsilon_inner": 0.001,
+        "epsilon_outer": 0.08
+      },
+      {
+        "kind": "goal_response",
+        "monotonic_seconds": 17805.077813236,
+        "request_id": 1,
+        "accepted": true
+      },
+      {
+        "kind": "result",
+        "monotonic_seconds": 17807.14797868,
+        "request_id": 1,
+        "status": 4,
+        "success": true,
+        "error": ""
+      },
+      {
+        "kind": "release_stop_requested",
+        "monotonic_seconds": 17810.157677009,
+        "request_id": null,
+        "next_command_type": "move"
+      },
+      {
+        "kind": "release_stop_result",
+        "monotonic_seconds": 17810.542669543,
+        "request_id": null,
+        "success": true,
+        "message": ""
+      },
+      {
+        "kind": "move_requested",
+        "monotonic_seconds": 17810.542673771,
+        "request_id": 2,
+        "width": 0.08,
+        "speed": 0.1
+      },
+      {
+        "kind": "goal_response",
+        "monotonic_seconds": 17810.652618684,
+        "request_id": 2,
+        "accepted": true
+      },
+      {
+        "kind": "result",
+        "monotonic_seconds": 17811.837598945,
+        "request_id": 2,
+        "status": 4,
+        "success": true,
+        "error": ""
+      },
+      {
+        "kind": "stop_requested",
+        "monotonic_seconds": 17814.131288567,
+        "request_id": null
+      },
+      {
+        "kind": "stop_result",
+        "monotonic_seconds": 17814.427602465,
+        "request_id": null,
+        "success": true,
+        "message": ""
+      }
+    ],
+    "error": null,
+    "settled": true
+  }
+}

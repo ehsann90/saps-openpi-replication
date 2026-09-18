@@ -26,8 +26,11 @@ powered comparison of arbitration methods.
 | Matched LIBERO shared-autonomy pilot | Complete: 60/60 outcomes, 20/20 exact triplets, analysis valid |
 | π0.5-DROID offline physical-policy integration | M1 complete and validated |
 | Manual FR3 FK/Jacobian and DROID finite-action mapping | Validated offline |
-| Live FR3 observation and spnavd input | M3 complete and live-validated without actuation |
-| Physical Cartesian scales, correction mapping, and execution | Unresolved; not implemented |
+| Live FR3 observation and spnavd input | M3 complete and live-validated |
+| FR3 measured-state-anchored policy execution | C1-C2 physically validated, including repeated 8-action chunks at 15 Hz |
+| DROID binary gripper semantics and FR3 Move/Grasp realization | G1B physically validated, including unsupported grasp/hold/release |
+| Physical task-directed π0.5 behavior | G2 pending; object-directed behavior remains unresolved |
+| Physical shared autonomy and operator blending | Not yet implemented |
 | Risk, collaboration, and intervention-learning research | Planned after the physical baseline |
 
 The matched pilot contains 20 autonomous, 20 Fixed, and 20 Cosine outcomes
@@ -73,6 +76,13 @@ OpenPI is pinned as `third_party/openpi`; LIBERO is pinned recursively below it.
 Project-specific compatibility changes are documented patches, not silent edits
 to either dependency.
 
+Gripper-enabled FR3 execution additionally requires the clean
+`frdedynamics/fr3_lab_stack` commit
+`4bb6cdc58839dcdd94acbe1633b8f361676a4eb6`. The G1B integration inspected
+local `franka_ros2` source revision
+`1369a2cb200d0f7b3da11c7728c7ca2e6975ca00`; no upstream `franka_ros2`
+modification is part of the SAPS G1B implementation.
+
 ## Simulation validation
 
 The repository progressed from autonomous π0.5 deployment through controlled
@@ -91,21 +101,33 @@ are outside the current baseline.
 
 ## Physical deployment
 
-The next target is ordinary chunked π0.5/SAPS deployment on a fixed physical
-robot. Planned components include a fixed-arm interface, available fixed and
-wrist/external cameras, SpaceMouse Cartesian correction, Fixed `alpha = 0.5`,
-Cosine `k = 6`, SAPS-consistent gripper arbitration, and complete latency,
-policy-wait, operator, policy, and executed-action logging.
+The fixed-arm physical runtime now has separately validated arm and gripper
+mechanisms.
 
-Offline policy inference, FR3 embodiment kinematics, and non-actuating live
-input diagnostics are implemented. A second D435I is temporarily assigned as
-the exterior camera for M3 acceptance; this is not a permanent scientific
-camera-role assumption. Actuation is not implemented.
-Physical safety must be independent of
-learned confidence and shared autonomy, using robot-native supervision,
-workspace and velocity limits, collision or force/torque monitoring where
-available, and an emergency stop. The concrete baseline specification is in
-[Simulation SAPS Baseline](docs/simulation_saps_baseline.md#physical-saps-next-stage).
+C1-C2 physically validates ordinary chunked π0.5/DROID arm execution through the
+persistent FR3 streaming impedance path: a discarded cold-start warm-up, fresh
+measured-q pre-inference holds, native `[15,8]` responses, actions `0..7` at
+independently scheduled 15 Hz deadlines, fresh measured-state anchoring, terminal
+holds, delivery audits, readiness reacquisition, and Franka health checks.
+
+G1B validates the DROID binary gripper contract and its FR3 realization. The
+strict policy rule is `action[7] > 0.5` → CLOSED and otherwise OPEN. OPEN maps to
+`Move(maximum_width)`; CLOSED maps to an object-agnostic `Grasp(width=0)` with
+the fixed validated embodiment parameters. Object width is not supplied to the
+adapter. The qualifying physical run captured and held an unsupported object for
+approximately three seconds, then performed the explicit Stop → Move(open)
+release sequence.
+
+These are runtime-mechanism validations, not manipulation-task-success results.
+The next gate is G2: the current physical π0.5 behavior does not yet reliably
+approach and interact with the intended object. Task-level SUCCESS/FAILURE
+detection and physical SAPS operator blending also remain future work.
+
+Physical safety remains independent of learned confidence and shared autonomy,
+using robot-native supervision, joint/workspace and timing checks, collision or
+force/torque monitoring where available, and an emergency stop. See
+[the C1-C2 runtime record](docs/physical_c1c2_runtime.md) and
+[the G1B gripper record](docs/physical_g1b_gripper.md).
 
 ## Research extensions
 
@@ -154,6 +176,32 @@ make fixed-blend CONDITION=nominal TRIAL=0 FIXED_AUTONOMY_WEIGHT=0.5
 make cosine-blend CONDITION=nominal TRIAL=0 COSINE_GAIN=6.0
 ```
 
+For supervised FR3 work, start the required robot/controller, cameras, and
+π0.5/DROID policy server first. The convenience targets preserve ROS's
+`PYTHONPATH` and keep arm-only, isolated-gripper, and arm+gripper outputs
+separate:
+
+```bash
+# Re-run the stationary-arm G1B mechanism validation.
+make physical-g1b-grasp-release
+
+# Validated C1-C2 arm-only policy execution.
+make physical-c1c2 \
+  PHYSICAL_RUN_ID=<unique> \
+  PHYSICAL_PROMPT='<instruction>'
+
+# Explicit opt-in arm + physical gripper execution.
+make physical-c1c2-gripper \
+  PHYSICAL_RUN_ID=<unique> \
+  PHYSICAL_PROMPT='<instruction>'
+```
+
+`physical-c1c2-gripper` uses the same validated fixed Grasp parameters as G1B
+and requires the clean pinned `fr3_lab_stack` revision. It is available as the
+integrated runtime path, but current task-level policy behavior remains a G2
+investigation; do not treat a run as manipulation-task success merely because
+the transport, arm, and gripper mechanisms execute correctly.
+
 The completed matched-pilot roots are frozen. Do not reuse their experiment IDs
 or output directories. Regenerate the read-only derived archive with:
 
@@ -180,6 +228,9 @@ Reference implementation:
 - [Offline π0.5-DROID physical milestone M1](docs/physical_pi05_droid.md)
 - [Validated FR3 kinematics and DROID action mapping](docs/physical_fr3_embodiment.md)
 - [Live observation and SpaceMouse milestone M3](docs/physical_m3_inputs.md)
+- [Repeated physical arm runtime C1-C2](docs/physical_c1c2_runtime.md)
+- [DROID-to-FR3 physical gripper integration G1B](docs/physical_g1b_gripper.md)
+- [G1B qualifying physical validation archive](docs/validation/2026-09-18_g1b_grasp_release/README.md)
 - [Analysis tools and interpretation limits](docs/analysis.md)
 
 Archived lower-level records:
@@ -204,9 +255,12 @@ outputs/gate2_autonomous_pilot_v2
 ```
 
 Small validated derived tables and reports for the completed baseline are
-tracked below `results/gate2_shared_autonomy_pilot_v2`. Other generated analysis
-products remain ignored unless deliberately selected as a reviewable archive.
-Raw outputs must never be edited to change an outcome or provenance record.
+tracked below `results/gate2_shared_autonomy_pilot_v2`. Raw physical runs also
+remain under `outputs/`; selected qualifying evidence may be copied verbatim
+into `docs/validation/` with checksums and a scope-limited validation record.
+Other generated analysis products remain ignored unless deliberately selected
+as a reviewable archive. Raw outputs must never be edited to change an outcome
+or provenance record.
 
 ## Citation
 

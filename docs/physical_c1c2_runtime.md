@@ -1,5 +1,9 @@
 # C1-C2 repeated physical arm runtime
 
+G1B adds an explicitly enabled asynchronous gripper path; see
+[the validated G1B integration](physical_g1b_gripper.md).
+The arm-only baseline and historical validation below remain unchanged.
+
 Implemented from frozen warm-up commit
 `cba260c97a19db5aadd99052a16c94cccec3413b`. No physical execution has been
 performed for this implementation. OpenPI remains pinned at `15a9616a` and

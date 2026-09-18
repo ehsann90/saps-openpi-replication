@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""C1-C2: repeated measured-state-anchored policy chunks; arm only."""
+"""C1-C2: repeated measured-state-anchored policy chunks with optional DROID gripper actuation."""
 
 from __future__ import annotations
 
@@ -29,6 +29,10 @@ def parse_args() -> argparse.Namespace:
                         required=True,
                         help="Positive seconds to await hold T4 evidence; "
                              "bounded failure handling, not a latency threshold")
+    parser.add_argument("--enable-gripper", action="store_true")
+    parser.add_argument("--gripper-speed", type=float, default=.1,
+                        help="Move speed in m/s; default matches local server")
+    parser.add_argument("--gripper-timeout", type=float, default=3.)
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
     workspace = Path.home() / "franka_ros2_ws/src"

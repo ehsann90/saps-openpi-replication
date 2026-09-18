@@ -11,6 +11,7 @@ from typing import Any, Callable
 
 import numpy as np
 
+from saps.physical.droid_gripper import finalize_gripper_evidence
 from saps.physical.live_inference_hold import (
     captured_records, controller_identity, POST_HOLD_DRAIN_SECONDS,
     wait_for_application,
@@ -136,12 +137,13 @@ def run_policy_episode(
     result: dict[str, Any],
     outcome_provider: Callable[[dict[str, Any]], TaskOutcome] = unevaluated_outcome,
     check_runtime: Callable[[], None] = lambda: None,
+    gripper: Any | None = None,
     now: Callable[[], int] = time.monotonic_ns,
     sleep: Callable[[float], None] = time.sleep,
 ) -> None:
     """One warm-up, then hold/observe/infer/execute/hold/evaluate per replan.
 
-    There is deliberately no gripper command capability. The finite replan
+    Optional gripper requests are nonblocking. The finite replan
     bound and bounded observation, transport and confirmation waits limit the
     episode. Runtime acceptance never implies manipulation-task success.
     """
@@ -160,7 +162,8 @@ def run_policy_episode(
         episode={"policy_episode_seed": policy_episode_seed,
                  "max_replans": max_replans,
                  "max_executed_policy_chunks": max_executed_policy_chunks,
-                 "gripper_actuation": "disabled_unverified_mapping",
+                 "gripper_actuation": ("droid_binary_franka_hand" if gripper is not None
+                                       else "disabled_arm_only"),
                  "outcome_provider": getattr(outcome_provider, "__name__",
                                              type(outcome_provider).__name__)},
         termination={"task_outcome": "not_evaluated"}, runtime_health={},
@@ -207,6 +210,8 @@ def run_policy_episode(
         nonlocal confirmation_start
         if kind != "abort_hold":
             check_runtime()
+            if gripper is not None and kind != "terminal_hold":
+                gripper.check()
         previous = rows[-1]["q_ref_source_stamp_ns"] if rows else 0
         timeout = eligible + int(observation_timeout * 1e9)
         while True:
@@ -241,7 +246,11 @@ def run_policy_episode(
         if kind in ("pre_inference_hold", "terminal_hold"):
             with boundary.lock:
                 confirmation_start = len(boundary.records)
+        if gripper is not None and kind not in ("abort_hold", "terminal_hold"):
+            gripper.check()
         boundary.publish(row, state, origin)
+        if gripper is not None and kind == "policy_action":
+            row["gripper"] = gripper.command(float(action[7]))
         return row
 
     def hold(kind: str) -> dict[str, Any]:
@@ -305,6 +314,8 @@ def run_policy_episode(
                 (sample_dir / "request.json").read_text())
             phase = "inference"
             check_runtime()
+            if gripper is not None:
+                gripper.check_inference()
             infer_live_request(
                 observation=observation, sample_dir=sample_dir, policy=policy,
                 index=index, policy_episode_seed=policy_episode_seed,
@@ -379,12 +390,16 @@ def run_policy_episode(
                 reacquire_readiness(current["readiness_reacquisition"])
         else:
             result["termination"]["termination_reason"] = "safety_replan_limit_reached"
+        if gripper is not None:
+            gripper.check()
         result["status"] = "success"  # Software validation only.
     except (Exception, KeyboardInterrupt) as error:
         result.update(status="failed", failed_phase=phase,
                       error=f"{type(error).__name__}: {error}")
         result["termination"].update(termination_reason="runtime_abort",
                                      task_outcome="abort")
+        if gripper is not None:
+            gripper.stop()
         # Exactly one best-effort fresh hold; no remaining action is attempted.
         # During readiness reacquisition the confirmed terminal hold remains
         # installed; the command-free barrier must not attempt another hold.
@@ -406,6 +421,9 @@ def run_policy_episode(
                 result["failure_hold_error"] = str(hold_error)
         sleep(POST_HOLD_DRAIN_SECONDS)
     finally:
+        if gripper is not None:
+            gripper.stop()
+            finalize_gripper_evidence(result, gripper)
         try:
             if rows:
                 result["runtime_health"]["final_delivery_validation"] = delivery()

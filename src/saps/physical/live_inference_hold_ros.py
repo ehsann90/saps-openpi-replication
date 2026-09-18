@@ -13,6 +13,7 @@ import uuid
 import numpy as np
 
 from saps.physical.discrete_verifier import limits_from_urdf
+from saps.physical.droid_gripper import finalize_gripper_evidence
 from saps.physical.live_inference_hold import (
     captured_records, controller_identity, finalize_hold_sequence,
     run_hold_sequence,
@@ -67,6 +68,8 @@ def run_inference_hold(args: Any, *, policy_execution: bool = False) -> int:
                       main_policy_requests=0, completed_main_replans=0,
                       policy_actions_scheduled=0, terminal_holds_applied=0)
     boundary = node = executor = transport = thread = collector = None
+    gripper = None
+    enable_gripper = policy_execution and getattr(args, "enable_gripper", False)
     initialized = False
     analysis_start = 0
     expected_identity = None
@@ -75,7 +78,11 @@ def run_inference_hold(args: Any, *, policy_execution: bool = False) -> int:
     observer_errors: list[str] = []
     try:
         root = Path(__file__).resolve().parents[3]
-        timing, lab_identity = pinned_timing_helpers(args.lab_stack_dir)
+        if enable_gripper:
+            from saps.physical.gripper_ros import gripper_timing_helpers
+            timing, lab_identity = gripper_timing_helpers(args.lab_stack_dir)
+        else:
+            timing, lab_identity = pinned_timing_helpers(args.lab_stack_dir)
         provenance = {
             "repository": git_identity(root),
             "openpi": git_identity(root / "third_party/openpi"),
@@ -125,11 +132,18 @@ def run_inference_hold(args: Any, *, policy_execution: bool = False) -> int:
                 history=HistoryPolicy.KEEP_LAST,
             ),
         )
+        if enable_gripper:
+            from saps.physical.gripper_ros import create_gripper
+            gripper = create_gripper(
+                node, collector, config, args.lab_stack_dir,
+                speed=args.gripper_speed, timeout=args.gripper_timeout)
         deadline = time.monotonic() + args.observation_timeout
         while True:
             executor.spin_once(timeout_sec=0.05)
             try:
                 result["initial_ros_graph"] = validate_graph(node, config)
+                if gripper is not None and not gripper.hand.ready():
+                    raise RuntimeError("Gripper move/grasp/stop endpoints unavailable")
                 break
             except RuntimeError:
                 if time.monotonic() >= deadline:
@@ -203,7 +217,7 @@ def run_inference_hold(args: Any, *, policy_execution: bool = False) -> int:
                 spin_once=check_observers,
                 check_runtime=check_runtime,
                 ros_now=lambda: node.get_clock().now().nanoseconds / 1e9,
-                result=result,
+                result=result, gripper=gripper,
             )
         else:
             run_hold_sequence(
@@ -226,8 +240,22 @@ def run_inference_hold(args: Any, *, policy_execution: bool = False) -> int:
     except (Exception, KeyboardInterrupt) as error:
         result.update(status="failed", error=f"{type(error).__name__}: {error}")
     finally:
-        stop.set()
         cleanup_errors = []
+        if gripper is not None:
+            gripper.stop()
+            deadline = time.monotonic() + args.gripper_timeout
+            try:
+                while not gripper.hand.settled and time.monotonic() < deadline:
+                    if thread is not None and thread.is_alive():
+                        time.sleep(.01)
+                    else:
+                        executor.spin_once(timeout_sec=.01)
+            except Exception as error:
+                cleanup_errors.append(f"gripper_cleanup: {error}")
+            finalize_gripper_evidence(result, gripper)
+            if not gripper.hand.settled or result["gripper"]["error"]:
+                cleanup_errors.append("gripper_stop_unconfirmed_or_failed")
+        stop.set()
         if thread is not None:
             thread.join(timeout=5)
             if thread.is_alive():

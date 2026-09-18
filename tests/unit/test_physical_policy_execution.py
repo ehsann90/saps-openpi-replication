@@ -132,7 +132,7 @@ class EpisodeTests(unittest.TestCase):
         self.client.infer = infer
 
     def run_episode(self, cap=1, provider=lambda _: TaskOutcome.CONTINUE,
-                    max_replans=3, seed=20260917, analyzer=analyze):
+                    max_replans=3, seed=20260917, analyzer=analyze, gripper=None):
         run_policy_episode(
             boundary=self.boundary, collector=self.collector, policy=self.policy,
             config=load_shadow_config(CONFIG_PATH), output_dir=self.output,
@@ -142,9 +142,41 @@ class EpisodeTests(unittest.TestCase):
             policy_episode_seed=20260827, warmup_policy_seed=seed,
             max_replans=max_replans, max_executed_policy_chunks=cap,
             spin_once=self.collector.spin, ros_now=lambda: self.boundary.now / 1e9,
-            result=self.result, outcome_provider=provider,
+            result=self.result, outcome_provider=provider, gripper=gripper,
             now=lambda: self.boundary.now, sleep=self.boundary.sleep,
         )
+
+    def test_gripper_requests_follow_eight_actions_and_preserve_hold_schedule(self):
+        from unittest.mock import Mock
+        gripper = Mock()
+        gripper.command.return_value = {"request_id": 0}
+        gripper.evidence.return_value = {
+            "requests": [{"request_id": 0, "command_issued": True}],
+            "events": [], "error": None}
+        self.run_episode(gripper=gripper)
+        self.assertEqual(self.result["status"], "success", self.result.get("error"))
+        self.assertEqual(gripper.command.call_count, 8)
+        self.assertEqual(self.result["policy_actions_executed"], 8)
+        self.assertEqual(self.result["terminal_holds_applied"], 1)
+        self.assertEqual(self.result["episode"]["gripper_actuation"], "droid_binary_franka_hand")
+        gripper.stop.assert_called_once()
+
+    def test_gripper_failure_prevents_remaining_actions_and_uses_abort_hold(self):
+        from unittest.mock import Mock
+        gripper = Mock()
+        gripper.evidence.return_value = {"requests": [], "events": []}
+        def command(value):
+            gripper.check.side_effect = RuntimeError("gripper_goal_rejected")
+            return {}
+        gripper.command.side_effect = command
+        # No real request record was emitted by this failure stub.
+        with patch.object(execution, "finalize_gripper_evidence"):
+            self.run_episode(gripper=gripper)
+        self.assertEqual(self.result["status"], "failed")
+        self.assertEqual(gripper.command.call_count, 1)
+        self.assertEqual(self.result["policy_actions_published"], 1)
+        self.assertEqual(self.result["failure_hold"], "applied")
+        self.assertEqual(self.result["termination"]["termination_reason"], "runtime_abort")
 
     def test_first_test_cap_and_separate_latency(self):
         self.run_episode()

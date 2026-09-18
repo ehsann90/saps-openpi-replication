@@ -67,6 +67,8 @@ PHYSICAL_REQUESTS ?= 10
 PHYSICAL_WARMUP_POLICY_SEED ?= 20260917
 PHYSICAL_PYTHON ?= $(CURDIR)/.venv-physical/bin/python
 PHYSICAL_CONFIG ?= configs/physical_pi05_fr3.json
+G1B_OUTPUT ?= outputs/physical_franka_hand_g1_b
+G1B_RUN_ID ?= g1b_grasp_release_$(shell date +%Y%m%d_%H%M%S)
 C1C1_APPLICATION_CONFIRMATION_TIMEOUT ?= 0.25
 C1C2_APPLICATION_CONFIRMATION_TIMEOUT ?= 0.25
 C1C2_MAX_EXECUTED_POLICY_CHUNKS ?= 1
@@ -76,6 +78,7 @@ export C1C2_MAX_REPLANS
 export C1C1_APPLICATION_CONFIRMATION_TIMEOUT
 export PHYSICAL_RUN_ID PHYSICAL_PROMPT PHYSICAL_REQUESTS PHYSICAL_PYTHON
 export PHYSICAL_CONFIG DROID_POLICY_SEED
+export G1B_OUTPUT G1B_RUN_ID
 M3_OBSERVATIONS ?= 5
 M3_CAPTURE_TIMEOUT ?= 30
 M3_WRIST_TOPIC ?= /wrist/wrist_camera/color/image_raw
@@ -135,8 +138,10 @@ help:
 	@echo "  make physical-pi05-shadow PHYSICAL_RUN_ID=<unique> PHYSICAL_PROMPT=<instruction>"
 	@echo "  make physical-m3-spacemouse  # subscriber/spnavd log only"
 	@echo "  make physical-c1c2-warmup PHYSICAL_RUN_ID=<unique> PHYSICAL_PROMPT=<instruction>"
-	@echo "  make physical-c1c2 PHYSICAL_RUN_ID=<unique> PHYSICAL_PROMPT=<instruction> (arm execution, test cap 1)"
 	@echo "  make physical-c1c1 PHYSICAL_RUN_ID=<unique> PHYSICAL_PROMPT=<instruction>"
+	@echo "  make physical-c1c2 PHYSICAL_RUN_ID=<unique> PHYSICAL_PROMPT=<instruction>  # arm-only execution"
+	@echo "  make physical-g1b-grasp-release [G1B_RUN_ID=<unique>]  # stationary-arm gripper validation"
+	@echo "  make physical-c1c2-gripper PHYSICAL_RUN_ID=<unique> PHYSICAL_PROMPT=<instruction>  # opt-in arm+gripper"
 	@echo "  make autonomous-smoke"
 	@echo "  make autonomous-sweep NUM_TRIALS=20"
 	@echo "  make teleop CONDITION=nominal TRIAL=0"
@@ -423,6 +428,39 @@ physical-c1c2:
 		"$$PHYSICAL_PYTHON" scripts/physical_policy_execution.py \
 		--execute --config "$$PHYSICAL_CONFIG" \
 		--output-dir "outputs/physical_c1c2/$$PHYSICAL_RUN_ID" \
+		--prompt "$$PHYSICAL_PROMPT" \
+		--warmup-policy-seed "$$PHYSICAL_WARMUP_POLICY_SEED" \
+		--max-replans "$$C1C2_MAX_REPLANS" \
+		--max-executed-policy-chunks "$$C1C2_MAX_EXECUTED_POLICY_CHUNKS" \
+		--application-confirmation-timeout "$$C1C2_APPLICATION_CONFIRMATION_TIMEOUT"'
+
+
+.PHONY: physical-g1b-grasp-release
+physical-g1b-grasp-release:
+	bash -lc 'source /opt/ros/jazzy/setup.bash && \
+		source "$(FRANKA_ROS2_INSTALL)/setup.bash" && \
+		cd "$(CURDIR)" && \
+		export PYTHONPATH="$(CURDIR)/src:$${PYTHONPATH}" && \
+		/usr/bin/python3 tests/manual/physical_gripper_validation.py \
+		--execute \
+		--mode grasp-release \
+		--config "$(PHYSICAL_CONFIG)" \
+		--lab-stack-dir "$(FRANKA_ROS2_WS)/src/fr3_lab_stack" \
+		--output-dir "$(G1B_OUTPUT)/$(G1B_RUN_ID)"'
+
+.PHONY: physical-c1c2-gripper
+physical-c1c2-gripper: export PHYSICAL_WARMUP_POLICY_SEED := $(PHYSICAL_WARMUP_POLICY_SEED)
+physical-c1c2-gripper:
+	@test -n "$$PHYSICAL_RUN_ID" -a -n "$$PHYSICAL_PROMPT" || \
+		{ echo "Set an explicit PHYSICAL_RUN_ID and PHYSICAL_PROMPT."; exit 2; }
+	bash -c 'source /opt/ros/jazzy/setup.bash && \
+		source "$$FRANKA_ROS2_INSTALL/setup.bash" && \
+		export PYTHONPATH="$$PWD/src:$$PWD/third_party/openpi/packages/openpi-client/src:$${PYTHONPATH}" && \
+		"$$PHYSICAL_PYTHON" scripts/physical_policy_execution.py \
+		--execute \
+		--enable-gripper \
+		--config "$$PHYSICAL_CONFIG" \
+		--output-dir "outputs/physical_c1c2_gripper/$$PHYSICAL_RUN_ID" \
 		--prompt "$$PHYSICAL_PROMPT" \
 		--warmup-policy-seed "$$PHYSICAL_WARMUP_POLICY_SEED" \
 		--max-replans "$$C1C2_MAX_REPLANS" \
