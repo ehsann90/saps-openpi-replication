@@ -132,7 +132,8 @@ class EpisodeTests(unittest.TestCase):
         self.client.infer = infer
 
     def run_episode(self, cap=1, provider=lambda _: TaskOutcome.CONTINUE,
-                    max_replans=3, seed=20260917, analyzer=analyze, gripper=None):
+                    max_replans=3, seed=20260917, analyzer=analyze, gripper=None,
+                    stop_after_inference_replan=None):
         run_policy_episode(
             boundary=self.boundary, collector=self.collector, policy=self.policy,
             config=load_shadow_config(CONFIG_PATH), output_dir=self.output,
@@ -143,6 +144,7 @@ class EpisodeTests(unittest.TestCase):
             max_replans=max_replans, max_executed_policy_chunks=cap,
             spin_once=self.collector.spin, ros_now=lambda: self.boundary.now / 1e9,
             result=self.result, outcome_provider=provider, gripper=gripper,
+            stop_after_inference_replan=stop_after_inference_replan,
             now=lambda: self.boundary.now, sleep=self.boundary.sleep,
         )
 
@@ -195,6 +197,49 @@ class EpisodeTests(unittest.TestCase):
         self.assertEqual([(r["policy_episode_seed"], r["replan_index"],
                            r.get("audit_model_input", False)) for r in self.client.requests],
                          [(20260917, 0, False), (20260827, 0, True)])
+
+    def test_stop_after_second_inference_executes_only_first_chunk(self):
+        self.run_episode(cap=2, stop_after_inference_replan=1)
+        self.assertEqual(self.result["status"], "success", self.result.get("error"))
+        self.assertEqual(self.result["main_policy_requests"], 2)
+        self.assertEqual(self.result["completed_main_replans"], 1)
+        self.assertEqual(self.result["policy_actions_scheduled"], 8)
+        self.assertEqual(self.result["policy_actions_executed"], 8)
+        self.assertEqual(self.result["terminal_holds_applied"], 1)
+        self.assertEqual(self.result["termination"], {
+            "termination_reason": "test_inference_stop_reached",
+            "task_outcome": "continue",
+            "stopped_after_inference_replan": 1,
+        })
+        self.assertEqual(
+            [r["replan_index"] for r in self.client.requests],
+            [0, 0, 1],
+        )
+        second = self.result["replans"][1]
+        self.assertTrue(second["pre_hold"]["application_confirmation"]["accepted"])
+        self.assertTrue(second["inference"]["hold_audit"]["accepted"])
+        self.assertTrue(second["execution_skipped_after_inference"])
+        self.assertEqual(second["actions"], [])
+        self.assertNotIn("terminal_hold", second)
+
+    def test_inference_stop_issues_no_second_chunk_gripper_commands(self):
+        from unittest.mock import Mock
+        gripper = Mock()
+        gripper.command.return_value = {"request_id": 0}
+        gripper.evidence.return_value = {
+            "requests": [{"request_id": 0, "command_issued": True}],
+            "events": [], "error": None}
+        self.run_episode(cap=2, gripper=gripper, stop_after_inference_replan=1)
+        self.assertEqual(self.result["status"], "success", self.result.get("error"))
+        self.assertEqual(gripper.command.call_count, 8)
+        self.assertEqual(self.result["policy_actions_executed"], 8)
+        gripper.stop.assert_called_once()
+
+    def test_inference_stop_requires_chunk_cap_beyond_stop_index(self):
+        with self.assertRaisesRegex(
+                ValueError, "max_executed_policy_chunks must exceed"):
+            self.run_episode(cap=1, stop_after_inference_replan=1)
+        self.assertEqual(self.client.requests, [])
 
     def test_continue_repeats_indices_seed_holds_and_only_first_audit(self):
         self.run_episode(cap=3)

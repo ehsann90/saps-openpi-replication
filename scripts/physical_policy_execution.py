@@ -23,6 +23,13 @@ def parse_args() -> argparse.Namespace:
                         help="Hard finite safety bound; never a task failure")
     parser.add_argument("--max-executed-policy-chunks", type=int, default=1,
                         help="Test-only cap; initial physical validation requires 1")
+    parser.add_argument(
+        "--stop-after-inference-replan", type=int, default=None,
+        help=(
+            "Diagnostic zero-based replan index: after a validated inference "
+            "at this index, stop before publishing any action from that chunk"
+        ),
+    )
     parser.add_argument("--observation-timeout", type=float, default=30)
     parser.add_argument("--policy-timeout", type=float, default=120)
     parser.add_argument("--application-confirmation-timeout", type=float,

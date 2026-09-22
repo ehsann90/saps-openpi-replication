@@ -137,6 +137,10 @@ def run_inference_hold(args: Any, *, policy_execution: bool = False) -> int:
             gripper = create_gripper(
                 node, collector, config, args.lab_stack_dir,
                 speed=args.gripper_speed, timeout=args.gripper_timeout)
+        allowed_service_clients = (
+            frozenset({"/franka_gripper/stop"})
+            if gripper is not None else frozenset()
+        )
         deadline = time.monotonic() + args.observation_timeout
         while True:
             executor.spin_once(timeout_sec=0.05)
@@ -148,7 +152,9 @@ def run_inference_hold(args: Any, *, policy_execution: bool = False) -> int:
             except RuntimeError:
                 if time.monotonic() >= deadline:
                     raise
-        result["initial_observation_interfaces"] = node_interface_evidence(node)
+        result["initial_observation_interfaces"] = node_interface_evidence(
+            node, allowed_service_clients=allowed_service_clients,
+        )
         result["camera_identity"] = camera_serial_evidence(config)
         transport = BoundedWebsocketClient(args.host, args.port, args.policy_timeout)
         policy = OpenPiDroidPolicy(client=transport)
@@ -214,6 +220,8 @@ def run_inference_hold(args: Any, *, policy_execution: bool = False) -> int:
                 warmup_policy_seed=args.warmup_policy_seed,
                 max_replans=args.max_replans,
                 max_executed_policy_chunks=args.max_executed_policy_chunks,
+                stop_after_inference_replan=getattr(
+                    args, "stop_after_inference_replan", None),
                 spin_once=check_observers,
                 check_runtime=check_runtime,
                 ros_now=lambda: node.get_clock().now().nanoseconds / 1e9,
@@ -233,7 +241,9 @@ def run_inference_hold(args: Any, *, policy_execution: bool = False) -> int:
                 ),
             )
         result["final_ros_graph"] = validate_graph(node, config)
-        result["final_observation_interfaces"] = node_interface_evidence(node)
+        result["final_observation_interfaces"] = node_interface_evidence(
+            node, allowed_service_clients=allowed_service_clients,
+        )
         result["final_camera_identity"] = camera_serial_evidence(config)
         if result["final_ros_graph"] != result["initial_ros_graph"]:
             raise RuntimeError("Source publisher endpoints changed")

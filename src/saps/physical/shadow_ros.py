@@ -114,12 +114,20 @@ def camera_serial_evidence(config: dict[str, Any]) -> dict[str, Any]:
     return evidence
 
 
-def node_interface_evidence(node: Any) -> dict[str, Any]:
-    """Inspect locally owned ROS interfaces, allowing only parameter events."""
+def node_interface_evidence(
+    node: Any,
+    *,
+    allowed_service_clients: frozenset[str] = frozenset(),
+) -> dict[str, Any]:
+    """Inspect locally owned ROS interfaces against an exact allow-list."""
 
     topics = [publisher.topic_name for publisher in node.publishers]
     services = [client.srv_name for client in node.clients]
-    if any(topic != "/parameter_events" for topic in topics) or services:
+    unexpected_services = (
+        len(services) != len(allowed_service_clients)
+        or set(services) != allowed_service_clients
+    )
+    if any(topic != "/parameter_events" for topic in topics) or unexpected_services:
         raise RuntimeError("Unexpected output/client interface in P0 subscriber node.")
     return {
         "published_topics": topics,

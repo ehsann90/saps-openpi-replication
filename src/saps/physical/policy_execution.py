@@ -138,6 +138,7 @@ def run_policy_episode(
     outcome_provider: Callable[[dict[str, Any]], TaskOutcome] = unevaluated_outcome,
     check_runtime: Callable[[], None] = lambda: None,
     gripper: Any | None = None,
+    stop_after_inference_replan: int | None = None,
     now: Callable[[], int] = time.monotonic_ns,
     sleep: Callable[[float], None] = time.sleep,
 ) -> None:
@@ -154,6 +155,18 @@ def run_policy_episode(
             or any(not np.isfinite(v) or v <= 0 for v in
                    (application_timeout, observation_timeout))):
         raise ValueError("Positive finite bounds are required")
+    if stop_after_inference_replan is not None:
+        if (type(stop_after_inference_replan) is not int
+                or stop_after_inference_replan < 0
+                or stop_after_inference_replan >= max_replans):
+            raise ValueError(
+                "stop_after_inference_replan must be a zero-based index "
+                "smaller than max_replans")
+        if (max_executed_policy_chunks is not None
+                and max_executed_policy_chunks <= stop_after_inference_replan):
+            raise ValueError(
+                "max_executed_policy_chunks must exceed "
+                "stop_after_inference_replan")
     warmup = PolicyWarmup(warmup_policy_seed=warmup_policy_seed,
                           policy_episode_seed=policy_episode_seed)
     rows: list[dict[str, Any]] = []
@@ -162,6 +175,7 @@ def run_policy_episode(
         episode={"policy_episode_seed": policy_episode_seed,
                  "max_replans": max_replans,
                  "max_executed_policy_chunks": max_executed_policy_chunks,
+                 "stop_after_inference_replan": stop_after_inference_replan,
                  "gripper_actuation": ("droid_binary_franka_hand" if gripper is not None
                                        else "disabled_arm_only"),
                  "outcome_provider": getattr(outcome_provider, "__name__",
@@ -330,6 +344,13 @@ def run_policy_episode(
             if (not current["inference"]["hold_audit"]["accepted"]
                     or not delivery()["accepted"]):
                 raise RuntimeError("inference_hold_evidence_failed")
+            if stop_after_inference_replan == index:
+                current["execution_skipped_after_inference"] = True
+                result["termination"].update(
+                    termination_reason="test_inference_stop_reached",
+                    stopped_after_inference_replan=index,
+                )
+                break
             with np.load(sample_dir / "actions.npz", allow_pickle=False) as data:
                 actions = selected_actions(data["actions"])
             phase = "actions"

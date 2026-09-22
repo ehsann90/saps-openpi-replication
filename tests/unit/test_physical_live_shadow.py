@@ -385,10 +385,24 @@ class RosPreflightTest(unittest.TestCase):
         node.publishers.append(SimpleNamespace(topic_name="/servo_node/delta_twist_cmds"))
         with self.assertRaises(RuntimeError):
             node_interface_evidence(node)
-        node.publishers = []
+        node.publishers = [SimpleNamespace(topic_name="/parameter_events")]
         node.clients = [SimpleNamespace(srv_name="/robot/move")]
         with self.assertRaises(RuntimeError):
             node_interface_evidence(node)
+
+        node.clients = [SimpleNamespace(srv_name="/franka_gripper/stop")]
+        evidence = node_interface_evidence(
+            node,
+            allowed_service_clients=frozenset({"/franka_gripper/stop"}),
+        )
+        self.assertEqual(evidence["service_clients"], ["/franka_gripper/stop"])
+
+        node.clients.append(SimpleNamespace(srv_name="/unexpected/service"))
+        with self.assertRaises(RuntimeError):
+            node_interface_evidence(
+                node,
+                allowed_service_clients=frozenset({"/franka_gripper/stop"}),
+            )
 
     def test_subscription_boundary_has_no_command_capabilities(self) -> None:
         boundary = SubscriptionBoundary(observation_tests.FakeRosNode())
