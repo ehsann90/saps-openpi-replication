@@ -15,7 +15,8 @@ import numpy as np
 
 from saps.physical import policy_execution as execution
 from saps.physical.policy_execution import (
-    execution_evidence_snapshot, run_policy_episode, TaskOutcome,
+    execution_evidence_snapshot, IncrementalDeliveryAudit, run_policy_episode,
+    TaskOutcome,
 )
 from saps.physical.shadow_config import load_shadow_config
 from saps.policies.openpi_droid import OpenPiDroidPolicy
@@ -133,7 +134,8 @@ class EpisodeTests(unittest.TestCase):
 
     def run_episode(self, cap=1, provider=lambda _: TaskOutcome.CONTINUE,
                     max_replans=3, seed=20260917, analyzer=analyze, gripper=None,
-                    stop_after_inference_replan=None):
+                    stop_after_inference_replan=None,
+                    gripper_transition_timeout=3.):
         run_policy_episode(
             boundary=self.boundary, collector=self.collector, policy=self.policy,
             config=load_shadow_config(CONFIG_PATH), output_dir=self.output,
@@ -144,6 +146,7 @@ class EpisodeTests(unittest.TestCase):
             max_replans=max_replans, max_executed_policy_chunks=cap,
             spin_once=self.collector.spin, ros_now=lambda: self.boundary.now / 1e9,
             result=self.result, outcome_provider=provider, gripper=gripper,
+            gripper_transition_timeout=gripper_transition_timeout,
             stop_after_inference_replan=stop_after_inference_replan,
             now=lambda: self.boundary.now, sleep=self.boundary.sleep,
         )
@@ -163,6 +166,61 @@ class EpisodeTests(unittest.TestCase):
         self.assertEqual(self.result["episode"]["gripper_actuation"], "droid_binary_franka_hand")
         gripper.stop.assert_called_once()
 
+    def test_queued_grasp_waits_before_new_hold_and_observation(self):
+        from unittest.mock import Mock
+        gripper = Mock()
+        gripper.command.return_value = {"request_id": 0}
+        gripper.evidence.return_value = {
+            "requests": [{"request_id": 0, "command_issued": True}],
+            "events": [], "error": None}
+        ready_at = None
+
+        def check_inference():
+            nonlocal ready_at
+            if not self.result["replans"] or "gripper_transition" not in self.result["replans"][0]:
+                return
+            if ready_at is None:
+                ready_at = self.boundary.now + 200_000_000
+            if self.boundary.now < ready_at:
+                raise RuntimeError("gripper_replacement_pending_before_inference")
+
+        gripper.check_inference.side_effect = check_inference
+        self.run_episode(cap=2, gripper=gripper)
+        self.assertEqual(self.result["status"], "success", self.result.get("error"))
+        self.assertEqual(self.result["main_policy_requests"], 2)
+        self.assertEqual(self.result["policy_actions_executed"], 16)
+        transition = self.result["replans"][0]["gripper_transition"]
+        self.assertTrue(transition["accepted"])
+        self.assertGreater(transition["checks"], 1)
+        self.assertGreaterEqual(transition["end_monotonic_ns"], ready_at)
+        self.assertGreater(
+            self.result["replans"][1]["pre_hold"]["actual_publish_t0_ns"],
+            transition["end_monotonic_ns"],
+        )
+
+    def test_queued_grasp_timeout_keeps_confirmed_terminal_hold(self):
+        from unittest.mock import Mock
+        gripper = Mock()
+        gripper.command.return_value = {"request_id": 0}
+        gripper.evidence.return_value = {
+            "requests": [{"request_id": 0, "command_issued": True}],
+            "events": [], "error": None}
+        def check_inference():
+            if "gripper_transition" in self.result["replans"][0]:
+                raise RuntimeError("gripper_replacement_pending_before_inference")
+
+        gripper.check_inference.side_effect = check_inference
+        self.run_episode(cap=2, gripper=gripper, gripper_transition_timeout=.03)
+        self.assertEqual(self.result["status"], "failed")
+        self.assertEqual(self.result["failed_phase"], "gripper_transition")
+        self.assertIn("gripper_replacement_pending_timeout", self.result["error"])
+        self.assertFalse(self.result["replans"][0]["gripper_transition"]["accepted"])
+        self.assertEqual(self.result["main_policy_requests"], 1)
+        self.assertEqual(self.result["terminal_holds_applied"], 1)
+        self.assertEqual(self.result["rows"][-1]["type"], "terminal_hold")
+        self.assertNotIn("failure_hold", self.result)
+        self.assertTrue(gripper.stop.called)
+
     def test_gripper_failure_prevents_remaining_actions_and_uses_abort_hold(self):
         from unittest.mock import Mock
         gripper = Mock()
@@ -179,6 +237,31 @@ class EpisodeTests(unittest.TestCase):
         self.assertEqual(self.result["policy_actions_published"], 1)
         self.assertEqual(self.result["failure_hold"], "applied")
         self.assertEqual(self.result["termination"]["termination_reason"], "runtime_abort")
+
+    def test_rejected_target_is_retained_but_not_expected_in_delivery_audit(self):
+        original = execution.prepare
+
+        def reject_action(*args, **kwargs):
+            row = original(*args, **kwargs)
+            if row["type"] == "policy_action" and row["action_index"] == 4:
+                row["safety_gate"]["accepted"] = False
+                row["safety_gate"]["rejection_reasons"] = ["test_gate_rejection"]
+            return row
+
+        with patch.object(execution, "prepare", side_effect=reject_action):
+            self.run_episode(cap=3)
+        self.assertEqual(self.result["status"], "failed")
+        self.assertEqual(self.result["error"], "RuntimeError: safety_gate_rejected")
+        self.assertEqual(self.result["main_policy_requests"], 1)
+        self.assertEqual(self.result["policy_actions_published"], 4)
+        self.assertEqual(self.result["rows"][-2]["action_index"], 4)
+        self.assertFalse(self.result["rows"][-2]["safety_gate"]["accepted"])
+        self.assertEqual(self.result["rows"][-1]["type"], "abort_hold")
+        audit = self.result["runtime_health"]["final_delivery_validation"]
+        self.assertTrue(audit["accepted"], audit["reasons"])
+        self.assertEqual(audit["expected_targets"], 6)
+        self.assertEqual(audit["analyzed_targets"], 6)
+        self.assertEqual(audit["safety_rejected_unpublished_targets"], 1)
 
     def test_first_test_cap_and_separate_latency(self):
         self.run_episode()
@@ -367,7 +450,8 @@ class EpisodeTests(unittest.TestCase):
                 self.assertTrue(first["terminal_hold"]["application_confirmation"]["accepted"])
                 self.assertEqual(first["terminal_hold"]["application_confirmation"]["analyzed_targets"], 1)
                 self.assertTrue(first["delivery_validation"]["accepted"])
-                self.assertEqual(first["delivery_validation"]["analyzed_targets"], 10)
+                self.assertEqual(first["inference"]["delivery_validation"]["analyzed_targets"], 1)
+                self.assertEqual(first["delivery_validation"]["analyzed_targets"], 9)
                 self.assertEqual(len(self.client.requests), 2)
             original(row, state, start)
         self.boundary.publish = publish
@@ -488,18 +572,124 @@ class EpisodeTests(unittest.TestCase):
         self.assertEqual(self.result["policy_actions_executed"], 0)
 
     def test_late_drain_health_failure_prevents_outcome_and_replan(self):
-        original = self.boundary.sleep
-        def sleep(seconds):
-            original(seconds)
-            if seconds == 2.:
+        original = self.boundary.snapshot
+        injected = False
+        def snapshot():
+            nonlocal injected
+            if self.result["replans"] and "post_chunk_timing" in self.result["replans"][-1] and not injected:
+                injected = True
                 self.boundary.records.append({"kind": "franka_state",
                     "health_reasons": ["collision"],
                     "receive_monotonic_ns": self.boundary.now})
-        self.boundary.sleep = sleep
+            return original()
+        self.boundary.snapshot = snapshot
         self.run_episode(cap=3)
+        self.assertTrue(injected)
         self.assertEqual(self.result["main_policy_requests"], 1)
         self.assertEqual(self.result["completed_main_replans"], 0)
         self.assertEqual(self.result["replans"][0]["outcome_after_chunk"], "not_evaluated")
+
+    def test_condition_barrier_uses_fresh_post_t4_evidence(self):
+        self.run_episode()
+        self.assertEqual(self.result["status"], "success", self.result.get("error"))
+        first = self.result["replans"][0]
+        elapsed = (first["post_chunk_timing"]["drain_completion_monotonic_ns"]
+                   - first["terminal_hold"]["timing"]["t4_ns"])
+        self.assertGreater(elapsed, 0)
+        self.assertLess(elapsed, 2_000_000_000)
+        self.assertGreaterEqual(first["post_chunk_timing"]["barrier_checks"], 1)
+        self.assertTrue(first["runtime_health"]["accepted"])
+
+    def test_next_chunk_does_not_recopy_prior_chunk_telemetry(self):
+        original = self.boundary.publish
+        def publish(row, state, start):
+            original(row, state, start)
+            if row["type"] == "terminal_hold" and len(self.result["replans"]) == 1:
+                self.boundary.records.extend(
+                    {"kind": "measured_joint", "prior_chunk_marker": True}
+                    for _ in range(2000))
+        self.boundary.publish = publish
+        second_window_count = []
+        def analyzer(records):
+            if (len(self.result["replans"]) == 2
+                    and "barrier_start_monotonic_ns" in
+                    self.result["replans"][-1].get("post_chunk_timing", {})
+                    and "drain_completion_monotonic_ns" not in
+                    self.result["replans"][-1]["post_chunk_timing"]):
+                second_window_count.append(len(records))
+                self.assertFalse(any(r.get("prior_chunk_marker") for r in records))
+            return analyze(records)
+        self.run_episode(cap=2, analyzer=analyzer)
+        self.assertEqual(self.result["status"], "success", self.result.get("error"))
+        self.assertTrue(second_window_count)
+
+    def test_missing_post_t4_controller_telemetry_times_out_without_replan(self):
+        original = self.boundary.sleep
+        def sleep(seconds):
+            original(seconds)
+            if not self.result["replans"]:
+                return
+            terminal = self.result["replans"][-1].get("terminal_hold")
+            if terminal is None:
+                return
+            t4 = (terminal.get("timing", {}).get("t4_ns")
+                  or terminal.get("actual_publish_t0_ns", 0) + 40)
+            self.boundary.records[:] = [
+                record for record in self.boundary.records
+                if not (record["kind"] == "controller_state"
+                        and record.get("receive_monotonic_ns", 0) > t4)]
+        self.boundary.sleep = sleep
+        self.run_episode(cap=3)
+        self.assertEqual(self.result["status"], "failed")
+        self.assertEqual(self.result["failed_phase"], "delivery_validation")
+        self.assertIn("post_hold_evidence_timeout", self.result["error"])
+        self.assertEqual(self.result["main_policy_requests"], 1)
+        self.assertEqual(self.result["completed_main_replans"], 0)
+
+    def test_late_inference_state_change_fails_bounded_post_chunk_recheck(self):
+        original = self.boundary.publish
+        def publish(row, state, start):
+            original(row, state, start)
+            if row["type"] == "terminal_hold":
+                changed = [0.] * 39
+                changed[38] = 1.
+                changed[37] = self.result["replans"][-1]["pre_hold"]["timing"]["sequence"] + 1
+                self.boundary.records.append({
+                    "kind": "controller_state", "data": changed,
+                    "receive_monotonic_ns": self.result["replans"][-1]["inference"][
+                        "request_start_monotonic_ns"] + 1,
+                })
+        self.boundary.publish = publish
+        self.run_episode(cap=3)
+        self.assertEqual(self.result["status"], "failed")
+        self.assertEqual(self.result["failed_phase"], "delivery_validation")
+        self.assertEqual(self.result["main_policy_requests"], 1)
+        self.assertEqual(self.result["completed_main_replans"], 0)
+        self.assertIn("installed_pre_hold_changed_during_inference",
+                      self.result["replans"][0]["inference"]["hold_audit"]["reasons"])
+
+    def test_evidence_id_gap_across_accepted_windows_rejects_next_window(self):
+        self.run_episode()
+        first = self.result["replans"][0]
+        action = first["actions"][0]
+        start = next(i for i, record in enumerate(self.boundary.records)
+                     if record["kind"] == "sent"
+                     and record["source_stamp_ns"] == action["source_stamp_ns"])
+        batches = [record for record in self.boundary.records[start:]
+                   if record["kind"] == "controller"
+                   and record["data"].get("event") == "samples"]
+        for index, record in enumerate(batches):
+            record["data"]["evidence_id"] = 1001 + index
+        audit = IncrementalDeliveryAudit(start, IDENTITY)
+        pre = first["pre_hold"]
+        audit.row_cursor = 1
+        audit.last_sequence = pre["timing"]["sequence"]
+        audit.last_stamp = pre["source_stamp_ns"]
+        audit.last_t4 = pre["timing"]["t4_ns"]
+        audit.last_evidence_id["controller:" + IDENTITY[0]] = 999
+        _, _, validation = audit.inspect(self.boundary, self.result["rows"], analyze)
+        self.assertFalse(validation["accepted"])
+        self.assertIn("evidence_id_gap_across_windows", validation["reasons"])
 
     def test_missed_tick_does_not_burst_remaining_actions(self):
         original = self.boundary.publish
@@ -521,17 +711,19 @@ class EpisodeTests(unittest.TestCase):
         self.assertEqual(self.result["policy_actions_published"], 8)
         self.assertEqual(self.result["policy_actions_executed"], 0)
 
-    def slow_post_chunk_analyzer(self, *, recover):
-        self.boundary.records.extend(
-            {"kind": "measured_joint", "historical": True}
-            for _ in range(20000))
+    def readiness_lapse_after_barrier(self, *, recover):
         stale_since = None
         refreshed = False
         original_snapshot = self.boundary.snapshot
         original_sleep = self.boundary.sleep
 
         def snapshot():
+            nonlocal stale_since
             state = original_snapshot()
+            if (stale_since is None and self.result["replans"]
+                    and "drain_completion_monotonic_ns"
+                    in self.result["replans"][0].get("post_chunk_timing", {})):
+                stale_since = self.boundary.now
             if stale_since is not None and not refreshed:
                 state = dataclasses.replace(state, readiness_reasons=(
                     "controller_active_evidence_missing_or_expired",))
@@ -549,20 +741,8 @@ class EpisodeTests(unittest.TestCase):
         self.boundary.snapshot = snapshot
         self.boundary.sleep = sleep
 
-        def analyzer(records):
-            nonlocal stale_since, refreshed
-            timing = self.result["replans"][-1].get("post_chunk_timing", {})
-            if ("evidence_snapshot_end_monotonic_ns" in timing
-                    and "validation_completion_monotonic_ns" not in timing):
-                self.boundary.now += sum(
-                    r.get("historical", False) for r in records) * 20000
-                stale_since = self.boundary.now
-                refreshed = False
-            return analyze(records)
-        return analyzer
-
-    def test_slow_audit_reacquires_readiness_before_next_pre_hold(self):
-        analyzer = self.slow_post_chunk_analyzer(recover=True)
+    def test_condition_barrier_reacquires_readiness_before_next_pre_hold(self):
+        self.readiness_lapse_after_barrier(recover=True)
         original_publish = self.boundary.publish
         def publish(row, state, start):
             if row["type"] == "pre_inference_hold" and len(self.result["replans"]) == 2:
@@ -572,12 +752,12 @@ class EpisodeTests(unittest.TestCase):
                 self.assertFalse(state.readiness_reasons)
             original_publish(row, state, start)
         self.boundary.publish = publish
-        self.run_episode(cap=2, analyzer=analyzer)
+        self.run_episode(cap=2)
         self.assertEqual(self.result["status"], "success", self.result.get("error"))
         first, second = self.result["replans"]
         timing = first["post_chunk_timing"]
-        self.assertGreater(timing["validation_completion_monotonic_ns"] -
-                           timing["evidence_snapshot_end_monotonic_ns"], 300_000_000)
+        self.assertLess(timing["drain_completion_monotonic_ns"] -
+                        first["terminal_hold"]["timing"]["t4_ns"], 200_000_000)
         ordered = [timing[key] for key in (
             "drain_completion_monotonic_ns",
             "evidence_snapshot_start_monotonic_ns",
@@ -591,7 +771,8 @@ class EpisodeTests(unittest.TestCase):
         self.assertEqual(self.client.requests[-1]["replan_index"], 1)
 
     def test_readiness_timeout_issues_no_command_or_next_inference(self):
-        self.run_episode(cap=2, analyzer=self.slow_post_chunk_analyzer(recover=False))
+        self.readiness_lapse_after_barrier(recover=False)
+        self.run_episode(cap=2)
         self.assertEqual(self.result["status"], "failed")
         self.assertEqual(self.result["failed_phase"], "readiness_reacquisition")
         self.assertIn("readiness_reacquisition_timeout", self.result["error"])
@@ -609,31 +790,29 @@ class EpisodeTests(unittest.TestCase):
     def test_post_chunk_validators_share_one_detached_snapshot(self):
         seen = []
         originals = [execution.validate_execution_delivery,
-                     execution.audit_inference_hold,
                      execution.validate_streaming_runtime_health]
         def wrapper(original):
             def validate(records, *args, **kwargs):
                 timing = self.result["replans"][-1].get("post_chunk_timing", {})
-                if ("evidence_snapshot_end_monotonic_ns" in timing
-                        and "validation_completion_monotonic_ns" not in timing):
+                if ("barrier_start_monotonic_ns" in timing
+                        and "drain_completion_monotonic_ns" not in timing):
                     seen.append(records)
                     self.assertFalse(any(r.get("late_append") for r in records))
-                    self.assertIsNot(records[0], self.boundary.records[0])
+                    self.assertFalse(any(records[0] is item for item in self.boundary.records))
                     self.boundary.records.append(
                         {"kind": "measured_joint", "late_append": True})
                 return original(records, *args, **kwargs)
             return validate
         with patch.object(execution, "validate_execution_delivery", wrapper(originals[0])), \
-             patch.object(execution, "audit_inference_hold", wrapper(originals[1])), \
-             patch.object(execution, "validate_streaming_runtime_health", wrapper(originals[2])), \
+             patch.object(execution, "validate_streaming_runtime_health", wrapper(originals[1])), \
              patch.object(execution, "execution_evidence_snapshot",
                           wraps=execution_evidence_snapshot) as capture:
             self.run_episode()
         self.assertEqual(self.result["status"], "success", self.result.get("error"))
-        self.assertEqual(len(seen), 3)
+        self.assertEqual(len(seen), 2)
         self.assertTrue(all(records is seen[0] for records in seen))
-        # Two inference audits, one shared post-chunk snapshot, final audit.
-        self.assertEqual(capture.call_count, 4)
+        # One inference snapshot, one bounded chunk snapshot, final audit.
+        self.assertEqual(capture.call_count, 3)
 
 
 class EvidenceSnapshotTests(unittest.TestCase):

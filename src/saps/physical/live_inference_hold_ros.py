@@ -226,6 +226,7 @@ def run_inference_hold(args: Any, *, policy_execution: bool = False) -> int:
                 check_runtime=check_runtime,
                 ros_now=lambda: node.get_clock().now().nanoseconds / 1e9,
                 result=result, gripper=gripper,
+                gripper_transition_timeout=args.gripper_timeout,
             )
         else:
             run_hold_sequence(
@@ -286,10 +287,14 @@ def run_inference_hold(args: Any, *, policy_execution: bool = False) -> int:
                     from saps.physical.policy_execution import (
                         audit_inference_hold, validate_execution_delivery,
                     )
+                    eligible = [row for row in result["rows"]
+                                if row["safety_gate"]["accepted"]]
                     validation = validate_execution_delivery(
-                        records[analysis_start:], result["rows"], timing.analyze,
+                        records[analysis_start:], eligible, timing.analyze,
                         expected_identity,
                     )
+                    validation["safety_rejected_unpublished_targets"] = (
+                        len(result["rows"]) - len(eligible))
                     result["runtime_health"]["final_delivery_validation"] = validation
                     if not validation["accepted"]:
                         result["status"] = "failed"

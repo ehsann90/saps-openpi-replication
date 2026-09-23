@@ -41,15 +41,15 @@ def unevaluated_outcome(replan: dict[str, Any]) -> TaskOutcome:
 
 
 def execution_evidence_snapshot(
-    boundary: Any, start: int,
+    boundary: Any, start: int, end: int | None = None,
 ) -> list[dict[str, Any]]:
-    """Isolate C1-C2 evidence without blocking callbacks during deep copy.
+    """Isolate an evidence window without blocking callbacks during deep copy.
 
     The boundary appends completed records and never mutates saved records.
-    Capture the prefix under its lock, then detach nested data outside it.
+    Capture the window under its lock, then detach nested data outside it.
     """
     with boundary.lock:
-        records = boundary.records[start:]
+        records = boundary.records[start:end]
     return copy.deepcopy(records)
 
 
@@ -57,7 +57,7 @@ def validate_execution_delivery(
     records: list[dict[str, Any]], rows: list[dict[str, Any]],
     analyzer: Any, expected_identity: tuple[str, int],
 ) -> dict[str, Any]:
-    """Validate the whole publication prefix, including intervening holds."""
+    """Validate a complete target window or the full prefix at final audit."""
     summary = correlate(records, rows, analyzer)
     result = validate_streaming_delivery(
         rows, summary, expected_types=[r["type"] for r in rows],
@@ -126,6 +126,94 @@ def audit_inference_hold(
             "gripper_commands_issued": 0}
 
 
+class IncrementalDeliveryAudit:
+    """Audit each new window once; preserve continuity across its boundaries."""
+
+    def __init__(self, start: int, expected_identity: tuple[str, int]):
+        self.record_cursor = start
+        self.row_cursor = 0
+        self.expected_identity = expected_identity
+        self.last_sequence: int | None = None
+        self.last_stamp: int | None = None
+        self.last_t4: int | None = None
+        self.last_evidence_id: dict[str, int] = {}
+
+    def inspect(self, boundary: Any, rows: list[dict[str, Any]],
+                analyzer: Any) -> tuple[list[dict[str, Any]], int, dict[str, Any]]:
+        with boundary.lock:
+            end = len(boundary.records)
+        records = execution_evidence_snapshot(boundary, self.record_cursor, end)
+        fresh_rows = rows[self.row_cursor:]
+        validation = validate_execution_delivery(
+            records, fresh_rows, analyzer, self.expected_identity)
+        reasons = validation["reasons"]
+        if not fresh_rows:
+            reasons.append("no_new_targets_to_validate")
+        elif self.last_sequence is not None:
+            first = fresh_rows[0]
+            timing = first.get("timing", {})
+            if timing.get("sequence") != self.last_sequence + 1:
+                reasons.append("controller_sequence_gap_across_windows")
+            if first.get("source_stamp_ns", 0) <= self.last_stamp:
+                reasons.append("source_stamp_not_increasing_across_windows")
+            if timing.get("t4_ns", 0) <= self.last_t4:
+                reasons.append("application_not_increasing_across_windows")
+
+        # The pinned analyzer reports gaps *inside* a capture but cannot see
+        # evidence-ID gaps that cross from one window into the next.
+        ids: dict[str, set[int]] = {}
+        for record in records:
+            if record["kind"] == "controller":
+                data = record["data"]
+                key = "controller:" + str(data.get("instance", ""))
+                number = data.get("evidence_id")
+            elif record["kind"] == "forwarder":
+                data = record["data"]
+                key = "forwarder:" + str(data.get("forwarder_instance", ""))
+                number = data.get("counts", {}).get("received")
+            else:
+                continue
+            if number is not None:
+                ids.setdefault(key, set()).add(number)
+        for key, values in ids.items():
+            previous = self.last_evidence_id.get(key)
+            if previous is not None:
+                if min(values) <= previous:
+                    reasons.append("evidence_id_repeated_across_windows")
+                elif min(values) != previous + 1:
+                    reasons.append("evidence_id_gap_across_windows")
+        if any(r["kind"] == "controller_readiness" and r.get("readiness_reasons")
+               for r in records):
+            reasons.append("controller_readiness_violation_observed")
+        validation["accepted"] = not reasons
+        return records, end, validation
+
+    def commit(self, records: list[dict[str, Any]], end: int,
+               rows: list[dict[str, Any]], validation: dict[str, Any]) -> None:
+        if not validation["accepted"] or len(rows) <= self.row_cursor:
+            raise RuntimeError("incremental_delivery_not_accepted")
+        for record in records:
+            if record["kind"] == "controller":
+                data = record["data"]
+                key = "controller:" + str(data.get("instance", ""))
+                number = data.get("evidence_id")
+            elif record["kind"] == "forwarder":
+                data = record["data"]
+                key = "forwarder:" + str(data.get("forwarder_instance", ""))
+                number = data.get("counts", {}).get("received")
+            else:
+                continue
+            if number is not None:
+                self.last_evidence_id[key] = max(
+                    number, self.last_evidence_id.get(key, number))
+        last = rows[-1]
+        self.last_sequence = last["timing"]["sequence"]
+        self.last_stamp = last["source_stamp_ns"]
+        self.last_t4 = last["timing"]["t4_ns"]
+        self.row_cursor = len(rows)
+        self.record_cursor = end
+
+
 def run_policy_episode(
     *, boundary: Any, collector: Any, policy: Any, config: dict[str, Any],
     output_dir: Path, limits: dict[str, Any], analyzer: Any,
@@ -138,6 +226,7 @@ def run_policy_episode(
     outcome_provider: Callable[[dict[str, Any]], TaskOutcome] = unevaluated_outcome,
     check_runtime: Callable[[], None] = lambda: None,
     gripper: Any | None = None,
+    gripper_transition_timeout: float = 3.0,
     stop_after_inference_replan: int | None = None,
     now: Callable[[], int] = time.monotonic_ns,
     sleep: Callable[[float], None] = time.sleep,
@@ -153,7 +242,8 @@ def run_policy_episode(
                 (type(max_executed_policy_chunks) is not int
                  or max_executed_policy_chunks <= 0))
             or any(not np.isfinite(v) or v <= 0 for v in
-                   (application_timeout, observation_timeout))):
+                   (application_timeout, observation_timeout,
+                    gripper_transition_timeout))):
         raise ValueError("Positive finite bounds are required")
     if stop_after_inference_replan is not None:
         if (type(stop_after_inference_replan) is not int
@@ -189,13 +279,31 @@ def run_policy_episode(
     current: dict[str, Any] | None = None
     phase = "warmup"
     confirmation_start: int | None = None
+    incremental = IncrementalDeliveryAudit(analysis_start, expected_identity)
 
     def evidence() -> list[dict[str, Any]]:
         return execution_evidence_snapshot(boundary, analysis_start)
 
     def delivery() -> dict[str, Any]:
-        return validate_execution_delivery(evidence(), rows, analyzer,
-                                           expected_identity)
+        # A rejected gate raises before publication. Keep its row for the
+        # safety audit, but do not count it as an expected delivered target.
+        eligible = [row for row in rows if row["safety_gate"]["accepted"]]
+        validation = validate_execution_delivery(evidence(), eligible, analyzer,
+                                                 expected_identity)
+        validation["safety_rejected_unpublished_targets"] = len(rows) - len(eligible)
+        return validation
+
+    def check_unreviewed_health() -> None:
+        # An event appended while a detached window was being validated must
+        # be checked before another hold or inference, even if latest state
+        # has recovered by then.
+        with boundary.lock:
+            recent = boundary.records[incremental.record_cursor:]
+        if any(r["kind"] == "invalid_evidence"
+               or (r["kind"] == "franka_state" and r.get("health_reasons"))
+               or (r["kind"] == "controller_readiness" and r.get("readiness_reasons"))
+               for r in recent):
+            raise RuntimeError("unreviewed_delivery_or_health_violation")
 
     def confirm() -> None:
         if confirmation_start is None:
@@ -224,6 +332,8 @@ def run_policy_episode(
         nonlocal confirmation_start
         if kind != "abort_hold":
             check_runtime()
+            if kind == "pre_inference_hold":
+                check_unreviewed_health()
             if gripper is not None and kind != "terminal_hold":
                 gripper.check()
         previous = rows[-1]["q_ref_source_stamp_ns"] if rows else 0
@@ -277,6 +387,7 @@ def run_policy_episode(
         record.update(start_monotonic_ns=start, checks=0, accepted=False)
         try:
             while now() < deadline:
+                check_unreviewed_health()
                 record["checks"] += 1
                 reasons = boundary.snapshot().readiness_reasons
                 record["last_readiness_reasons"] = list(reasons)
@@ -287,6 +398,37 @@ def run_policy_episode(
                 if remaining > 0:
                     sleep(min(.01, remaining / 1e9))
             raise TimeoutError("readiness_reacquisition_timeout")
+        finally:
+            record["end_monotonic_ns"] = now()
+
+    def await_gripper_transition(record: dict[str, Any]) -> None:
+        # A late CLOSE can remain queued while an earlier Move is being
+        # cancelled. Keep the terminal arm hold installed until the hand has
+        # issued that replacement, before taking the next observation.
+        start = now()
+        deadline = start + int(gripper_transition_timeout * 1e9)
+        record.update(start_monotonic_ns=start, deadline_monotonic_ns=deadline,
+                      checks=0, accepted=False)
+        try:
+            while now() < deadline:
+                check_runtime()
+                check_unreviewed_health()
+                if boundary.snapshot().readiness_reasons:
+                    raise RuntimeError("gripper_transition_arm_readiness_lost")
+                record["checks"] += 1
+                try:
+                    gripper.check_inference()
+                except RuntimeError as error:
+                    if str(error) != "gripper_replacement_pending_before_inference":
+                        raise
+                else:
+                    if now() < deadline:
+                        record["accepted"] = True
+                        return
+                remaining = deadline - now()
+                if remaining > 0:
+                    sleep(min(.01, remaining / 1e9))
+            raise TimeoutError("gripper_replacement_pending_timeout")
         finally:
             record["end_monotonic_ns"] = now()
 
@@ -328,6 +470,7 @@ def run_policy_episode(
                 (sample_dir / "request.json").read_text())
             phase = "inference"
             check_runtime()
+            check_unreviewed_health()
             if gripper is not None:
                 gripper.check_inference()
             infer_live_request(
@@ -339,11 +482,16 @@ def run_policy_episode(
             )
             current["inference"]["response"] = json.loads(
                 (sample_dir / "response.json").read_text())
+            inference_records, inference_end, inference_delivery = incremental.inspect(
+                boundary, rows, analyzer)
+            current["inference"]["delivery_validation"] = inference_delivery
             current["inference"]["hold_audit"] = audit_inference_hold(
-                evidence(), current["pre_hold"], current["inference"])
+                inference_records, current["pre_hold"], current["inference"])
             if (not current["inference"]["hold_audit"]["accepted"]
-                    or not delivery()["accepted"]):
+                    or not inference_delivery["accepted"]):
                 raise RuntimeError("inference_hold_evidence_failed")
+            incremental.commit(inference_records, inference_end, rows,
+                               inference_delivery)
             if stop_after_inference_replan == index:
                 current["execution_skipped_after_inference"] = True
                 result["termination"].update(
@@ -370,27 +518,64 @@ def run_policy_episode(
             confirm()
             result["terminal_holds_applied"] += 1
             phase = "delivery_validation"
-            sleep(POST_HOLD_DRAIN_SECONDS)
-            timing = {"drain_completion_monotonic_ns": now()}
+            terminal_t4 = current["terminal_hold"]["timing"]["t4_ns"]
+            deadline = now() + int(POST_HOLD_DRAIN_SECONDS * 1e9)
+            timing: dict[str, Any] = {"barrier_start_monotonic_ns": now(),
+                                       "barrier_deadline_monotonic_ns": deadline,
+                                       "barrier_checks": 0}
             current["post_chunk_timing"] = timing
-            check_runtime()
-            timing["evidence_snapshot_start_monotonic_ns"] = now()
-            records = evidence()
-            timing["evidence_snapshot_end_monotonic_ns"] = now()
-            current["delivery_validation"] = validate_execution_delivery(
-                records, rows, analyzer, expected_identity)
-            current["inference"]["hold_audit"] = audit_inference_hold(
-                records, current["pre_hold"], current["inference"])
-            current["runtime_health"] = validate_streaming_runtime_health(
-                records, current["actions"] + [current["terminal_hold"]],
-                hold_type="terminal_hold",
-                after_monotonic_ns=current["terminal_hold"]["timing"]["t4_ns"],
-            )
-            timing["validation_completion_monotonic_ns"] = now()
-            if (not current["delivery_validation"]["accepted"]
-                    or not current["inference"]["hold_audit"]["accepted"]
-                    or not current["runtime_health"]["accepted"]):
-                raise RuntimeError("chunk_delivery_or_health_failed")
+            while now() < deadline:
+                check_runtime()
+                timing["barrier_checks"] += 1
+                timing["evidence_snapshot_start_monotonic_ns"] = now()
+                records, end, validation = incremental.inspect(boundary, rows, analyzer)
+                timing["evidence_snapshot_end_monotonic_ns"] = now()
+                health = validate_streaming_runtime_health(
+                    records, current["actions"] + [current["terminal_hold"]],
+                    hold_type="terminal_hold", after_monotonic_ns=terminal_t4)
+                timing["validation_completion_monotonic_ns"] = now()
+                current["delivery_validation"] = validation
+                current["runtime_health"] = health
+                if any(r["kind"] == "invalid_evidence"
+                       or (r["kind"] == "franka_state" and r.get("health_reasons"))
+                       or (r["kind"] == "controller_readiness" and r.get("readiness_reasons"))
+                       for r in records):
+                    raise RuntimeError("chunk_delivery_or_health_failed")
+                # All four sources must be received strictly after T4. The
+                # controller-state message has no embedded monotonic stamp;
+                # its callback receive timestamp is the available evidence.
+                advanced = all(any(
+                    record["kind"] == kind
+                    and record.get("response_monotonic_ns" if kind == "controller_readiness"
+                                   else "receive_monotonic_ns", -1) > terminal_t4
+                    for record in records)
+                    for kind in ("controller_state", "franka_state",
+                                 "controller_readiness", "measured_joint"))
+                if validation["accepted"] and health["accepted"] and advanced:
+                    # Recheck the inference hold using only this chunk's two
+                    # bounded windows. Late records for its inference interval
+                    # must still fail before outcome or another replan.
+                    current["inference"]["hold_audit"] = audit_inference_hold(
+                        inference_records + records, current["pre_hold"],
+                        current["inference"])
+                    if not current["inference"]["hold_audit"]["accepted"]:
+                        raise RuntimeError("chunk_delivery_or_health_failed")
+                    check_runtime()
+                    if boundary.snapshot().readiness_reasons:
+                        raise RuntimeError("post_hold_readiness_failed")
+                    if now() >= deadline:
+                        break
+                    incremental.commit(records, end, rows, validation)
+                    timing["drain_completion_monotonic_ns"] = now()
+                    break
+                remaining = deadline - now()
+                if remaining > 0:
+                    sleep(min(.01, remaining / 1e9))
+            else:
+                raise TimeoutError("post_hold_evidence_timeout")
+            if "drain_completion_monotonic_ns" not in timing:
+                raise TimeoutError("post_hold_evidence_timeout")
+            check_unreviewed_health()
             result["completed_main_replans"] += 1
             phase = "outcome"
             outcome = outcome_provider(current)
@@ -409,6 +594,10 @@ def run_policy_episode(
                 phase = "readiness_reacquisition"
                 current["readiness_reacquisition"] = {}
                 reacquire_readiness(current["readiness_reacquisition"])
+                if gripper is not None:
+                    phase = "gripper_transition"
+                    current["gripper_transition"] = {}
+                    await_gripper_transition(current["gripper_transition"])
         else:
             result["termination"]["termination_reason"] = "safety_replan_limit_reached"
         if gripper is not None:
@@ -425,7 +614,8 @@ def run_policy_episode(
         # During readiness reacquisition the confirmed terminal hold remains
         # installed; the command-free barrier must not attempt another hold.
         # A terminal-hold failure has already consumed that hold attempt.
-        if phase not in ("terminal_hold", "readiness_reacquisition"):
+        if phase not in ("terminal_hold", "readiness_reacquisition",
+                         "gripper_transition"):
             try:
                 with boundary.lock:
                     abort_start = len(boundary.records)

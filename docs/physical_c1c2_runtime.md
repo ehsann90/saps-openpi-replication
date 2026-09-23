@@ -4,12 +4,12 @@ G1B adds an explicitly enabled asynchronous gripper path; see
 [the validated G1B integration](physical_g1b_gripper.md).
 The arm-only baseline and historical validation below remain unchanged.
 
-Implemented from frozen warm-up commit
-`cba260c97a19db5aadd99052a16c94cccec3413b`. No physical execution has been
-performed for this implementation. OpenPI remains pinned at `15a9616a` and
-fr3_lab_stack at `9e535b6`. C1-B, C1-C1 and C1-C2-W commands retain their
-existing behavior. This is arm execution only, not complete manipulation-task
-execution: gripper commands are disabled and no task-success detector exists.
+The arm-only baseline was implemented from frozen warm-up commit
+`cba260c97a19db5aadd99052a16c94cccec3413b`; its validation is recorded
+below. OpenPI remains pinned at `15a9616a` and fr3_lab_stack at `9e535b6`.
+The separately enabled `physical-c1c2-gripper` path adds G1B hand actuation.
+Neither entry point has a task-success detector. C1-B, C1-C1 and C1-C2-W
+commands retain their existing behavior.
 
 ## Lifecycle and protocol
 
@@ -32,7 +32,7 @@ is synchronous; no target publication or gripper call occurs inside it.
 Controller state records must show the installed pre-hold desired q and target
 sequence during inference. Delivery analysis also rejects unmatched commands,
 identity changes and evidence gaps. Audits run before action 0 and again after
-the drain to include delayed evidence.
+the terminal hold to include delayed evidence.
 
 Only native finite `[15,8]` chunks qualify. Execute actions 0 through 7:
 
@@ -59,31 +59,56 @@ that target and evidence acquired from its cursor onward are validated,
 including run/source stamp, T0, desired q, controller identity, and unique
 forwarder/callback/application evidence. Confirmation cost therefore does not
 grow with prior episode telemetry. The confirmation's target counts describe
-one hold; they are not a full-prefix audit. After the terminal hold and drain,
-the unchanged full-prefix delivery audit remains authoritative for sequence
-continuity, gaps, publication errors, application order, identity, and all prior
-targets; it must pass before another replan.
+one hold; they are not a complete episode audit. In the G2 policy-execution
+path, the pre-inference and post-chunk online audits inspect new evidence since
+their last accepted cursor. Cross-window sequence, source-stamp, T4, and
+evidence-ID continuity is required. The full append-only record is retained
+for the final audit after closure. C1-B and its existing drain remain unchanged.
+If a safety gate rejects a target before publication, its raw row remains in
+the run, while final delivery analysis counts only targets eligible for
+publication and reports `safety_rejected_unpublished_targets` separately.
+The episode still fails on the original safety rejection.
 
-Post-chunk delivery, inference-hold, and health validation share one detached
-evidence snapshot taken after the drain. C1-C2 copies the append-only record
-references under the boundary lock, then deep-copies outside it so callbacks
-can refresh readiness during expensive history processing. The full audit
-still grows with the recorded prefix; it is outside the bounded online waits.
-After a successful audit and CONTINUE, if another replan is permitted, a
+After terminal T4 confirmation, the G2 policy-execution path waits for complete
+incremental target delivery and healthy Franka state, controller state,
+controller readiness, and measured-joint evidence received strictly after T4.
+The controller-state message is headerless; the comparable timestamp here is
+its monotonic callback receive time. The wait fails closed at the existing
+two-second drain bound if its evidence does not arrive. Unhealthy Franka or
+readiness records stop the replan even if later records recover. This changes
+the previous G2 fixed two-second wait into a condition-based wait; it does not
+change the hold, the validated arm mapping, or the safety gates. In the archived
+14 complete G2 chunks, all four streams and delivery evidence had advanced
+within 22–96 ms, but these observations do not guarantee a future duration.
+
+Incremental audits capture append-only record references under the boundary
+lock and deep-copy outside it so callbacks can continue. A full episode audit
+still runs at finalization. After a successful chunk audit and CONTINUE, if
+another replan is permitted, a
 command-free readiness barrier waits up to the application-confirmation bound
 (default 0.25 s) for all snapshot readiness reasons to clear. The 300 ms active
 evidence TTL and publication safety checks remain unchanged. Timeout stops the
 episode with the confirmed terminal hold in place, without another hold or
 inference request.
 
-Each replan records `post_chunk_timing` with drain completion, evidence-snapshot
-start/end, and validation completion in monotonic nanoseconds. When another
+When gripper actuation is enabled, a late CLOSE can be queued while an older
+Move is cancelling. Before the next pre-hold and observation, the confirmed
+terminal arm hold remains installed while the runtime waits for the gripper
+replacement to be issued. This condition wait uses the configured gripper
+timeout (default 3 seconds); a pending replacement, latched hand failure, or
+lost arm readiness fails the episode without starting another inference or
+publishing an extra arm hold. Each attempted wait records `gripper_transition`
+start, deadline, check count, completion, and acceptance.
+
+Each replan records `post_chunk_timing` with barrier start, deadline, check
+count, completion, evidence-snapshot start/end, and validation completion in
+monotonic nanoseconds. When another
 replan is allowed, `readiness_reacquisition` records start/end monotonic times,
 check count, acceptance, and the last readiness reasons. These are additive
 diagnostic fields; outcome and action semantics are unchanged.
 
-Unique terminal T4 confirmation and the unchanged two-second evidence drain
-precede delivery/health validation and outcome evaluation. There is no
+Unique terminal T4 confirmation and the post-T4 condition barrier
+precede outcome evaluation. There is no
 convergence wait. CONTINUE establishes a new pre-hold; SUCCESS, FAILURE and
 ABORT terminate before another inference. `TaskOutcome` is a separate provider
 interface. The installed validation provider returns CONTINUE and does not
@@ -102,43 +127,17 @@ actions are suppressed. A failed terminal hold is not retried. Partial action
 counts and unsafe/unconfirmed holds are retained; no failed chunk permits
 another inference.
 
-## Gripper evidence and remaining gap
+## Gripper behavior and remaining task gap
 
-Inspection of pinned OpenPI, existing SAPS and the local Franka interface found:
-
-* `third_party/openpi/src/openpi/training/config.py`, `pi05_droid`: horizon 15,
-  `DroidInputs`/`DroidOutputs`; no relative gripper transform.
-* `third_party/openpi/src/openpi/policies/droid_policy.py`, `DroidOutputs`:
-  returns the first eight output dimensions, with no closure conversion.
-* `third_party/openpi/examples/droid/convert_droid_data_to_lerobot.py`: the
-  action combines seven `joint_velocity` values and `gripper_position`.
-  `src/openpi/training/droid_rlds_dataset.py` likewise takes dimension 7 from
-  `action_dict/gripper_position`. The repository dataset manifest is DROID raw
-  1.0.1 in `configs/droid_m1_sample.json`.
-* `third_party/openpi/examples/droid/main.py:80` selects gripper **position**
-  mode; lines 140–150 threshold at `> 0.5` into 1 or 0 and clip before
-  `RobotEnv.step`. This supports absolute position intent, not a relative
-  gripper increment. The backend `droid.robot_env` is not vendored/pinned here;
-  these sources alone do not establish its physical width conversion.
-* `src/saps/physical/live_observation.py` maps observed finger width to
-  `1 - width / maximum_width`. This is an input observation convention, not
-  a validated output command adapter. `embodiment.py`'s historical 0=open,
-  1=closed validator and `discrete_verifier.py`'s threshold labels do not
-  establish current actuation semantics.
-* Existing SAPS subscribes to `/franka_gripper/joint_states` but has no current
-  physical gripper action client. The inspected local
-  `franka_gripper/src/gripper_action_server.cpp` exposes `~/move` and `~/grasp`,
-  passing width/speed and width/speed/force/epsilon to libfranka respectively;
-  `~/gripper_action` uses `2 * command.position` as total width. These are
-  distinct ROS interfaces, not interchangeable normalized policy inputs.
-
-The earlier DROID document states normalized absolute closure and describes
-the binary example. However, a pinned DROID backend width/polarity contract and
-a validated FR3 command conversion (including Move versus Grasp, width,
-speed/force/epsilon, cancellation and action-deadline behavior) are missing.
-Consequently this runtime creates no gripper action client, does not guess a
-mapping, and records zero gripper commands. Those contracts and their tests
-must be established before enabling gripper actuation.
+The G1B adapter maps finite `action[7] > 0.5` to CLOSED (Franka Grasp at
+width zero) and values at or below 0.5 to OPEN (Franka Move at maximum width).
+It is enabled only by `physical-c1c2-gripper`; see
+[the G1B integration](physical_g1b_gripper.md) for the validated conversion,
+configured hand parameters and asynchronous action lifecycle. The arm-only
+`physical-c1c2` entry point issues no hand commands. Physical hand actuation
+does not establish that the policy grasps the object at the right time or
+completes the task; the runtime still reports CONTINUE until a test cap or
+safety abort.
 
 ## Progressive physical validation
 
@@ -156,6 +155,23 @@ starts the server. Application confirmation defaults to 0.25 seconds; override
 `C1C2_APPLICATION_CONFIRMATION_TIMEOUT` explicitly if required by the supervised
 protocol. `C1C2_MAX_REPLANS` remains an independent hard bound. The main seed is
 fixed in this command, unaffected by `DROID_POLICY_SEED` overrides.
+
+For supervised G2 runs with the validated G1B hand adapter, select the
+separately enabled entry point and set the chunk cap explicitly:
+
+```bash
+make physical-c1c2-gripper \
+  PHYSICAL_RUN_ID=<unique-run-id> \
+  PHYSICAL_PROMPT='Pick up the red object' \
+  C1C2_MAX_EXECUTED_POLICY_CHUNKS=<reviewed-cap> \
+  C1C2_STOP_AFTER_INFERENCE_REPLAN=
+```
+
+This enables hand commands, keeps the existing safety gates and records the
+raw observation, response, action and runtime evidence in the output directory.
+Changing the physical wrist-camera mount changes policy input, so compare
+such runs as separate camera configurations rather than controlled policy
+repeats.
 
 Inspect Test 1 before increasing `C1C2_MAX_EXECUTED_POLICY_CHUNKS`. Require one
 warm-up, one main request at index 0, eight fresh independently anchored safety
@@ -233,6 +249,44 @@ motion.
 Frozen evidence is archived under:
 
 `docs/validation/2026-09-17_c1c2_repeated_cold/`
+
+### G2 condition-based wait and hand-transition validation — 2026-09-23
+
+Supervised runs exercised the G2 incremental audit, post-terminal-T4
+condition barrier and gripper transition wait. The one-chunk run completed
+eight actions with final delivery accepted and its post-T4 barrier completed
+in 49.36 ms. A two-chunk run after the hand-transition correction completed
+16 actions with 20 targets accepted in the final delivery audit; its two
+post-T4 barriers completed in 39.86 ms and 88.01 ms. These were bounded
+runtime checks, not grasp-success checks.
+
+The subsequent run `g2_wait_chunk15_20260923T092918Z` completed ten chunks
+and stopped in replan 10 when a proposed target exceeded the existing
+Jacobian-condition safety limit (17.013 >= 17.0). Its rejected target was
+never published and an abort hold was applied. That run predates the final
+audit correction for rejected, unpublished targets, so its final audit count
+is not evidence of a delivery failure.
+
+Two runs with the wrist camera moved to the corrected side of the gripper
+used the same prompt, `Pick up the red object`, but different initial arm
+positions. The following figures are from their archived `run.json` files:
+
+| Run | Software outcome | Actions and hand commands | Delivery and wait evidence |
+| --- | --- | --- | --- |
+| `g2_wait_chunk18_20260923T124245Z` | 18 completed chunks; `test_chunk_limit_reached`, outcome CONTINUE | 144 applied actions; 9 hand commands issued | Final audit accepted 180/180 expected targets; all 18 per-chunk delivery and health checks accepted; post-T4 barriers 15.7–136.0 ms |
+| `g2_wait_chunk18_20260923T124449Z` | Eight completed chunks, then replan 8/action 3 rejected; `runtime_abort` | 67 applied actions; 2 hand commands issued; confirmed abort hold | Proposed target condition 17.036 >= 17.0; final audit accepted 85/85 published targets and separately counted one rejected, unpublished target; eight completed post-T4 barriers 14.2–104.6 ms |
+
+The first 18-chunk run began away from the usual home pose. The operator
+observed smooth motion followed by retraction away from the desk without a
+successful pickup. The second began at the usual home pose. The operator
+observed smooth approach and a grasp attempt before the gripper was aligned
+with the object; the log records a Grasp command but cannot establish why
+the policy requested it. Earlier runs did not show the same frequency of
+early closing. The corrected-side wrist view still does not include the
+gripper as in the DROID examples; moving the camera again will produce a new
+input configuration. Camera placement and starting pose both differ between
+these runs, so neither a visual causal explanation nor task success follows
+from the runtime audits. The 17.0 singularity threshold remains unchanged.
 
 ## Evidence
 
