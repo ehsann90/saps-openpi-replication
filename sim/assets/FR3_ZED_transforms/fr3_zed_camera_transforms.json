@@ -1,0 +1,586 @@
+{
+  "status": "CAD mount measured; optical pose nominal manufacturer model, not calibrated",
+  "convention": "T_A_from_B maps homogeneous column coordinates in B into A: p_A=T_A_from_B@p_B. Translation in metres. Matrices stored by rows.",
+  "frames": {
+    "fr3_hand": "NVIDIA Isaac Sim 5.1 standard /fr3/fr3_hand link frame, origin at flange interface; not TCP or CAD hand origin",
+    "camera_cad": "ZED M STEP component source frame (coincident with ZEDM imported camera frame in this assembly)",
+    "left_optical": "Nominal left optical center, X image right, Y image down, Z forward",
+    "usd_camera": "Native USD camera axes, X right, Y up, -Z forward; same position as left_optical",
+    "sim_fr3_link8": "NVIDIA standard USD flange frame; derived using its fixed hand joint"
+  },
+  "matrices": {
+    "T_fr3_hand_from_camera_cad": [
+      [
+        0.7071068139522464,
+        0.24220462933328646,
+        -0.6643318983699553,
+        -0.06226319713265448
+      ],
+      [
+        -0.7071067484208462,
+        0.24220465177969358,
+        -0.6643319599371792,
+        -0.05385412025437762
+      ],
+      [
+        -2.3706900359159506e-15,
+        0.9395072241264574,
+        0.34252908754468886,
+        -0.0045884671013255345
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "T_camera_cad_from_left_optical_nominal": [
+      [
+        0.9999999965070167,
+        7.746355126479334e-05,
+        3.1390515251158806e-05,
+        -0.025981690841494428
+      ],
+      [
+        -3.136184972023538e-05,
+        -0.0003700253305435617,
+        0.9999999310488465,
+        0.00769800630481895
+      ],
+      [
+        7.747516120937751e-05,
+        -0.999999928540325,
+        -0.000370022899851035,
+        1.978903398097615e-05
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "T_fr3_hand_from_left_optical_nominal": [
+      [
+        0.7070477462762247,
+        0.6642970040539179,
+        0.24247262709572384,
+        -0.07878368148752338
+      ],
+      [
+        -0.7071658111625174,
+        0.6641875156080433,
+        0.24242825667251264,
+        -0.0336309448762461
+      ],
+      [
+        -2.9271881000743912e-06,
+        -0.34287670453882707,
+        0.9393804157400939,
+        0.0026506437531758414
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "T_fr3_hand_from_usd_camera_nominal": [
+      [
+        0.7070477462762247,
+        -0.6642970040539179,
+        -0.24247262709572384,
+        -0.07878368148752338
+      ],
+      [
+        -0.7071658111625174,
+        -0.6641875156080433,
+        -0.24242825667251264,
+        -0.0336309448762461
+      ],
+      [
+        -2.9271881000743912e-06,
+        0.34287670453882707,
+        -0.9393804157400939,
+        0.0026506437531758414
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "T_sim_fr3_link8_from_fr3_hand": [
+      [
+        0.7071067484208462,
+        0.7071068139522475,
+        4.686520667464706e-17,
+        0.0
+      ],
+      [
+        -0.7071068139522475,
+        0.7071067484208471,
+        -9.322069771778206e-18,
+        0.0
+      ],
+      [
+        -3.973040296154323e-17,
+        -2.6547008532048915e-17,
+        1.0000000000000009,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "T_sim_fr3_link8_from_left_optical_nominal": [
+      [
+        -8.353081941568196e-05,
+        0.9393804125507378,
+        0.3428767031144158,
+        -0.07948914312691231
+      ],
+      [
+        -0.9999999965070168,
+        -7.746355126499558e-05,
+        -3.139051525374549e-05,
+        0.03192780993030819
+      ],
+      [
+        -2.927188100083712e-06,
+        -0.3428767045388274,
+        0.9393804157400947,
+        0.002650643753175848
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "T_fr3_link8_from_camera_cad": [
+      [
+        -9.903644462482546e-16,
+        0.34252908754468925,
+        -0.9395072241264582,
+        -0.08210734226203163
+      ],
+      [
+        -1.0,
+        -2.5752585201862373e-15,
+        1.1514976694971368e-16,
+        0.005946119088813777
+      ],
+      [
+        -2.3800121056877307e-15,
+        0.9395072241264582,
+        0.3425290875446892,
+        -0.0045884671013255345
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "T_cad_hand_geometry_from_camera_cad": [
+      [
+        -8.064838131948414e-16,
+        0.34252908754468925,
+        -0.9395072241264582,
+        -0.0821073422661845
+      ],
+      [
+        -1.0,
+        -2.6828784774120105e-10,
+        -9.78125370229044e-11,
+        0.0059461190996509235
+      ],
+      [
+        -2.855620101066311e-10,
+        0.9395072241264582,
+        0.3425290875446892,
+        -0.0045884670996277355
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "T_cad_hand_geometry_from_left_optical_nominal": [
+      [
+        -8.353081941576448e-05,
+        0.9393804125507378,
+        0.3428767031144158,
+        -0.0794891431310652
+      ],
+      [
+        -0.9999999965070158,
+        -7.746345335299e-05,
+        -3.139078350279517e-05,
+        0.031927809939078136
+      ],
+      [
+        -2.927473659712808e-06,
+        -0.3428767045388495,
+        0.9393804157400858,
+        0.0026506437622929686
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ]
+  },
+  "poses": {
+    "left_optical_in_fr3_hand": {
+      "position_m": [
+        -0.07878368148752338,
+        -0.0336309448762461,
+        0.0026506437531758414
+      ],
+      "quaternion_wxyz": [
+        0.9097548677561939,
+        -0.16084139309276982,
+        0.06663211236282304,
+        -0.3768770203447743
+      ]
+    },
+    "usd_camera_in_fr3_hand": {
+      "position_m": [
+        -0.07878368148752338,
+        -0.0336309448762461,
+        0.0026506437531758414
+      ],
+      "quaternion_wxyz": [
+        0.1608413930927698,
+        0.9097548677561939,
+        -0.37687702034477427,
+        -0.06663211236282304
+      ]
+    },
+    "camera_cad_in_fr3_hand": {
+      "position_m": [
+        -0.06226319713265448,
+        -0.05385412025437762,
+        -0.0045884671013255345
+      ],
+      "quaternion_wxyz": [
+        0.7569413044081802,
+        0.5297105517704606,
+        -0.21941328029699927,
+        -0.31353533365983993
+      ]
+    }
+  },
+  "inverse_matrices": {
+    "T_camera_cad_from_fr3_hand": [
+      [
+        0.7071068139522468,
+        -0.7071067484208478,
+        -2.3727991123572114e-15,
+        0.005946119088813687
+      ],
+      [
+        0.2422046293332862,
+        0.2422046517796938,
+        0.9395072241264587,
+        0.032435051015095126
+      ],
+      [
+        -0.6643318983699548,
+        -0.6643319599371799,
+        0.3425290875446894,
+        -0.07556875775955647
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "T_left_optical_from_camera_cad_nominal": [
+      [
+        0.9999999965070172,
+        -3.136184972013087e-05,
+        7.747516120937346e-05,
+        0.025981930641299108
+      ],
+      [
+        7.74635512647972e-05,
+        -0.0003700253305437787,
+        -0.9999999285403227,
+        2.4650123934773112e-05
+      ],
+      [
+        3.1390515251263045e-05,
+        0.9999999310488378,
+        -0.00037002289985081383,
+        -0.007697182872974116
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "T_left_optical_from_fr3_hand_nominal": [
+      [
+        0.7070477462762252,
+        -0.7071658111625193,
+        -2.927188100041102e-06,
+        0.031921177784457674
+      ],
+      [
+        0.6642970040539158,
+        0.6641875156080426,
+        -0.3428767045388271,
+        0.07558186130040001
+      ],
+      [
+        0.24247262709572148,
+        0.24242825667251058,
+        0.9393804157400873,
+        0.024766014728312805
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ]
+  },
+  "provenance": {
+    "assembly_filename": "FR3_ZED_DROID_Reference.step",
+    "assembly_sha256": "425a357a0e283429570101990b2ac083ab735983d9ff027f7bd6c155a0c5285d",
+    "robot_usd_url": "https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/5.1/Isaac/Robots/FrankaRobotics/FrankaFR3/fr3.usd",
+    "robot_usd_sha256": "edd3be9975fa94a9add48a691d7daccb3725c8546d85272d528e36c16a2d2945",
+    "zed_description_url": "https://github.com/stereolabs/zed-ros2-description/blob/main/urdf/zed_macro.urdf.xacro",
+    "zed_description_sha256": "347ca5515d9f80d774b0f4ce3f2a039eaab888e994761b0570f3e139056c2720",
+    "zed_mesh_url": "https://raw.githubusercontent.com/stereolabs/zed-ros2-description/main/meshes/zedm.stl",
+    "zed_mesh_sha256": "bf0193e6b2f36a348e1cbe3c19e18adc3e90e4b054f4fce47286482380cd149c",
+    "nominal_baseline_m": 0.063,
+    "nominal_camera_center_to_left_translation_m": [
+      0,
+      0.0315,
+      0
+    ],
+    "T_world_from_cad_hand_mm": [
+      [
+        -0.0007762512100056191,
+        0.9999996987169841,
+        -2.85337964086136e-10,
+        419.301772027274
+      ],
+      [
+        0.9999996987169841,
+        0.000776251210005619,
+        -2.855974092688e-10,
+        0.000999718362480878
+      ],
+      [
+        -2.853758292832688e-10,
+        -2.85559573453173e-10,
+        -1.0,
+        371.471965392746
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "T_world_from_camera_cad_mm": [
+      [
+        -0.0007762512100064256,
+        0.34252898407820737,
+        -0.9395069411667006,
+        337.199435399658
+      ],
+      [
+        0.9999996987169841,
+        0.0002658886186356233,
+        -0.0007292936195500958,
+        -6.00885322112049
+      ],
+      [
+        1.8618082336246955e-13,
+        -0.9395072242242706,
+        -0.3425290872764039,
+        402.960432517517
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "T_world_from_cad_flange_interface_mm": [
+      [
+        0.9999996987169841,
+        0.0007762512100054351,
+        -2.85559630094525e-10,
+        419.30213724069415
+      ],
+      [
+        0.0007762512100054351,
+        -0.9999996987169841,
+        -3.78652085412247e-14,
+        0.0010000000096531327
+      ],
+      [
+        -2.855595734531723e-10,
+        -1.83800811256499e-13,
+        -1.0,
+        398.371965392746
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "T_isaac_hand_from_cad_hand_mm": [
+      [
+        0.0,
+        1.0,
+        0.0,
+        -0.00036521
+      ],
+      [
+        -1.0,
+        0.0,
+        0.0,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0,
+        26.9
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "T_camera_cad_from_zed_ros_center_m": [
+      [
+        3.1390515251158806e-05,
+        -0.9999999965070167,
+        -7.746355126479334e-05,
+        0.005518309048476601
+      ],
+      [
+        0.9999999310488465,
+        3.136184972023538e-05,
+        0.0003700253305435617,
+        0.007697018406552763
+      ],
+      [
+        -0.000370022899851035,
+        -7.747516120937751e-05,
+        0.999999928540325,
+        2.2229501559071544e-05
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "hand_geometry_check": {
+      "method": "CAD hand surface vs native USD hand mesh vertices after -90 degree CAD-to-USD rotation and +26.9mm origin shift",
+      "median_surface_distance_mm": 0.04014241,
+      "p90_surface_distance_mm": 0.72303154,
+      "fraction_below_0_1_mm": 0.6360082886
+    },
+    "zed_mesh_registration": {
+      "method": "20,000 source surface samples, 120,000 target surface samples, 25 trimmed rigid ICP iterations, random seed 3",
+      "median_sample_nearest_distance_mm": 0.18263974,
+      "p80_mm": 0.30435439,
+      "p90_mm": 0.92819888,
+      "note": "Models differ in fine details. Nominal left optical point is approximately 0.98mm laterally displaced from the exact lens-cylinder axis in the provided CAD. No optical-depth accuracy claim from visible lens front."
+    },
+    "flange_geometry_check": {
+      "method": "CAD flange component in its source frame compared with standard USD fr3_link7 visual vertices; same axial/radial datum, different fine surfaces",
+      "median_surface_distance_mm": 0.27556888,
+      "p90_surface_distance_mm": 2.01760824,
+      "max_mm": 2.24799203,
+      "matching_bounds_mm": {
+        "CAD_x_min": -44.0,
+        "USD_x_min": -43.99996,
+        "CAD_x_max": 81.281345,
+        "USD_x_max": 81.28136,
+        "CAD_z_flange_interface": 107.0,
+        "USD_joint8_z": 107.000000775
+      }
+    }
+  },
+  "limitations": [
+    "This is the uploaded CAD assembly pose, not measured physical hand-eye calibration.",
+    "Optical center is transferred from official Stereolabs nominal URDF via mesh registration; treat its position as millimetre-scale nominal, not exact factory optical extrinsics.",
+    "Use these hand-relative matrices only if the simulation uses the unmodified standard fr3_hand geometry/frame.",
+    "CAD hand geometry clocking differs about 45 degrees from the stock USD. Primary matrices preserve the camera mount relative to the wrist/flange, then convert through the USD fixed joint. Alternative cad_hand_geometry matrices preserve the image relative to CAD fingers but would rotate the camera mount around the stock USD flange. To reproduce both CAD mount and fingers simultaneously, the simulation hand clocking must also match CAD.",
+    "The native USD Camera transform includes an optical-to-USD 180 degree X rotation. Do not apply this again if using an API that converts optical axes automatically."
+  ],
+  "checks": {
+    "T_fr3_hand_from_camera_cad": {
+      "rotation_orthogonality_max_abs_error": 1.3322676295501878e-15,
+      "rotation_determinant": 0.9999999999999986
+    },
+    "T_camera_cad_from_left_optical_nominal": {
+      "rotation_orthogonality_max_abs_error": 8.659739592076221e-15,
+      "rotation_determinant": 1.0000000000000053
+    },
+    "T_fr3_hand_from_left_optical_nominal": {
+      "rotation_orthogonality_max_abs_error": 7.327471962526033e-15,
+      "rotation_determinant": 1.0000000000000038
+    },
+    "T_fr3_hand_from_usd_camera_nominal": {
+      "rotation_orthogonality_max_abs_error": 7.327471962526033e-15,
+      "rotation_determinant": 1.0000000000000038
+    },
+    "T_sim_fr3_link8_from_fr3_hand": {
+      "rotation_orthogonality_max_abs_error": 1.7763568394002505e-15,
+      "rotation_determinant": 1.0000000000000018
+    },
+    "T_sim_fr3_link8_from_left_optical_nominal": {
+      "rotation_orthogonality_max_abs_error": 8.881784197001252e-15,
+      "rotation_determinant": 1.0000000000000056
+    },
+    "T_fr3_link8_from_camera_cad": {
+      "rotation_orthogonality_max_abs_error": 2.220446049250313e-16,
+      "rotation_determinant": 1.0000000000000002
+    },
+    "T_cad_hand_geometry_from_camera_cad": {
+      "rotation_orthogonality_max_abs_error": 2.220446049250313e-16,
+      "rotation_determinant": 1.0000000000000002
+    },
+    "T_cad_hand_geometry_from_left_optical_nominal": {
+      "rotation_orthogonality_max_abs_error": 8.881784197001252e-15,
+      "rotation_determinant": 1.0000000000000053
+    }
+  }
+}
