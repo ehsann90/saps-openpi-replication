@@ -24,13 +24,10 @@ The simulator currently provides:
 - finger/cube collision inspection;
 - PhysX contact reporting;
 - validated contact-limited grasp, lift, and release of a simple rigid cube.
+- two virtual, RGB-only DROID-like camera views and a capture validator.
 
-Planned next steps are:
-1. external and wrist RGB cameras;
-2. exact DROID/OpenPI observation construction;
-3. OpenPI policy-server connection;
-4. 15 Hz DROID policy execution;
-5. closed-loop pi0.5 simulation rollouts.
+Planned next steps are exact DROID/OpenPI observation construction, policy-server
+connection, 15 Hz action execution, and closed-loop pi0.5 rollouts.
 
 ## Requirements
 
@@ -71,11 +68,14 @@ sim/
 ├── scenes/
 ├── scripts/
 │   ├── launch_scene.py
-│   └── gripper_contact_test.py
+│   ├── gripper_contact_test.py
+│   └── camera_validation.py
 └── src/
     └── isaac_fr3/
         ├── __init__.py
-        └── scene.py
+        ├── scene.py
+        ├── cameras.py
+        └── grasp_poses.py
 ```
 
 `sim/src/isaac_fr3/scene.py` is the reusable source of truth for the baseline
@@ -285,6 +285,94 @@ high-level target semantics, but not the same low-level controller dynamics.
 This distinction must be retained when comparing simulation and physical
 results.
 
+## SIM-P3 virtual RGB cameras
+
+`sim/configs/fr3_droid_scene.json` defines two independent pinhole cameras. The
+wrist camera prim is a child of `/World/fr3/fr3_hand`, so its USD transform is
+fixed in the hand frame. The external camera is a child of `/World` and stays
+world-fixed. Neither camera adds collision geometry. Each camera has one RGB
+render product at 320 × 180; no depth, right stereo, or segmentation annotators
+are created.
+
+Camera poses use metres and scalar-first `[w, x, y, z]` quaternions. The
+configured rotations are **USD camera** rotations: +X image right, +Y image up,
+and -Z forward. Conventional optical coordinates are +X right, +Y down, +Z
+forward. Captured RGB arrays have top-left origin and are not flipped,
+mirrored, or channel swapped.
+
+| Camera | Position and quaternion | Horizontal FOV | Provenance |
+| --- | --- | --- | --- |
+| Wrist (`zed_mini_droid_like`) | Hand-relative `[-0.079489144607, 0.031927806250, 0.002650643753]` m; `[0.123099065614, 0.696279310194, -0.696337080774, -0.123111381195]` | 66° | CAD-derived DROID ZED Mini mount with nominal left optical center; manufacturer rectified HD1080 reference FOV |
+| External (`zed2_droid_like`) | World `[1.05, -0.85, 1.10]` m; `[0.84480517, 0.45397060, 0.13406399, 0.24948300]` | 84° | Representative simulator viewpoint; manufacturer rectified HD1080 ZED 2 FOV |
+
+The FOVs approximate left rectified pinhole views. Isaac uses a *virtual* 36 mm
+horizontal aperture, with focal length computed as `aperture / (2 tan(FOV/2))`.
+That aperture is a rendering parameter, not a measured ZED sensor width. The
+camera config and saved metadata record the realized focal length, apertures,
+intrinsics matrix, and poses. The clip range is 0.01 to 10 m; the near plane
+must be closer than the wrist camera's hand and tabletop view.
+
+The [DROID dataset description](https://github.com/droid-dataset/droid/blob/main/docs/the-droid-dataset.md)
+documents 180 × 320 × 3 left images. The [DROID schema](https://github.com/droid-dataset/droid/blob/main/droid/postprocessing/schema.py)
+stores episode camera calibration, and the [DROID hardware description](https://droid-dataset.github.io/)
+describes adjustable external ZED 2 viewpoints and a wrist-mounted ZED Mini.
+There is no single external DROID pose. A [separate calibrated DROID
+extrinsics release](https://github.com/Stanford-TML/cloak/blob/main/examples/render_extrinsics.py)
+contains per-episode camera poses in an `attachment_site` end-effector frame,
+using OpenCV optical axes. For example, its AUTOLab 2023-07-07 09:42:23 entry
+is `[-0.07127, 0.03159, 0.02091, -0.34140, 0.01211, -1.57947]` (metres,
+XYZ Euler radians). That real episode's frame and Robotiq mount are not a
+transferable transform for Isaac's `fr3_hand` and Franka Hand. The
+[Stereolabs rectified FOV table](https://support.stereolabs.com/articles/8809264540-what-is-the-camera-focal-length-and-field-of-view)
+supplies the 66° and 84° HD1080 reference values. The [ZED Mini specifications](https://docs.stereolabs.com/docs/products/cameras/zed/specifications)
+give 102° horizontal native maximum and a 63 mm stereo baseline. DROID's
+180 × 320 image shape alone does not establish its effective rectified or
+cropped HFOV. Thus 66° remains a provisional rendering intrinsic pending
+episode-specific DROID calibration; no intrinsic has been inferred from the
+native maximum. Camera geometry remains explicit for later comparisons.
+
+The wrist extrinsic is `T_fr3_hand_from_usd_camera_nominal`, directly parented
+to `/World/fr3/fr3_hand`. The supplied transform package derives mount
+placement from the CAD assembly hierarchy, verifies hand alignment against
+Isaac's standard FR3 hand frame to numerical precision, and transfers the
+nominal ZED Mini left optical center from Stereolabs URDF/mesh registration.
+Its nominal camera-center to left-optical-center displacement is 0.0315 m.
+The supplied quaternion already uses native USD camera axes; no further
+optical-frame conversion or 180° X rotation is applied. This is mechanically
+CAD-derived with nominal optical position accuracy around the millimetre scale,
+not a measured physical hand-eye calibration. The Isaac
+`Stereolabs/ZED_X_mini/ZED_X_Mini.usd` asset represents the distinct ZED X Mini
+product. It is not used here, nor are its intrinsics transferred to the
+original ZED Mini virtual camera.
+
+Raw captures are `(180, 320, 3)` `uint8` RGB. The validation script calls the
+pinned `openpi_client.image_tools.resize_with_pad(image, 224, 224)` used by the
+[OpenPI DROID example](https://github.com/Physical-Intelligence/openpi/blob/main/examples/droid/main.py):
+PIL bilinear scaling, centered zero padding, yielding `(224, 224, 3)` `uint8`
+RGB. The current task only prepares images; it makes no policy request.
+
+With OpenPI off, run from `~/isaacsim`:
+
+```bash
+./python.sh -u \
+  ~/MyProjects/saps-openpi-replication/sim/scripts/camera_validation.py \
+  --config \
+  ~/MyProjects/saps-openpi-replication/sim/configs/fr3_droid_scene.json
+```
+
+Add `--headless` for a non-GUI capture. Every run creates a unique directory
+under `outputs/isaac_camera_validation/` with raw and processed PNGs for HOME,
+PREGRASP, and GRASP_POSE_OPEN, plus `metadata.json`. The approach targets use
+the SIM-P2 settled cube, finger-tip collider midpoint, home TCP orientation,
+and Lula IK. The gripper remains open; there is no close or lift. The validator
+prints and records configured-versus-measured hand-relative pose errors and
+checks rigid attachment through arm motion. The metadata records each stage's
+arm state, camera poses, and projections of the cube and
+points 5 cm away in world X/Y. Those projections test FOV coverage, while the
+saved images show actual occlusion. Inspect the images before using the camera
+setup for policy experiments; visibility is an observation, not a pose-tuning
+criterion for the CAD-derived extrinsic.
+
 ## Known warnings
 
 Isaac currently reports known warnings for:
@@ -323,8 +411,11 @@ At minimum:
 ```bash
 python3 -m py_compile \
   sim/src/isaac_fr3/scene.py \
+  sim/src/isaac_fr3/cameras.py \
+  sim/src/isaac_fr3/grasp_poses.py \
   sim/scripts/launch_scene.py \
-  sim/scripts/gripper_contact_test.py
+  sim/scripts/gripper_contact_test.py \
+  sim/scripts/camera_validation.py
 
 git diff --check
 ```
