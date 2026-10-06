@@ -213,11 +213,12 @@ policy-stop:
 
 .PHONY: droid-sample
 droid-sample:
+	docker build -t saps_droid_sample:latest -f docker/droid-sample.Dockerfile docker
 	docker run --rm \
 		-v $(CURDIR):/workspace \
 		-w /workspace \
 		--entrypoint /bin/bash \
-		openpi_server:latest -lc \
+		saps_droid_sample:latest -lc \
 		'source /.venv/bin/activate && python tools/datasets/prepare_droid_m1_sample.py --config-path $(DROID_SAMPLE_CONFIG) --output-dir $(DROID_DATA_DIR) && chown -R $(LOCAL_UID):$(LOCAL_GID) $(DROID_DATA_DIR)'
 
 .PHONY: droid-policy-server
