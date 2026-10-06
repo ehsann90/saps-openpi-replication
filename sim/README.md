@@ -64,7 +64,8 @@ sim/
 ├── README.md
 ├── assets/
 ├── configs/
-│   └── fr3_droid_scene.json
+│   ├── fr3_droid_scene.json
+│   └── fr3_presentation_scene.json
 ├── scenes/
 ├── scripts/
 │   ├── launch_scene.py
@@ -147,6 +148,25 @@ Headless mode is available with:
 ```text
 --headless
 ```
+
+Omitting `--config` selects `fr3_droid_scene.json`.
+
+### Illustrative presentation scene
+
+For a workspace overview image, launch the optional presentation config:
+
+```bash
+cd ~/isaacsim
+./python.sh -u \
+  ~/MyProjects/saps-openpi-replication/sim/scripts/launch_scene.py \
+  --config \
+  ~/MyProjects/saps-openpi-replication/sim/configs/fr3_presentation_scene.json
+```
+
+This scene adds four coloured cubes, an open fixed basket, and a plain light
+floor for an overview image. It is an illustrative pick-and-place layout for a
+presentation, separate from the single-cube baseline experiment. It does not
+establish policy execution or evaluation performance in this layout.
 
 ### Gripper/contact validation
 

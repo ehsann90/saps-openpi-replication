@@ -27,6 +27,7 @@ class SceneHandles:
     target: DynamicCuboid
     arm_indices: np.ndarray
     finger_indices: np.ndarray
+    cubes: list[DynamicCuboid]
 
 
 def load_config(path: Path) -> dict:
@@ -35,13 +36,29 @@ def load_config(path: Path) -> dict:
 
 
 def create_scene(config: dict) -> SceneHandles:
-    """Build and reset the baseline scene before commanding the FR3."""
+    """Build and reset the configured scene before commanding the FR3."""
     robot_cfg = config["robot"]
     table_cfg = config["table"]
-    object_cfg = config["target_object"]
+    object_cfgs = (
+        config["objects"] if "objects" in config
+        else [config["target_object"]]
+    )
+    if not object_cfgs:
+        raise ValueError("Scene must contain at least one cube")
 
     world = World(stage_units_in_meters=1.0)
     world.scene.add_default_ground_plane()
+    if "floor" in config:
+        floor_cfg = config["floor"]
+        world.scene.add(
+            FixedCuboid(
+                prim_path="/World/PresentationFloor",
+                name="presentation_floor",
+                position=np.asarray(floor_cfg["position_m"], dtype=np.float64),
+                scale=np.asarray(floor_cfg["size_m"], dtype=np.float64),
+                color=np.asarray(floor_cfg["color_rgb"], dtype=np.float64),
+            )
+        )
 
     assets_root = get_assets_root_path()
     if assets_root is None:
@@ -67,25 +84,81 @@ def create_scene(config: dict) -> SceneHandles:
         )
     )
 
-    target = world.scene.add(
-        DynamicCuboid(
-            prim_path="/World/TargetCube",
-            name="target_cube",
-            position=np.asarray(object_cfg["position_m"], dtype=np.float64),
-            scale=np.asarray(object_cfg["size_m"], dtype=np.float64),
-            color=np.asarray(
-                object_cfg.get("color_rgb", [1.0, 0.0, 0.0]),
-                dtype=np.float64,
-            ),
-            mass=float(object_cfg["mass_kg"]),
+    cubes = []
+    for index, object_cfg in enumerate(object_cfgs):
+        if object_cfg["type"] != "cube":
+            raise ValueError("Only cube scene objects are supported")
+        cubes.append(
+            world.scene.add(
+                DynamicCuboid(
+                    prim_path=(
+                        "/World/TargetCube" if index == 0
+                        else f"/World/Cube{index}"
+                    ),
+                    name=("target_cube" if index == 0 else f"cube_{index}"),
+                    position=np.asarray(
+                        object_cfg["position_m"], dtype=np.float64
+                    ),
+                    scale=np.asarray(object_cfg["size_m"], dtype=np.float64),
+                    color=np.asarray(
+                        object_cfg.get("color_rgb", [1.0, 0.0, 0.0]),
+                        dtype=np.float64,
+                    ),
+                    mass=float(object_cfg["mass_kg"]),
+                )
+            )
         )
-    )
+
+    if "basket" in config:
+        basket_cfg = config["basket"]
+        center = np.asarray(
+            [*basket_cfg["center_xy_m"], 0.0], dtype=np.float64
+        )
+        width, depth = map(float, basket_cfg["size_xy_m"])
+        wall = float(basket_cfg["wall_thickness_m"])
+        bottom = float(basket_cfg["bottom_thickness_m"])
+        height = float(basket_cfg["wall_height_m"])
+        if (
+            min(width, depth, wall, bottom, height) <= 0
+            or 2 * wall >= min(width, depth)
+        ):
+            raise ValueError("Basket dimensions must form an open interior")
+        color = np.asarray(basket_cfg["color_rgb"], dtype=np.float64)
+        table_top = (
+            float(table_cfg["position_m"][2])
+            + float(table_cfg["size_m"][2]) / 2
+        )
+        parts = (
+            ("Bottom", [0, 0, bottom / 2], [width, depth, bottom]),
+            ("Left", [-width / 2 + wall / 2, 0, bottom + height / 2],
+             [wall, depth, height]),
+            ("Right", [width / 2 - wall / 2, 0, bottom + height / 2],
+             [wall, depth, height]),
+            ("Front", [0, -depth / 2 + wall / 2, bottom + height / 2],
+             [width - 2 * wall, wall, height]),
+            ("Back", [0, depth / 2 - wall / 2, bottom + height / 2],
+             [width - 2 * wall, wall, height]),
+        )
+        for name, offset, size in parts:
+            position = center + np.asarray(offset, dtype=np.float64)
+            position[2] += table_top
+            world.scene.add(
+                FixedCuboid(
+                    prim_path=f"/World/Basket{name}",
+                    name=f"basket_{name.lower()}",
+                    position=position,
+                    scale=np.asarray(size, dtype=np.float64),
+                    color=color,
+                )
+            )
 
     world.reset()
     fr3 = Articulation(robot_cfg["prim_path"])
     arm_indices = fr3.get_dof_indices(robot_cfg["arm_dof_names"])
     finger_indices = fr3.get_dof_indices(robot_cfg["finger_dof_names"])
-    return SceneHandles(world, fr3, table, target, arm_indices, finger_indices)
+    return SceneHandles(
+        world, fr3, table, cubes[0], arm_indices, finger_indices, cubes
+    )
 
 
 def command_home(handles: SceneHandles, config: dict) -> None:

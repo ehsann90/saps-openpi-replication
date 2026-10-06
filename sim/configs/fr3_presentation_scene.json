@@ -1,0 +1,221 @@
+{
+  "schema_version": 1,
+  "robot": {
+    "asset": "/Isaac/Robots/FrankaRobotics/FrankaFR3/fr3.usd",
+    "prim_path": "/World/fr3",
+    "arm_dof_names": [
+      "fr3_joint1",
+      "fr3_joint2",
+      "fr3_joint3",
+      "fr3_joint4",
+      "fr3_joint5",
+      "fr3_joint6",
+      "fr3_joint7"
+    ],
+    "finger_dof_names": [
+      "fr3_finger_joint1",
+      "fr3_finger_joint2"
+    ],
+    "tcp_prim": "/World/fr3/fr3_hand_tcp",
+    "left_finger_prim": "/World/fr3/fr3_leftfinger",
+    "right_finger_prim": "/World/fr3/fr3_rightfinger",
+    "home_arm_rad": [
+      0.0,
+      -0.4,
+      0.0,
+      -1.9,
+      0.0,
+      1.5,
+      0.75
+    ],
+    "home_fingers_m": [
+      0.04,
+      0.04
+    ]
+  },
+  "table": {
+    "position_m": [
+      0.55,
+      0.0,
+      0.375
+    ],
+    "size_m": [
+      0.7,
+      0.8,
+      0.05
+    ]
+  },
+  "droid": {
+    "control_hz": 15.0,
+    "arm_action_clip": 1.0,
+    "max_joint_delta_rad": 0.2,
+    "gripper_max_width_m": 0.08
+  },
+  "cameras": {
+    "wrist": {
+      "model": "zed_mini_droid_like",
+      "prim_path": "/World/fr3/fr3_hand/WristCamera",
+      "parent_prim": "/World/fr3/fr3_hand",
+      "position_xyz_m": [
+        -0.079489144607,
+        0.03192780625,
+        0.002650643753
+      ],
+      "orientation_wxyz": [
+        0.123099065614,
+        0.696279310194,
+        -0.696337080774,
+        -0.123111381195
+      ],
+      "resolution_wh": [
+        320,
+        180
+      ],
+      "clipping_range_m": [
+        0.01,
+        10.0
+      ],
+      "horizontal_fov_deg": 66.0,
+      "calibration": "CAD-derived DROID wrist mount with nominal ZED Mini left optical center; hand alignment verified against standard Isaac FR3 hand frame; optical center transferred from Stereolabs URDF/mesh registration; mechanically derived, approximately millimetre-scale nominal optical position, not measured physical hand-eye calibration; 66-degree rectified HD1080 reference FOV, not verified DROID effective FOV"
+    },
+    "external": {
+      "model": "zed2_droid_like",
+      "prim_path": "/World/ExternalCamera",
+      "parent_prim": "/World",
+      "position_xyz_m": [
+        1.05,
+        -0.85,
+        1.1
+      ],
+      "orientation_wxyz": [
+        0.8448051708473091,
+        0.45397059583823757,
+        0.1340639852609568,
+        0.24948300399000006
+      ],
+      "resolution_wh": [
+        320,
+        180
+      ],
+      "clipping_range_m": [
+        0.01,
+        10.0
+      ],
+      "horizontal_fov_deg": 84.0,
+      "calibration": "representative simulator viewpoint; manufacturer rectified HD1080 FOV"
+    }
+  },
+  "objects": [
+    {
+      "type": "cube",
+      "position_m": [
+        0.38,
+        -0.2,
+        0.42
+      ],
+      "size_m": [
+        0.04,
+        0.04,
+        0.04
+      ],
+      "mass_kg": 0.05,
+      "color_rgb": [
+        0.82,
+        0.12,
+        0.12
+      ]
+    },
+    {
+      "type": "cube",
+      "position_m": [
+        0.5,
+        -0.2,
+        0.42
+      ],
+      "size_m": [
+        0.04,
+        0.04,
+        0.04
+      ],
+      "mass_kg": 0.05,
+      "color_rgb": [
+        0.14,
+        0.34,
+        0.78
+      ]
+    },
+    {
+      "type": "cube",
+      "position_m": [
+        0.62,
+        -0.2,
+        0.42
+      ],
+      "size_m": [
+        0.04,
+        0.04,
+        0.04
+      ],
+      "mass_kg": 0.05,
+      "color_rgb": [
+        0.12,
+        0.58,
+        0.28
+      ]
+    },
+    {
+      "type": "cube",
+      "position_m": [
+        0.74,
+        -0.2,
+        0.42
+      ],
+      "size_m": [
+        0.04,
+        0.04,
+        0.04
+      ],
+      "mass_kg": 0.05,
+      "color_rgb": [
+        0.9,
+        0.72,
+        0.12
+      ]
+    }
+  ],
+  "basket": {
+    "center_xy_m": [
+      0.6,
+      0.15
+    ],
+    "size_xy_m": [
+      0.22,
+      0.22
+    ],
+    "bottom_thickness_m": 0.008,
+    "wall_thickness_m": 0.01,
+    "wall_height_m": 0.045,
+    "color_rgb": [
+      0.62,
+      0.65,
+      0.68
+    ]
+  },
+  "floor": {
+    "position_m": [
+      0.0,
+      0.0,
+      -0.023
+    ],
+    "size_m": [
+      10.0,
+      10.0,
+      0.05
+    ],
+    "color_rgb": [
+      0.9,
+      0.92,
+      0.94
+    ]
+  }
+}

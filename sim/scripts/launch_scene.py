@@ -9,6 +9,11 @@ from pathlib import Path
 from isaacsim import SimulationApp
 
 
+DEFAULT_CONFIG = (
+    Path(__file__).resolve().parents[1] / "configs/fr3_droid_scene.json"
+)
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Launch the reproducible Isaac Sim FR3/DROID scene."
@@ -16,8 +21,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--config",
         type=Path,
-        required=True,
-        help="Path to the FR3/DROID scene JSON configuration.",
+        default=DEFAULT_CONFIG,
+        help="Scene JSON configuration (defaults to the baseline scene).",
     )
     parser.add_argument(
         "--headless",
