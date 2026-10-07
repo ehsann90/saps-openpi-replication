@@ -26,8 +26,7 @@ The simulator currently provides:
 - validated contact-limited grasp, lift, and release of a simple rigid cube.
 - two virtual, RGB-only DROID-like camera views and a capture validator.
 
-Planned next steps are exact DROID/OpenPI observation construction, policy-server
-connection, 15 Hz action execution, and closed-loop pi0.5 rollouts.
+Planned next steps are 15 Hz action execution and closed-loop pi0.5 rollouts.
 
 ## Requirements
 
@@ -70,13 +69,15 @@ sim/
 ├── scripts/
 │   ├── launch_scene.py
 │   ├── gripper_contact_test.py
-│   └── camera_validation.py
+│   ├── camera_validation.py
+│   └── policy_shadow.py
 └── src/
     └── isaac_fr3/
         ├── __init__.py
         ├── scene.py
         ├── cameras.py
-        └── grasp_poses.py
+        ├── grasp_poses.py
+        └── droid_observation.py
 ```
 
 `sim/src/isaac_fr3/scene.py` is the reusable source of truth for the baseline
@@ -392,6 +393,41 @@ points 5 cm away in world X/Y. Those projections test FOV coverage, while the
 saved images show actual occlusion. Inspect the images before using the camera
 setup for policy experiments; visibility is an observation, not a pose-tuning
 criterion for the CAD-derived extrinsic.
+
+## SIM-P4 one-request policy shadow inference
+
+`sim/scripts/policy_shadow.py` captures one settled HOME observation, sends one
+seeded request to the existing `pi05_droid` server, validates the returned
+action chunk, and archives the request, audit, actions, timing, and provenance
+under a unique `outputs/isaac_droid_shadow/<run-id>/` directory. It never
+applies policy actions. The simulator adapter in
+`sim/src/isaac_fr3/droid_observation.py` reads measured articulation positions
+in `fr3_joint1` through `fr3_joint7` order and maps measured finger width to
+`clip(1 - width / 0.08, 0, 1)`. It passes raw 180 × 320 RGB `uint8` images to
+the shared `prepare_droid_observation`; OpenPI performs the 224 × 224 resize
+once on the server.
+
+Start the existing server first with `make droid-policy-server` in a separate
+terminal. Wait for checkpoint restoration and the port 8000 listening log.
+Isaac's bundled Python may lack `msgpack`, which the pinned OpenPI client
+declares as a dependency. For that environment, install it into a temporary
+target without changing Isaac's installation:
+
+```bash
+cd ~/isaacsim
+./python.sh -m pip install --target /tmp/isaac-openpi-client-deps 'msgpack>=1.0.5'
+PYTHONPATH=/tmp/isaac-openpi-client-deps ./python.sh -u \
+  ~/MyProjects/saps-openpi-replication/sim/scripts/policy_shadow.py \
+  --config ~/MyProjects/saps-openpi-replication/sim/configs/fr3_droid_scene.json \
+  --host 127.0.0.1 --port 8000 --prompt 'Pick up the red object' --headless
+```
+
+The script defaults to seed `20260827` and replan index `0`; both are CLI
+arguments. It requires the seeded server's `pi05_droid` checkpoint and pinned
+OpenPI commit identity. The server model-input audit checks the received raw
+arrays and prompt, then archives the transformed images and sampler input.
+Stop this task's server afterward with `make policy-stop` unless it was already
+running for another purpose.
 
 ## Known warnings
 
