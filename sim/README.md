@@ -26,7 +26,7 @@ The simulator currently provides:
 - validated contact-limited grasp, lift, and release of a simple rigid cube.
 - two virtual, RGB-only DROID-like camera views and a capture validator.
 
-Planned next steps are 15 Hz action execution and closed-loop pi0.5 rollouts.
+Planned next steps are task outcome detection and broader rollout evaluation.
 
 ## Requirements
 
@@ -324,15 +324,35 @@ mirrored, or channel swapped.
 
 | Camera | Position and quaternion | Horizontal FOV | Provenance |
 | --- | --- | --- | --- |
-| Wrist (`zed_mini_droid_like`) | Hand-relative `[-0.079489144607, 0.031927806250, 0.002650643753]` m; `[0.123099065614, 0.696279310194, -0.696337080774, -0.123111381195]` | 66° | CAD-derived DROID ZED Mini mount with nominal left optical center; manufacturer rectified HD1080 reference FOV |
-| External (`zed2_droid_like`) | World `[1.05, -0.85, 1.10]` m; `[0.84480517, 0.45397060, 0.13406399, 0.24948300]` | 84° | Representative simulator viewpoint; manufacturer rectified HD1080 ZED 2 FOV |
+| Wrist (`zed_mini_droid_like`) | Hand-relative `[-0.079489144607, 0.031927806250, 0.002650643753]` m; `[0.123099065614, 0.696279310194, -0.696337080774, -0.123111381195]` | 82.19068145751953° | CAD-derived DROID ZED Mini mount with nominal left optical center; selected episode rectified LEFT SVO intrinsic |
+| External (`zed2_droid_like`) | World `[1.05, -0.85, 1.10]` m; `[0.84480517, 0.45397060, 0.13406399, 0.24948300]` | 101.5525131225586° | Representative simulator viewpoint; selected episode rectified LEFT SVO intrinsic |
 
-The FOVs approximate left rectified pinhole views. Isaac uses a *virtual* 36 mm
-horizontal aperture, with focal length computed as `aperture / (2 tan(FOV/2))`.
+The FOVs come from the rectified LEFT calibration of selected DROID episode
+`IRIS+7dfa2da3+2023-12-04-15h-44m-25s`. The Stereolabs ZED SDK 5.5 read
+the episode SVO files and retrieved factory calibration for each camera serial.
+Both streams were acquired at 1280 × 720 and 60 fps. The source values are:
+
+| Camera | Serial | fx, fy (px) | cx, cy (px) | HFOV | VFOV |
+| --- | --- | --- | --- | --- | --- |
+| Wrist ZED Mini | 19824535 | 733.6873779296875, 733.6873779296875 | 650.0894775390625, 354.6379699707031 | 82.19068145751953° | 52.26985549926758° |
+| External ZED 2 | 23404442 | 522.412841796875, 522.412841796875 | 640.4915161132812, 353.2311706542969 | 101.5525131225586° | 69.13614654541016° |
+
+Rectified distortion is zero. RAW calibration includes lens distortion and is
+not the simulator target. The source-calibration values and serials are also
+stored in the camera config. Only HFOV controls the current Isaac projection;
+the 16:9 render aspect ratio supplies the vertical aperture. Isaac uses a
+*virtual* 36 mm horizontal aperture, with focal length computed as
+`aperture / (2 tan(FOV/2))`.
 That aperture is a rendering parameter, not a measured ZED sensor width. The
 camera config and saved metadata record the realized focal length, apertures,
 intrinsics matrix, and poses. The clip range is 0.01 to 10 m; the near plane
 must be closer than the wrist camera's hand and tabletop view.
+
+Acquisition was 1280 × 720, simulator and DROID policy observations are
+320 × 180, and OpenPI receives 224 × 224 after resize-with-pad. The source
+principal points scale to approximately (162.5224, 88.6595) px for wrist and
+(160.1229, 88.3078) px for external at 320 × 180. The current centered Isaac
+projection does not apply these offsets; they remain calibration provenance.
 
 The [DROID dataset description](https://github.com/droid-dataset/droid/blob/main/docs/the-droid-dataset.md)
 documents 180 × 320 × 3 left images. The [DROID schema](https://github.com/droid-dataset/droid/blob/main/droid/postprocessing/schema.py)
@@ -344,14 +364,10 @@ contains per-episode camera poses in an `attachment_site` end-effector frame,
 using OpenCV optical axes. For example, its AUTOLab 2023-07-07 09:42:23 entry
 is `[-0.07127, 0.03159, 0.02091, -0.34140, 0.01211, -1.57947]` (metres,
 XYZ Euler radians). That real episode's frame and Robotiq mount are not a
-transferable transform for Isaac's `fr3_hand` and Franka Hand. The
-[Stereolabs rectified FOV table](https://support.stereolabs.com/articles/8809264540-what-is-the-camera-focal-length-and-field-of-view)
-supplies the 66° and 84° HD1080 reference values. The [ZED Mini specifications](https://docs.stereolabs.com/docs/products/cameras/zed/specifications)
-give 102° horizontal native maximum and a 63 mm stereo baseline. DROID's
-180 × 320 image shape alone does not establish its effective rectified or
-cropped HFOV. Thus 66° remains a provisional rendering intrinsic pending
-episode-specific DROID calibration; no intrinsic has been inferred from the
-native maximum. Camera geometry remains explicit for later comparisons.
+transferable transform for Isaac's `fr3_hand` and Franka Hand. The selected
+episode's calibrated intrinsics above replace the earlier
+manufacturer-reference FOV values. Camera geometry remains explicit for later
+comparisons.
 
 The wrist extrinsic is `T_fr3_hand_from_usd_camera_nominal`, directly parented
 to `/World/fr3/fr3_hand`. The supplied transform package derives mount

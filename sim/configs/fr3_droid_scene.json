@@ -84,8 +84,26 @@
       "orientation_wxyz": [0.123099065614, 0.696279310194, -0.696337080774, -0.123111381195],
       "resolution_wh": [320, 180],
       "clipping_range_m": [0.01, 10.0],
-      "horizontal_fov_deg": 66.0,
-      "calibration": "CAD-derived DROID wrist mount with nominal ZED Mini left optical center; hand alignment verified against standard Isaac FR3 hand frame; optical center transferred from Stereolabs URDF/mesh registration; mechanically derived, approximately millimetre-scale nominal optical position, not measured physical hand-eye calibration; 66-degree rectified HD1080 reference FOV, not verified DROID effective FOV"
+      "horizontal_fov_deg": 82.19068145751953,
+      "calibration": "CAD-derived DROID wrist mount with nominal ZED Mini left optical center; hand alignment verified against standard Isaac FR3 hand frame; optical center transferred from Stereolabs URDF/mesh registration; mechanically derived, approximately millimetre-scale nominal optical position, not measured physical hand-eye calibration; rectified LEFT intrinsic from selected DROID episode SVO factory calibration",
+      "source_calibration": {
+        "source": "DROID episode SVO via Stereolabs ZED SDK 5.5 factory calibration",
+        "episode_uuid": "IRIS+7dfa2da3+2023-12-04-15h-44m-25s",
+        "camera_serial": "19824535",
+        "camera_model": "ZED Mini",
+        "source_resolution_wh": [1280, 720],
+        "source_fps": 60.0,
+        "rectified_left": {
+          "fx_px": 733.6873779296875,
+          "fy_px": 733.6873779296875,
+          "cx_px": 650.0894775390625,
+          "cy_px": 354.6379699707031,
+          "horizontal_fov_deg": 82.19068145751953,
+          "vertical_fov_deg": 52.26985549926758,
+          "diagonal_fov_deg": 90.0509033203125,
+          "distortion": "all zeros"
+        }
+      }
     },
     "external": {
       "model": "zed2_droid_like",
@@ -95,8 +113,26 @@
       "orientation_wxyz": [0.8448051708473091, 0.45397059583823757, 0.1340639852609568, 0.24948300399000006],
       "resolution_wh": [320, 180],
       "clipping_range_m": [0.01, 10.0],
-      "horizontal_fov_deg": 84.0,
-      "calibration": "representative simulator viewpoint; manufacturer rectified HD1080 FOV"
+      "horizontal_fov_deg": 101.5525131225586,
+      "calibration": "representative simulator viewpoint; rectified LEFT intrinsic from selected DROID episode SVO factory calibration",
+      "source_calibration": {
+        "source": "DROID episode SVO via Stereolabs ZED SDK 5.5 factory calibration",
+        "episode_uuid": "IRIS+7dfa2da3+2023-12-04-15h-44m-25s",
+        "camera_serial": "23404442",
+        "camera_model": "ZED 2",
+        "source_resolution_wh": [1280, 720],
+        "source_fps": 60.0,
+        "rectified_left": {
+          "fx_px": 522.412841796875,
+          "fy_px": 522.412841796875,
+          "cx_px": 640.4915161132812,
+          "cy_px": 353.2311706542969,
+          "horizontal_fov_deg": 101.5525131225586,
+          "vertical_fov_deg": 69.13614654541016,
+          "diagonal_fov_deg": 109.14212036132812,
+          "distortion": "all zeros"
+        }
+      }
     }
   }
 }
