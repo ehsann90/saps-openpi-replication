@@ -1,8 +1,9 @@
-"""One finite DROID action chunk through Isaac's native position drives."""
+"""Finite DROID chunks and repeated rollout control for Isaac position drives."""
 
 from __future__ import annotations
 
 import time
+from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
@@ -21,6 +22,92 @@ TOTAL_WIDTH_SPEED_M_S = 0.100
 ACTIVE_FINGER_MAX_EFFORT_N = 20.0
 PHYSICS_STEPS_PER_ACTION = 4
 TERMINAL_EVIDENCE_STEPS = 8
+
+
+class InvalidPolicyResponse(ValueError):
+    """The server returned an action chunk outside the DROID contract."""
+
+
+@dataclass
+class GripperRuntime:
+    """Persist one rate-limited finger transition across action chunks."""
+
+    intent: str = "OPEN"
+    ramp_origin_width_m: float | None = None
+    ramp_steps: int = 0
+    active_effort_set: bool = False
+
+    def request_intent(self, policy_value: float, width_m: float) -> dict:
+        """Start a new width ramp only when binary policy intent changes."""
+        decision = droid_gripper_decision(policy_value)
+        intent = "CLOSED" if decision.binary_closure else "OPEN"
+        previous = self.intent
+        transition = intent != previous
+        if transition:
+            self.intent = intent
+            self.ramp_origin_width_m = float(width_m)
+            self.ramp_steps = 0
+        return {"from": previous, "to": intent, "transition": transition}
+
+
+def run_rollout_loop(
+    *, hold: Any, capture: Any, infer: Any, execute: Any,
+    record: Any, emergency_hold: Any, max_replans: int | None = None,
+) -> dict:
+    """Repeat hold/capture/infer/execute with unlimited replans by default."""
+    if max_replans is not None and max_replans <= 0:
+        raise ValueError("max_replans must be positive when supplied")
+    requests = completed = actions = 0
+    index = 0
+    reason = error = None
+    while max_replans is None or index < max_replans:
+        try:
+            hold(index)
+            observation = capture(index)
+            requests += 1
+            response = infer(index, observation)
+            execution = execute(index, response)
+            actions += int(execution["actions_executed"])
+            record(index, observation, response, execution)
+            if (execution["status"] == "complete"
+                    and not execution.get("terminal_hold", {}).get("applied")):
+                raise RuntimeError("Completed chunk lacks its terminal hold")
+            if execution["status"] != "complete":
+                reason = "safety_violation"
+                error = execution.get("failure") or execution["terminal_hold"].get("error")
+                break
+            completed += 1
+            index += 1
+        except KeyboardInterrupt:
+            reason = "manual_interrupt"
+            error = None
+            try:
+                emergency_hold()
+            except (ValueError, RuntimeError) as hold_error:
+                error = f"interrupt hold failed: {hold_error}"
+            break
+        except Exception as runtime_error:
+            reason = (
+                "invalid_policy_response"
+                if isinstance(runtime_error, InvalidPolicyResponse)
+                else "runtime_error"
+            )
+            error = f"{type(runtime_error).__name__}: {runtime_error}"
+            try:
+                emergency_hold()
+            except (ValueError, RuntimeError) as hold_error:
+                error += f"; emergency hold failed: {hold_error}"
+            break
+    if reason is None:
+        reason = "max_replans"
+    return {
+        "termination_reason": reason,
+        "error": error,
+        "inference_requests": requests,
+        "completed_replans": completed,
+        "policy_actions_executed": actions,
+        "next_replan_index": index,
+    }
 
 
 def select_actions(actions: np.ndarray) -> tuple[np.ndarray, int]:
@@ -97,11 +184,46 @@ def _pose(position: Any, orientation: Any) -> dict:
     }
 
 
+def command_fresh_hold(handles: Any) -> dict:
+    """Command and verify the current measured arm state without stepping."""
+    lower_wp, upper_wp = handles.fr3.get_dof_limits(
+        dof_indices=handles.arm_indices
+    )
+    q, _ = _arm_state(handles)
+    target = terminal_hold_target(
+        q, _array(lower_wp).reshape(-1), _array(upper_wp).reshape(-1)
+    )
+    handles.fr3.set_dof_position_targets(
+        np.asarray([target], dtype=np.float32),
+        dof_indices=handles.arm_indices,
+    )
+    active = _array(handles.fr3.get_dof_position_targets(
+        dof_indices=handles.arm_indices
+    )).reshape(-1)
+    if active.shape != (7,) or not np.allclose(
+        active, target, rtol=0, atol=1e-6
+    ):
+        raise RuntimeError("Fresh measured-state hold is not the active target")
+    return {
+        "measured_arm_q_rad": q.tolist(),
+        "commanded_arm_q_hold_rad": target.tolist(),
+        "active_arm_q_target_rad": active.tolist(),
+        "simulation_time_seconds": float(handles.world.current_time),
+        "simulation_step_index": int(handles.world.current_time_step_index),
+        "wall_timestamp_unix_ns": time.time_ns(),
+    }
+
+
 def execute_chunk(
     handles: Any, config: dict, selected: np.ndarray,
     *, physics_dt: float, render: bool = False,
+    gripper_runtime: GripperRuntime | None = None,
+    on_action: Any | None = None,
+    terminal_evidence_steps: int = TERMINAL_EVIDENCE_STEPS,
 ) -> dict:
     """Issue eight fresh-q targets at four-physics-step absolute deadlines."""
+    if terminal_evidence_steps < 0:
+        raise ValueError("terminal_evidence_steps must be nonnegative")
     from isaac_fr3.scene import get_tcp_pose
 
     expected_dt = 1.0 / (DROID_CONTROL_HZ * PHYSICS_STEPS_PER_ACTION)
@@ -127,19 +249,18 @@ def execute_chunk(
     wall_start = time.perf_counter()
     simulated_steps = 0
     rows = []
-    current_intent = "OPEN"  # HOME commands the fingers fully open.
-    ramp_origin_width = None
-    ramp_start_step = None
-    active_effort_set = False
+    gripper = gripper_runtime if gripper_runtime is not None else GripperRuntime()
+    transitions = []
     failed = None
 
     def advance_step() -> None:
         nonlocal simulated_steps
-        if ramp_start_step is not None:
-            elapsed = (simulated_steps - ramp_start_step + 1) * physics_dt
-            sign = -1.0 if current_intent == "CLOSED" else 1.0
+        if gripper.ramp_origin_width_m is not None:
+            gripper.ramp_steps += 1
+            elapsed = gripper.ramp_steps * physics_dt
+            sign = -1.0 if gripper.intent == "CLOSED" else 1.0
             target_width = float(np.clip(
-                ramp_origin_width + sign * TOTAL_WIDTH_SPEED_M_S * elapsed,
+                gripper.ramp_origin_width_m + sign * TOTAL_WIDTH_SPEED_M_S * elapsed,
                 0.0, config["droid"]["gripper_max_width_m"],
             ))
             handles.fr3.set_dof_position_targets(
@@ -180,30 +301,34 @@ def execute_chunk(
         try:
             mapped = arm_target(action, q_before, lower, upper)
             row.update({key: value.tolist() for key, value in mapped.items()})
-            decision = droid_gripper_decision(float(action[7]))
-            intent = "CLOSED" if decision.binary_closure else "OPEN"
-            row["binary_gripper_intent"] = intent
-            row["gripper_transition_initiated"] = intent != current_intent
             row["safety_result"] = "accepted"
             handles.fr3.set_dof_position_targets(
                 np.asarray([mapped["q_target_rad"]], dtype=np.float32),
                 dof_indices=handles.arm_indices,
             )
-            if intent != current_intent:
-                current_intent = intent
-                ramp_origin_width = width
-                ramp_start_step = simulated_steps
-                if intent == "CLOSED" and not active_effort_set:
+            intent_result = gripper.request_intent(float(action[7]), width)
+            intent = intent_result["to"]
+            row["binary_gripper_intent"] = intent
+            row["gripper_transition_initiated"] = intent_result["transition"]
+            if intent_result["transition"]:
+                transitions.append({
+                    "action_index": index, "from": intent_result["from"],
+                    "to": intent, "measured_width_m": width,
+                    "simulated_seconds": actual_sim_time,
+                })
+                if intent == "CLOSED" and not gripper.active_effort_set:
                     active_index = int(_array(handles.finger_indices).reshape(-1)[0])
                     handles.fr3.set_dof_max_efforts(
                         np.asarray([[ACTIVE_FINGER_MAX_EFFORT_N]], dtype=np.float32),
                         dof_indices=[active_index],
                     )
-                    active_effort_set = True
+                    gripper.active_effort_set = True
         except (ValueError, RuntimeError) as error:
             row["safety_result"] = "rejected"
             row["rejection_reason"] = f"{type(error).__name__}: {error}"
             rows.append(row)
+            if on_action is not None:
+                on_action(row)
             failed = row["rejection_reason"]
             break
         for _ in range(PHYSICS_STEPS_PER_ACTION):
@@ -213,8 +338,23 @@ def execute_chunk(
         row["measured_dq_after_rad_s"] = dq_after.tolist()
         row["tcp_pose_after"] = _pose(*get_tcp_pose(config))
         rows.append(row)
+        if on_action is not None:
+            on_action(row)
 
     hold = {"scheduled_simulation_seconds": simulated_steps * physics_dt}
+    if failed is not None:
+        # Stop an active finger ramp after an arm safety rejection. The
+        # previously requested binary intent remains recorded for provenance.
+        fingers, _, _ = _finger_state(handles)
+        try:
+            handles.fr3.set_dof_position_targets(
+                np.asarray([fingers], dtype=np.float32),
+                dof_indices=handles.finger_indices,
+            )
+            hold["gripper_width_frozen_m"] = float(np.sum(fingers))
+        except (ValueError, RuntimeError) as error:
+            hold["gripper_freeze_error"] = f"{type(error).__name__}: {error}"
+        gripper.ramp_origin_width_m = None
     try:
         fresh_q, _ = _arm_state(handles)
         hold_q = terminal_hold_target(fresh_q, lower, upper)
@@ -225,8 +365,19 @@ def execute_chunk(
             np.asarray([hold_q], dtype=np.float32),
             dof_indices=handles.arm_indices,
         )
+        active = _array(handles.fr3.get_dof_position_targets(
+            dof_indices=handles.arm_indices
+        )).reshape(-1)
+        if active.shape != (7,) or not np.allclose(
+            active, hold_q, rtol=0, atol=1e-6
+        ):
+            raise RuntimeError("Terminal fresh-q hold is not the active target")
+        hold["active_q_target_rad"] = active.tolist()
         hold["applied"] = True
-        for _ in range(TERMINAL_EVIDENCE_STEPS):
+        hold["simulation_step_index"] = int(
+            handles.world.current_time_step_index
+        )
+        for _ in range(terminal_evidence_steps):
             advance_step()
     except (ValueError, RuntimeError) as error:
         hold["applied"] = False
@@ -243,6 +394,9 @@ def execute_chunk(
         "joint_limits_upper_rad": upper.tolist(),
         "actions_executed": sum(r.get("safety_result") == "accepted" for r in rows),
         "rows": rows,
+        "gripper_transitions": transitions,
+        "gripper_intent_after": gripper.intent,
+        "gripper_ramp_steps_after": gripper.ramp_steps,
         "terminal_hold": hold,
         "initial_tcp_pose": tcp_before,
         "final_tcp_pose": _pose(*get_tcp_pose(config)),

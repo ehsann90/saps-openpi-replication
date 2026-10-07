@@ -482,6 +482,41 @@ archived observation hashes before attributing a difference to policy sampling.
 This gate records motion and safety checks, not task success. Stop the server
 afterward with `make policy-stop`.
 
+## SIM-P6 repeating closed-loop rollout
+
+Start `make droid-policy-server` and wait for checkpoint restoration before
+launching Isaac. Using the pinned OpenPI client dependency described in SIM-P4:
+
+```bash
+cd ~/isaacsim
+PYTHONPATH=/tmp/isaac-openpi-client-deps ./python.sh -u \
+  ~/MyProjects/saps-openpi-replication/sim/scripts/policy_rollout.py \
+  --config ~/MyProjects/saps-openpi-replication/sim/configs/fr3_droid_scene.json \
+  --host 127.0.0.1 --port 8000 --prompt 'Pick up the red object' \
+  --policy-episode-seed 20260827 --headless
+```
+
+The default has no replan cap. Each cycle commands a fresh measured-q hold,
+renders the held state without stepping physics, captures new RGB images and
+measured joints, makes exactly one seeded request, then executes the first eight
+actions at four 60 Hz physics steps per action. Each completed chunk advances
+exactly 32 physics steps (8/15 s). The gripper's binary intent and rate-limited
+transition persist across chunks. After action 7, a fresh measured-q terminal
+hold is verified without stepping physics; the next observation is captured
+from that held state. Physics does not advance during inference. Omit
+`--headless` to watch the scene. An explicit
+`--max-replans N` is available for diagnostics; it is not the default.
+
+Stop a normal rollout with Ctrl-C. The runtime attempts a fresh measured-q
+hold, preserves the gripper state, and writes the partial episode. Safety,
+invalid response, or server/runtime errors also end the episode. Artifacts
+under a unique `outputs/isaac_droid_rollout/<run-id>/` include top-level
+provenance, episode, timing, and termination JSON, plus raw images, observation,
+response, native and selected actions, and execution evidence per replan.
+There is no task-success detector in this baseline: the outcome is recorded as
+`not_evaluated` even if objects move. Stop the server with `make policy-stop`
+after the run.
+
 ## Known warnings
 
 Isaac currently reports known warnings for:
