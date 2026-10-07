@@ -270,7 +270,8 @@ target-to-target.
 
 The policy action cadence is 15 Hz.
 
-The simulator must preserve these semantics when policy execution is added.
+SIM-P5 applies these semantics to eight actions in one native Isaac position
+drive chunk; it does not yet run a closed-loop episode.
 
 ## DROID gripper semantics
 
@@ -428,6 +429,42 @@ OpenPI commit identity. The server model-input audit checks the received raw
 arrays and prompt, then archives the transformed images and sampler input.
 Stop this task's server afterward with `make policy-stop` unless it was already
 running for another purpose.
+
+## SIM-P5 one-chunk execution
+
+Start `make droid-policy-server` and wait for checkpoint restoration before
+starting Isaac. With the pinned OpenPI client dependency available to Isaac
+Python as described above, run:
+
+```bash
+cd ~/isaacsim
+PYTHONPATH=/tmp/isaac-openpi-client-deps ./python.sh -u \
+  ~/MyProjects/saps-openpi-replication/sim/scripts/policy_one_chunk.py \
+  --config ~/MyProjects/saps-openpi-replication/sim/configs/fr3_droid_scene.json \
+  --host 127.0.0.1 --port 8000 --prompt 'Pick up the red object' \
+  --policy-episode-seed 20260827 --replan-index 0 --headless
+```
+
+This command captures one settled HOME observation, holds the simulator during
+one seeded inference, and requires at least eight returned actions. It executes
+only actions 0–7. Each arm target is `fresh measured q + 0.2 × clip(action[:7],
+-1, 1)` and must satisfy the FR3 articulation limits before the native
+position drive receives it. The physical baseline's gripper threshold is
+strictly `action[7] > 0.5` for CLOSED. A change of binary intent starts one
+rate-limited gripper transition; repeated intent continues the same transition.
+Closing uses the SIM-P2 0.100 m/s total-width rate and 20 N active-finger
+drive effort. Opening uses the same rate toward 0.08 m width. Policy targets
+are issued every four 1/60 s physics steps, with no convergence wait. After
+the eighth action period the script commands an explicit fresh-measured-q hold
+and advances eight more physics steps for evidence only.
+
+Each run creates `outputs/isaac_droid_one_chunk/<run-id>/` with the raw images,
+observation and provenance, native and selected action arrays, per-action
+execution evidence, and timing. A repeated run with the same seed can still
+receive different actions if Isaac's rendered RGB pixels differ; compare the
+archived observation hashes before attributing a difference to policy sampling.
+This gate records motion and safety checks, not task success. Stop the server
+afterward with `make policy-stop`.
 
 ## Known warnings
 
