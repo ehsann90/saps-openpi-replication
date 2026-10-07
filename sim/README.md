@@ -311,10 +311,10 @@ results.
 
 `sim/configs/fr3_droid_scene.json` defines two independent pinhole cameras. The
 wrist camera prim is a child of `/World/fr3/fr3_hand`, so its USD transform is
-fixed in the hand frame. The external camera is a child of `/World` and stays
-world-fixed. Neither camera adds collision geometry. Each camera has one RGB
-render product at 320 × 180; no depth, right stereo, or segmentation annotators
-are created.
+fixed in the hand frame. The external camera is a child of the stationary FR3
+root `/World/fr3` and is fixed relative to the robot base. Neither camera adds
+collision geometry. Each camera has one RGB render product at 320 × 180; no
+depth, right stereo, or segmentation annotators are created.
 
 Camera poses use metres and scalar-first `[w, x, y, z]` quaternions. The
 configured rotations are **USD camera** rotations: +X image right, +Y image up,
@@ -325,9 +325,23 @@ mirrored, or channel swapped.
 | Camera | Position and quaternion | Horizontal FOV | Provenance |
 | --- | --- | --- | --- |
 | Wrist (`zed_mini_droid_like`) | Hand-relative `[-0.079489144607, 0.031927806250, 0.002650643753]` m; `[0.123099065614, 0.696279310194, -0.696337080774, -0.123111381195]` | 82.19068145751953° | CAD-derived DROID ZED Mini mount with nominal left optical center; selected episode rectified LEFT SVO intrinsic |
-| External (`zed2_droid_like`) | World `[1.05, -0.85, 1.10]` m; `[0.84480517, 0.45397060, 0.13406399, 0.24948300]` | 101.5525131225586° | Representative simulator viewpoint; selected episode rectified LEFT SVO intrinsic |
+| External (`zed2_droid_like`) | FR3 root-relative `[0.18596379, -0.57591951, 0.74884339]` m; `[0.74966453, 0.59876325, -0.18201043, -0.21530877]` | 101.5525131225586° | DROID-informed side placement adapted to the simulated tabletop; selected episode rectified LEFT SVO intrinsic |
 
-The FOVs come from the rectified LEFT calibration of selected DROID episode
+The selected DROID episode's external ZED 2 (serial `23404442`) was physically
+side-mounted relative to the robot. Its left-camera calibration was constant
+across all 228 frames: base-relative position
+`[0.18596379, -0.57591951, 0.34884339]` m and Euler xyz
+`[-1.78926414, -0.01505613, -0.57143820]` rad. Applying that position
+directly in Isaac placed the camera below or near the tabletop and yielded an
+under-table view: this simulator's tabletop workspace is approximately 0.4 m
+above the FR3 base reference. The active pose keeps the DROID-like side-view
+x/y placement and derived orientation, and raises z by 0.4 m to
+`0.74884339` m. This height adaptation is specific to the current tabletop;
+the active extrinsic is DROID-informed rather than the exact recorded pose.
+Its parent is `/World/fr3`, not `/World`.
+
+The camera intrinsics use the exact rectified LEFT SVO calibration of selected
+DROID episode
 `IRIS+7dfa2da3+2023-12-04-15h-44m-25s`. The Stereolabs ZED SDK 5.5 read
 the episode SVO files and retrieved factory calibration for each camera serial.
 Both streams were acquired at 1280 × 720 and 60 fps. The source values are:
