@@ -60,11 +60,17 @@ def create_scene(config: dict) -> SceneHandles:
             )
         )
 
-    assets_root = get_assets_root_path()
-    if assets_root is None:
-        raise RuntimeError("Isaac Sim asset root could not be resolved.")
-    robot_usd = assets_root + robot_cfg["asset"]
-    print(f"Isaac asset root: {assets_root}")
+    if robot_cfg.get("asset_source") == "local":
+        robot_usd = str((Path(__file__).resolve().parents[2]
+                         / robot_cfg["asset"]).resolve())
+        if not Path(robot_usd).is_file():
+            raise FileNotFoundError(f"Missing local robot assembly: {robot_usd}")
+    else:
+        assets_root = get_assets_root_path()
+        if assets_root is None:
+            raise RuntimeError("Isaac Sim asset root could not be resolved.")
+        robot_usd = assets_root + robot_cfg["asset"]
+        print(f"Isaac asset root: {assets_root}")
     print(f"FR3 asset: {robot_usd}")
     add_reference_to_stage(
         usd_path=robot_usd,
@@ -165,9 +171,14 @@ def command_home(handles: SceneHandles, config: dict) -> None:
     """Command the configured arm and fully open finger positions."""
     robot_cfg = config["robot"]
     home_arm = np.asarray([robot_cfg["home_arm_rad"]], dtype=np.float32)
-    home_fingers = np.asarray(
-        [robot_cfg["home_fingers_m"]], dtype=np.float32
-    )
+    if config.get("gripper", {}).get("kind") == "robotiq_2f85":
+        home_fingers = np.asarray(
+            [[config["gripper"]["open_joint_rad"]]], dtype=np.float32
+        )
+    else:
+        home_fingers = np.asarray(
+            [robot_cfg["home_fingers_m"]], dtype=np.float32
+        )
     handles.fr3.set_dof_position_targets(
         home_arm, dof_indices=handles.arm_indices
     )

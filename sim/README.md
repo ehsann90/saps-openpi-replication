@@ -531,6 +531,90 @@ There is no task-success detector in this baseline: the outcome is recorded as
 `not_evaluated` even if objects move. Stop the server with `make policy-stop`
 after the run.
 
+## SIM-P7 separate FR3 + Robotiq embodiment
+
+`sim/configs/fr3_droid_robotiq_scene.json` selects the derived
+`sim/assets/fr3_robotiq_droid.usda` assembly. The original
+`fr3_droid_scene.json` still selects the NVIDIA FR3 with Franka Hand. This
+Robotiq scene is an OpenPI-off asset and mechanical validation condition; the
+SIM-P6 policy rollout entry point still uses the Franka-specific gripper
+executor. Do not use that entry point with the Robotiq configuration yet.
+
+The assembly references the Isaac Sim 6.1 FR3 and an unchanged copy of
+[Robotiq's 2F-85 Isaac asset](https://github.com/robotiq/isaacsim_assets/tree/ef313b8416096d50c3ab56d67adb21f92d086660/grippers/Robotiq_2F_85)
+at `ef313b8416096d50c3ab56d67adb21f92d086660`. It uses the PhysX
+parallel-grip variant and standard fingertips. Source pin, resolved LFS files,
+and licenses are recorded in
+`sim/assets/robotiq_2f85_upstream/SAPS_PROVENANCE.md`. The derived USD alone
+disables the stock hand and Robotiq's standalone root joint, connects
+`fr3_link8` to `base_link` with a fixed joint, and limits the drive to 10 N m.
+The upstream 26 N m setting caused deep cube penetration in the initial
+scripted trial; 10 N m gave shallow bilateral contacts on this scene.
+
+The supplied `sim/assets/FR3_2F85_ZED_transforms/` package defines column-vector
+transforms `p_A = T_A_from_B @ p_B`, in metres. The verified FR3 `fr3_link8`
+frame is the flange interface; the source STEP flange frame needs the supplied
++107 mm local-Z datum correction. Robotiq's `base_link/visuals` has a 120-degree
+rotation about `(1,1,1)` relative to `base_link`, so the authored mount is the
+composition `T_flange_from_hand_cad @ inverse(T_usd_base_from_hand_cad)`:
+180 degrees about flange Z and translation `(0, 0, 0.013758)` m. CAD and USD
+base-mesh bounds agree to within about 0.05 mm; mesh volume
+is about 0.56% below the STEP solid, so this is a geometric registration, not
+proof of identical source meshes. The source grip-frame TCP lies 0.133717 m
+from the USD fixed base along its local Z. It is a nominal grasp reference,
+not a measured centre of every grasped object.
+
+The native USD wrist-camera prim is parented to `fr3_link8` and uses the
+package's `T_flange_from_usd_camera_nominal` directly: position
+`(-0.079491597033, 0.031930911279, 0.002650643753)` m and quaternion
+`(w, x, y, z) = (0.123099062742, 0.696279294064, -0.696337096906,
+-0.123111384047)`. This is the nominal ZED Mini LEFT optical pose; its
+camera-body CAD transform is separate. The 82.19068145751953-degree wrist
+HFOV, 101.5525131225586-degree external HFOV, SVO-derived LEFT intrinsics,
+320 × 180 RGB captures, and OpenPI 224 × 224 resize-with-pad stay as in the
+baseline. The external view remains DROID-informed and tabletop adapted.
+
+The Robotiq articulation has seven arm joints, one driven `finger_joint`
+(0 to 0.820305 rad), and five passive/mimic joints. Open and closed are driver
+targets 0 and 0.820305 rad. The measured opening projects the two moving pad
+origins onto the fixed base's lateral axis. An unconstrained full sweep of this
+asset gives about 0.08708 m at open and 0 m at closed; a 0.4-rad driver pose
+gives about 0.04735 m. Thus the normalized DROID observation is
+`clip(1 - measured_width / 0.08708, 0, 1)`. Policy intent `> 0.5` commands
+closed; `<= 0.5` commands open. Repeated intent leaves the current joint drive
+active. This separate controller does not copy the Franka finger gains or
+rate limiter. The arm's 15 Hz, 0.2-rad policy mapping is unchanged.
+
+Run the independent validation with OpenPI stopped:
+
+```bash
+~/isaacsim/python.sh -u \
+  sim/scripts/robotiq_validation.py \
+  --config sim/configs/fr3_droid_robotiq_scene.json \
+  --headless
+```
+
+Each run creates a unique directory under
+`outputs/isaac_robotiq_validation/`, containing per-stage raw and OpenPI-sized
+RGB images, transform and joint measurements, PhysX contact events, and pass
+flags. The scripted HOME → pregrasp → grasp → close → lift → open sequence uses
+Lula IK and the existing 40 mm, 50 g cube. The 2026-10-08 run
+`20261008T073122Z_4cb0c4ac` passed: the measured flange datum was
+0.106999953 m, both pads carried loaded contact during
+close and lift, cube centre rose from 0.42003 to 0.48979 m, and opening
+returned to 0.08708 m after release. The worst reported contact separation
+was -0.000121 m. The maximum flange-to-base translation/rotation errors
+were `3.92e-8 m` / `2.99e-8 rad`; flange-to-camera errors were `3.51e-9 m`
+/ `2.10e-8 rad` through the sampled poses. The grasp/lift wrist images show
+the red target between the fingers; the HOME wrist image is dominated by the
+gripper and its shadow, so the target is not clearly visible there. The
+external images show the arm and tabletop. A selected
+DROID episode frame also has gripper fingers at the lower edge and a central
+work surface, but scene content, lighting, and material appearance differ;
+this qualitative comparison is not camera-pose ground truth.
+
+**Validation status:** The SIM-P7 focused unit tests (17/17), standalone Robotiq grasp validation, and Franka-Hand mechanical regression passed. The repository-wide `make check` did not pass: two archived-sweep tests use `str.removeprefix`, which is unavailable in the Docker Python 3.8 runtime, and one presentation-scene fixture expects a different HOME joint value. These failures remain unresolved and were not addressed by SIM-P7.
+
 ## Known warnings
 
 Isaac currently reports known warnings for:

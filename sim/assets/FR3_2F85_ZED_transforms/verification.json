@@ -1,0 +1,60 @@
+{
+  "ZED M STEP": {
+    "step_parser_vs_OpenCascade_max_matrix_error": 1.1102230246251565e-16,
+    "source_local_bounds_mm": [
+      -64.8499986504895,
+      -1.9984014443252818e-15,
+      -13.29999970272183,
+      60.3499986510724,
+      30.25,
+      13.324236179800502
+    ],
+    "source_volume_mm3": 55565.438016180684,
+    "previous_source_geometry_comparison": {
+      "bounds_max_difference_mm": 1.758593271006248e-13,
+      "volume_difference_mm3": 5.093170329928398e-11,
+      "result": "Same local source geometry extents and volume; source frame preserved."
+    }
+  },
+  "Defeatured 2F-85 PAD OPEN_base.step": {
+    "step_parser_vs_OpenCascade_max_matrix_error": 2.220446049250313e-16,
+    "source_local_bounds_mm": [
+      -42.44336728358347,
+      -3.399999999999962,
+      -37.50000054083255,
+      42.44336728348634,
+      90.00000010000005,
+      37.5000000999412
+    ],
+    "source_volume_mm3": 225906.750578969
+  },
+  "W-008-COUPLING_W-50-4M6-1D6_C-062": {
+    "step_parser_vs_OpenCascade_max_matrix_error": 5.684341886080802e-14,
+    "source_local_bounds_mm": [
+      -37.5000001,
+      -37.5000001,
+      -7.00000010000081,
+      37.5000001,
+      37.5000001,
+      9.9000001
+    ],
+    "source_volume_mm3": 39749.251680364025
+  },
+  "Franka_Research_3_v2_Link_Flange": {
+    "step_parser_vs_OpenCascade_max_matrix_error": 5.169878828456423e-26,
+    "source_local_bounds_mm": [
+      -44.00000009793803,
+      -44.00000009999998,
+      50.3499999982134,
+      81.28134522942861,
+      81.2823452293453,
+      107.0000000012441
+    ],
+    "source_volume_mm3": 389545.6909611015,
+    "previous_source_geometry_comparison": {
+      "bounds_max_difference_mm": 7.105427357601002e-14,
+      "volume_difference_mm3": 0.0,
+      "result": "Same local source geometry extents and volume; source frame preserved."
+    }
+  }
+}

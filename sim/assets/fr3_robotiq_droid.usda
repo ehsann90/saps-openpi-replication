@@ -1,0 +1,62 @@
+#usda 1.0
+(
+    defaultPrim = "fr3"
+    metersPerUnit = 1
+    upAxis = "Z"
+)
+
+# Isaac 6.1 FR3 is referenced unchanged. Overrides below apply only to this
+# derived assembly. Column-vector CAD transforms are authored as USD poses.
+def Xform "fr3" (
+    prepend references = @https://omniverse-content-production.s3-us-west-2.amazonaws.com/Assets/Isaac/6.1/Isaac/Robots/FrankaRobotics/FrankaFR3/fr3.usd@
+)
+{
+    over "fr3_hand" (active = false) {}
+    over "fr3_leftfinger" (active = false) {}
+    over "fr3_rightfinger" (active = false) {}
+    over "fr3_hand_tcp" (active = false) {}
+
+    over "fr3_link8"
+    {
+        over "fr3_hand_joint" (active = false) {}
+
+        # T_flange_from_usd_base = T_flange_from_hand_cad *
+        # inverse(T_usd_base_from_hand_cad).
+        # The latter is the upstream base_link/visuals quaternion (0.5 each).
+        def Xform "Robotiq_2F_85" (
+            prepend references = @./robotiq_2f85_upstream/configuration/Robotiq_2F_85_config_physics_parallel_grip.usda@
+        )
+        {
+            quatd xformOp:orient = (0, 0, 0, 1)
+            double3 xformOp:translate = (0, 0, 0.013758000000000437)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient"]
+
+            over "Robotiq_2F_85" (
+                delete apiSchemas = ["PhysicsArticulationRootAPI"]
+            )
+            {
+                over "root_joint" (active = false) {}
+
+                # Robotiq's PhysX grasp guide recommends 10 N m rather than
+                # the source asset's 26 N m when contact penetration is high.
+                over "Joints"
+                {
+                    over "finger_joint"
+                    {
+                        float drive:angular:physics:maxForce = 10
+                    }
+                }
+            }
+        }
+
+        def PhysicsFixedJoint "robotiq_mount_joint"
+        {
+            rel physics:body0 = </fr3/fr3_link8>
+            rel physics:body1 = </fr3/fr3_link8/Robotiq_2F_85/Robotiq_2F_85/base_link>
+            point3f physics:localPos0 = (0, 0, 0.013758000000000437)
+            point3f physics:localPos1 = (0, 0, 0)
+            quatf physics:localRot0 = (0, 0, 0, 1)
+            quatf physics:localRot1 = (1, 0, 0, 0)
+        }
+    }
+}

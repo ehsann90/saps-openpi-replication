@@ -1,0 +1,547 @@
+{
+  "source": "FR3_2F85_ZED.step",
+  "source_sha256": "d5066f1e77bc549beead37cebd1d3c59b46c68be3423113c4c54947327e69812",
+  "convention": "T_A_from_B maps column coordinates in B into A: p_A = T_A_from_B @ p_B. Translation in metres; matrices listed by rows.",
+  "frames": {
+    "flange": "Actual FR3 flange interface / standard Isaac fr3_link8 frame. STEP Link_Flange source frame translated +107 mm in its local Z.",
+    "hand_cad": "Source frame of fixed Robotiq body Defeatured 2F-85 PAD OPEN_base.step; not TCP, not Franka fr3_hand, and not a verified Robotiq USD or URDF frame. Local +Y points outward along flange +Z, local +X points along flange -Y, local +Z points along flange -X.",
+    "camera_cad": "Source frame of ZED M STEP, coincident with ZEDM in this file. Use the same source-local geometry origin when importing the camera.",
+    "robotiq_assembly_cad": "Parent Robotiq_2F85 / 2F85_Opened source assembly origin, offset from its body centreline; supplied separately for whole-assembly import.",
+    "left_optical": "Nominal LEFT optical centre; X image right, Y image down, Z forward. Prior optical registration reused.",
+    "usd_camera": "Native USD Camera frame: X right, Y up, -Z forward; same origin as left_optical."
+  },
+  "matrices": {
+    "T_flange_from_hand_cad": [
+      [
+        -3.330126683985838e-16,
+        1.2054300844974026e-15,
+        -1.0000000000000002,
+        4.3538079808058685e-12
+      ],
+      [
+        -1.0,
+        -2.775557558989017e-17,
+        3.3290420563542325e-16,
+        -5.068218067449948e-14
+      ],
+      [
+        -2.7755575589956224e-17,
+        1.0000000000000002,
+        1.205430084382297e-15,
+        0.013758000000000437
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "T_flange_from_camera_cad": [
+      [
+        -1.8393487035362662e-16,
+        0.3425290875446891,
+        -0.939507224126458,
+        -0.08210979616827142
+      ],
+      [
+        -1.0,
+        -2.299274940378266e-15,
+        -6.425989030708947e-16,
+        0.005949220437173757
+      ],
+      [
+        -2.3803282856192985e-15,
+        0.939507224126458,
+        0.342529087544689,
+        -0.004588467101326899
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "T_camera_cad_from_left_optical_nominal": [
+      [
+        0.9999999965070167,
+        7.746355126479334e-05,
+        3.1390515251158806e-05,
+        -0.025981690841494428
+      ],
+      [
+        -3.136184972023538e-05,
+        -0.0003700253305435617,
+        0.9999999310488465,
+        0.00769800630481895
+      ],
+      [
+        7.747516120937751e-05,
+        -0.999999928540325,
+        -0.000370022899851035,
+        1.978903398097615e-05
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "T_flange_from_left_optical_nominal": [
+      [
+        -8.353081941514192e-05,
+        0.9393804125507377,
+        0.34287670311441565,
+        -0.07949159703315213
+      ],
+      [
+        -0.9999999965070167,
+        -7.746355126414989e-05,
+        -3.139051525345784e-05,
+        0.031930911278668164
+      ],
+      [
+        -2.927188100084038e-06,
+        -0.34287670453882724,
+        0.9393804157400946,
+        0.0026506437531744823
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "T_flange_from_usd_camera_nominal": [
+      [
+        -8.353081941514192e-05,
+        -0.9393804125507377,
+        -0.34287670311441565,
+        -0.07949159703315213
+      ],
+      [
+        -0.9999999965070167,
+        7.746355126414989e-05,
+        3.139051525345784e-05,
+        0.031930911278668164
+      ],
+      [
+        -2.927188100084038e-06,
+        0.34287670453882724,
+        -0.9393804157400946,
+        0.0026506437531744823
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "T_hand_cad_from_camera_cad": [
+      [
+        1.0,
+        2.1591690028056857e-15,
+        9.458577172263723e-16,
+        -0.005949220437224411
+      ],
+      [
+        -2.3525727100293415e-15,
+        0.9395072241264583,
+        0.3425290875446878,
+        -0.01834646710132743
+      ],
+      [
+        -1.4907779804495998e-16,
+        -0.3425290875446879,
+        0.9395072241264583,
+        0.0821097961726252
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "T_flange_from_robotiq_assembly_cad": [
+      [
+        -3.330126683985838e-16,
+        1.205430084394005e-15,
+        -1.0000000000000002,
+        0.09342573390549785
+      ],
+      [
+        -1.0,
+        -2.7755575590016387e-17,
+        3.3290420563542325e-16,
+        1.8872681195603035e-15
+      ],
+      [
+        -2.7755575590057198e-17,
+        1.0000000000000002,
+        1.2054300842788994e-15,
+        0.013888956130326391
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ]
+  },
+  "inverse_matrices": {
+    "T_hand_cad_from_flange": [
+      [
+        -3.3290420563542325e-16,
+        -1.0,
+        -2.7755575589889763e-17,
+        -5.068179881328906e-14
+      ],
+      [
+        1.2054300843822966e-15,
+        -2.775557558995662e-17,
+        0.9999999999999998,
+        -0.013758000000000433
+      ],
+      [
+        -0.9999999999999998,
+        3.330126683985837e-16,
+        1.2054300844974023e-15,
+        4.353791396498765e-12
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "T_camera_cad_from_flange": [
+      [
+        -1.838422356912937e-16,
+        -1.0,
+        -2.3802942326644044e-15,
+        0.005949220437173731
+      ],
+      [
+        0.3425290875446891,
+        -2.2993386634417566e-15,
+        0.9395072241264583,
+        0.03243589154936164
+      ],
+      [
+        -0.9395072241264582,
+        -6.425235362639968e-16,
+        0.34252908754468914,
+        -0.07557106322219564
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "T_left_optical_nominal_from_flange": [
+      [
+        -8.353081941510225e-05,
+        -0.9999999965070172,
+        -2.927188099987205e-06,
+        0.031924278927830105
+      ],
+      [
+        0.9393804125507356,
+        -7.746355126415383e-05,
+        -0.34287670453882674,
+        0.07558416669209692
+      ],
+      [
+        0.3428767031144125,
+        -3.139051525356214e-05,
+        0.9393804157400868,
+        0.02476685621294826
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "T_usd_camera_nominal_from_flange": [
+      [
+        -8.353081941510225e-05,
+        -0.9999999965070172,
+        -2.927188099987205e-06,
+        0.031924278927830105
+      ],
+      [
+        -0.9393804125507356,
+        7.746355126415383e-05,
+        0.34287670453882674,
+        -0.07558416669209692
+      ],
+      [
+        -0.3428767031144125,
+        3.139051525356214e-05,
+        -0.9393804157400868,
+        -0.02476685621294826
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "T_robotiq_assembly_cad_from_flange": [
+      [
+        -3.3290420563542325e-16,
+        -1.0,
+        -2.775557559001598e-17,
+        1.9187554352637612e-15
+      ],
+      [
+        1.205430084278899e-15,
+        -2.7755575590057593e-17,
+        0.9999999999999998,
+        -0.0138889561303265
+      ],
+      [
+        -0.9999999999999998,
+        3.330126683985837e-16,
+        1.2054300843940047e-15,
+        0.09342573390549783
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ]
+  },
+  "poses": {
+    "hand_cad_in_flange": {
+      "position_m": [
+        4.3538079808058685e-12,
+        -5.068218067449948e-14,
+        0.013758000000000437
+      ],
+      "quaternion_wxyz": [
+        0.5000000000000001,
+        0.49999999999999967,
+        -0.4999999999999998,
+        -0.5000000000000003
+      ]
+    },
+    "camera_cad_in_flange": {
+      "position_m": [
+        -0.08210979616827142,
+        0.005949220437173757,
+        -0.004588467101326899
+      ],
+      "quaternion_wxyz": [
+        0.5793377873798425,
+        0.40542290033226813,
+        -0.40542290033226686,
+        -0.5793377873798435
+      ]
+    },
+    "left_optical_nominal_in_flange": {
+      "position_m": [
+        -0.07949159703315213,
+        0.031930911278668164,
+        0.0026506437531744823
+      ],
+      "quaternion_wxyz": [
+        0.6962792940640644,
+        -0.1230990627419222,
+        0.12311138404719145,
+        -0.696337096906156
+      ]
+    },
+    "usd_camera_nominal_in_flange": {
+      "position_m": [
+        -0.07949159703315213,
+        0.031930911278668164,
+        0.0026506437531744823
+      ],
+      "quaternion_wxyz": [
+        0.1230990627419222,
+        0.6962792940640644,
+        -0.696337096906156,
+        -0.12311138404719145
+      ]
+    },
+    "robotiq_assembly_cad_in_flange": {
+      "position_m": [
+        0.09342573390549785,
+        1.8872681195603035e-15,
+        0.013888956130326391
+      ],
+      "quaternion_wxyz": [
+        0.5000000000000001,
+        0.49999999999999967,
+        -0.4999999999999998,
+        -0.5000000000000003
+      ]
+    }
+  },
+  "checks": {
+    "T_flange_from_hand_cad": {
+      "rotation_orthogonality_max_error": 4.440892098500626e-16,
+      "determinant": 1.0000000000000004,
+      "inverse_closure_max_error": 7.044402057171984e-32
+    },
+    "T_flange_from_camera_cad": {
+      "rotation_orthogonality_max_error": 1.1102230246251565e-16,
+      "determinant": 0.9999999999999999,
+      "inverse_closure_max_error": 2.220446049250313e-16
+    },
+    "T_camera_cad_from_left_optical_nominal": {
+      "rotation_orthogonality_max_error": 8.659739592076221e-15,
+      "determinant": 1.0000000000000053,
+      "inverse_closure_max_error": 1.1102230246251565e-16
+    },
+    "T_flange_from_left_optical_nominal": {
+      "rotation_orthogonality_max_error": 8.43769498715119e-15,
+      "determinant": 1.000000000000005,
+      "inverse_closure_max_error": 1.1102230246251565e-16
+    },
+    "T_flange_from_usd_camera_nominal": {
+      "rotation_orthogonality_max_error": 8.43769498715119e-15,
+      "determinant": 1.000000000000005,
+      "inverse_closure_max_error": 1.1102230246251565e-16
+    },
+    "T_hand_cad_from_camera_cad": {
+      "rotation_orthogonality_max_error": 5.551115123125783e-16,
+      "determinant": 0.9999999999999994,
+      "inverse_closure_max_error": 2.220446049250313e-16
+    },
+    "T_flange_from_robotiq_assembly_cad": {
+      "rotation_orthogonality_max_error": 4.440892098500626e-16,
+      "determinant": 1.0000000000000004,
+      "inverse_closure_max_error": 1.3877787807814457e-17
+    }
+  },
+  "provenance": {
+    "extraction": "STEP nested representation placements; independent OpenCascade XCAF cross-check recorded in verification.json.",
+    "flange_datum_offset_mm": 107,
+    "previous_camera_registration": {
+      "zed_description_url": "https://github.com/stereolabs/zed-ros2-description/blob/main/urdf/zed_macro.urdf.xacro",
+      "zed_mesh_url": "https://raw.githubusercontent.com/stereolabs/zed-ros2-description/main/meshes/zedm.stl",
+      "nominal_baseline_m": 0.063,
+      "zed_mesh_registration": {
+        "method": "20,000 source surface samples, 120,000 target surface samples, 25 trimmed rigid ICP iterations, random seed 3",
+        "median_sample_nearest_distance_mm": 0.18263974,
+        "p80_mm": 0.30435439,
+        "p90_mm": 0.92819888,
+        "note": "Models differ in fine details. Nominal left optical point is approximately 0.98mm laterally displaced from the exact lens-cylinder axis in the provided CAD. No optical-depth accuracy claim from visible lens front."
+      },
+      "flange_geometry_check": {
+        "method": "CAD flange component in its source frame compared with standard USD fr3_link7 visual vertices; same axial/radial datum, different fine surfaces",
+        "median_surface_distance_mm": 0.27556888,
+        "p90_surface_distance_mm": 2.01760824,
+        "max_mm": 2.24799203,
+        "matching_bounds_mm": {
+          "CAD_x_min": -44.0,
+          "USD_x_min": -43.99996,
+          "CAD_x_max": 81.281345,
+          "USD_x_max": 81.28136,
+          "CAD_z_flange_interface": 107.0,
+          "USD_joint8_z": 107.000000775
+        }
+      }
+    },
+    "T_world_from_flange_mm": [
+      [
+        0.9999996987169841,
+        0.0007762512100054351,
+        -2.85559630094525e-10,
+        419.30213724069415
+      ],
+      [
+        0.0007762512100054351,
+        -0.9999996987169841,
+        -3.78652085412247e-14,
+        0.0010000000099082528
+      ],
+      [
+        -2.8555957345317237e-10,
+        -1.83800811256499e-13,
+        -1.0,
+        398.371965392747
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "T_world_from_hand_cad_mm": [
+      [
+        -0.0007762512100057682,
+        -2.8555842468634904e-10,
+        -0.9999996987169841,
+        419.3021372411191
+      ],
+      [
+        0.9999996987169841,
+        -3.783651725743544e-14,
+        -0.0007762512100057681,
+        0.0010000000634490802
+      ],
+      [
+        1.8382856683218406e-13,
+        -1.0000000000000002,
+        2.8555836802308794e-10,
+        384.61396539274654
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "T_world_from_camera_cad_mm": [
+      [
+        -0.0007762512100056191,
+        0.3425289840782072,
+        -0.9395069411667005,
+        337.196983901583
+      ],
+      [
+        0.9999996987169841,
+        0.00026588861863534715,
+        -0.0007292936195493379,
+        -6.01195647339352
+      ],
+      [
+        1.861811395421708e-13,
+        -0.9395072242242705,
+        -0.34252908727640374,
+        402.96043251752
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ]
+  },
+  "limitations": [
+    "As-designed CAD transforms; physical camera mounting and hand-eye calibration are not measured.",
+    "Optical transform is the previous nominal Stereolabs registration, with millimetre-scale uncertainty.",
+    "No new Robotiq simulation USD was provided. Register the chosen simulation gripper base frame to hand_cad before applying its body pose.",
+    "When constructing Gf.Matrix4d directly, transpose these column-vector matrices to USD row-vector convention. Quaternion poses use w,x,y,z. Avoid applying optical-to-USD conversion twice."
+  ]
+}

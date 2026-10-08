@@ -1,0 +1,31 @@
+#usda 1.0
+(
+    defaultPrim = "Robotiq_2F_85"
+    metersPerUnit = 1
+    subLayers = [
+        @./base.usda@
+    ]
+    upAxis = "Z"
+)
+
+over "Meshes"
+{
+    over "fingertip"
+    {
+        over "tip_standard" (
+            active = false
+        )
+        {
+        }
+
+        def Xform "tip_tsf85" (
+            instanceable = false
+            kind = "subcomponent"
+            prepend references = @../parts/TSF_85_case.usd@
+        )
+        {
+            matrix4d xformOp:transform = ( (0, 0, -1, 0), (0, 1, 0, 0), (1, 0, 0, 0), (-0.044888, 0.11042, 0, 1) )
+            uniform token[] xformOpOrder = ["xformOp:transform"]
+        }
+    }
+}
