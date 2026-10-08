@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Protocol
 
 import numpy as np
 
@@ -16,6 +16,7 @@ from saps.policies.openpi_droid import (
 )
 
 from isaac_fr3.droid_observation import measured_gripper
+from isaac_fr3.robotiq_gripper import RobotiqGripperController
 
 
 TOTAL_WIDTH_SPEED_M_S = 0.100
@@ -48,6 +49,83 @@ class GripperRuntime:
             self.ramp_origin_width_m = float(width_m)
             self.ramp_steps = 0
         return {"from": previous, "to": intent, "transition": transition}
+
+    def read(self, handles: Any, config: dict) -> dict:
+        """Read the original two Franka finger translations without coercion."""
+        indices = _array(handles.finger_indices).astype(int).reshape(-1)
+        fingers = _array(handles.fr3.get_dof_positions()).reshape(-1)[indices].copy()
+        width, scalar = measured_gripper(fingers)
+        return {"positions": fingers, "width_m": width, "scalar": scalar}
+
+    def apply_transition(self, handles: Any, config: dict) -> None:
+        if self.intent == "CLOSED" and not self.active_effort_set:
+            active_index = int(_array(handles.finger_indices).reshape(-1)[0])
+            handles.fr3.set_dof_max_efforts(
+                np.asarray([[ACTIVE_FINGER_MAX_EFFORT_N]], dtype=np.float32),
+                dof_indices=[active_index],
+            )
+            self.active_effort_set = True
+
+    def advance_step(self, handles: Any, config: dict,
+                     physics_dt: float) -> None:
+        if self.ramp_origin_width_m is None:
+            return
+        self.ramp_steps += 1
+        elapsed = self.ramp_steps * physics_dt
+        sign = -1.0 if self.intent == "CLOSED" else 1.0
+        target_width = float(np.clip(
+            self.ramp_origin_width_m + sign * TOTAL_WIDTH_SPEED_M_S * elapsed,
+            0.0, config["droid"]["gripper_max_width_m"],
+        ))
+        handles.fr3.set_dof_position_targets(
+            np.full((1, 2), target_width / 2, dtype=np.float32),
+            dof_indices=handles.finger_indices,
+        )
+
+    def freeze(self, handles: Any, config: dict) -> dict:
+        fingers = self.read(handles, config)["positions"]
+        handles.fr3.set_dof_position_targets(
+            np.asarray([fingers], dtype=np.float32),
+            dof_indices=handles.finger_indices,
+        )
+        self.ramp_origin_width_m = None
+        return {"gripper_width_frozen_m": float(np.sum(fingers))}
+
+    def report(self, handles: Any, config: dict) -> dict:
+        state = self.read(handles, config)
+        return {
+            "intent": self.intent,
+            "finger_positions_m": state["positions"].tolist(),
+            "measured_width_m": state["width_m"],
+            "normalized_observation": float(state["scalar"][0]),
+            "transition_active": self.ramp_origin_width_m is not None,
+            "transition_steps": self.ramp_steps,
+            "faults": [],
+        }
+
+
+class GripperController(Protocol):
+    """Small embodiment boundary used by the unchanged arm action loop."""
+
+    intent: str
+
+    def read(self, handles: Any, config: dict) -> dict: ...
+    def request_intent(self, policy_value: float, width_m: float) -> dict: ...
+    def apply_transition(self, handles: Any, config: dict) -> None: ...
+    def advance_step(self, handles: Any, config: dict,
+                     physics_dt: float) -> None: ...
+    def freeze(self, handles: Any, config: dict) -> dict: ...
+    def report(self, handles: Any, config: dict) -> dict: ...
+
+
+def create_gripper_controller(config: dict) -> GripperController:
+    """Choose the validated gripper implementation from scene configuration."""
+    kind = config.get("gripper", {}).get("kind", "franka_hand")
+    if kind == "franka_hand":
+        return GripperRuntime()
+    if kind == "robotiq_2f85":
+        return RobotiqGripperController()
+    raise ValueError(f"Unsupported gripper embodiment: {kind}")
 
 
 def run_rollout_loop(
@@ -170,13 +248,6 @@ def _arm_state(handles: Any) -> tuple[np.ndarray, np.ndarray]:
     return q, dq
 
 
-def _finger_state(handles: Any) -> tuple[np.ndarray, float, float]:
-    indices = _array(handles.finger_indices).astype(int).reshape(-1)
-    fingers = _array(handles.fr3.get_dof_positions()).reshape(-1)[indices].copy()
-    width, scalar = measured_gripper(fingers)
-    return fingers, width, float(scalar[0])
-
-
 def _pose(position: Any, orientation: Any) -> dict:
     return {
         "position_xyz_m": _array(position).reshape(-1).tolist(),
@@ -217,8 +288,9 @@ def command_fresh_hold(handles: Any) -> dict:
 def execute_chunk(
     handles: Any, config: dict, selected: np.ndarray,
     *, physics_dt: float, render: bool = False,
-    gripper_runtime: GripperRuntime | None = None,
+    gripper_runtime: GripperController | None = None,
     on_action: Any | None = None,
+    contact_monitor: Any | None = None,
     terminal_evidence_steps: int = TERMINAL_EVIDENCE_STEPS,
 ) -> dict:
     """Issue eight fresh-q targets at four-physics-step absolute deadlines."""
@@ -249,24 +321,17 @@ def execute_chunk(
     wall_start = time.perf_counter()
     simulated_steps = 0
     rows = []
-    gripper = gripper_runtime if gripper_runtime is not None else GripperRuntime()
+    gripper = (gripper_runtime if gripper_runtime is not None
+               else create_gripper_controller(config))
+    robotiq = config.get("gripper", {}).get("kind") == "robotiq_2f85"
+    if robotiq != isinstance(gripper, RobotiqGripperController):
+        raise ValueError("Gripper controller does not match scene embodiment")
     transitions = []
     failed = None
 
     def advance_step() -> None:
         nonlocal simulated_steps
-        if gripper.ramp_origin_width_m is not None:
-            gripper.ramp_steps += 1
-            elapsed = gripper.ramp_steps * physics_dt
-            sign = -1.0 if gripper.intent == "CLOSED" else 1.0
-            target_width = float(np.clip(
-                gripper.ramp_origin_width_m + sign * TOTAL_WIDTH_SPEED_M_S * elapsed,
-                0.0, config["droid"]["gripper_max_width_m"],
-            ))
-            handles.fr3.set_dof_position_targets(
-                np.full((1, 2), target_width / 2, dtype=np.float32),
-                dof_indices=handles.finger_indices,
-            )
+        gripper.advance_step(handles, config, physics_dt)
         handles.world.step(render=render)
         simulated_steps += 1
 
@@ -289,11 +354,19 @@ def execute_chunk(
             "wall_lateness_seconds": max(0.0, wall_now - wall_start - scheduled_sim_time),
         }
         q_before, dq_before = _arm_state(handles)
-        fingers, width, gripper_scalar = _finger_state(handles)
+        sample = gripper.read(handles, config)
+        fingers = sample["positions"]
+        width = sample["width_m"]
+        gripper_scalar = float(sample["scalar"][0])
         row.update({
             "measured_q_before_rad": q_before.tolist(),
             "measured_dq_before_rad_s": dq_before.tolist(),
-            "measured_finger_positions_m": fingers.tolist(),
+        })
+        if robotiq:
+            row["measured_gripper_driver_position_rad"] = float(fingers[0])
+        else:
+            row["measured_finger_positions_m"] = fingers.tolist()
+        row.update({
             "measured_total_width_m": width,
             "normalized_gripper_observation": gripper_scalar,
             "policy_gripper_value": float(action[7]),
@@ -316,13 +389,7 @@ def execute_chunk(
                     "to": intent, "measured_width_m": width,
                     "simulated_seconds": actual_sim_time,
                 })
-                if intent == "CLOSED" and not gripper.active_effort_set:
-                    active_index = int(_array(handles.finger_indices).reshape(-1)[0])
-                    handles.fr3.set_dof_max_efforts(
-                        np.asarray([[ACTIVE_FINGER_MAX_EFFORT_N]], dtype=np.float32),
-                        dof_indices=[active_index],
-                    )
-                    gripper.active_effort_set = True
+                gripper.apply_transition(handles, config)
         except (ValueError, RuntimeError) as error:
             row["safety_result"] = "rejected"
             row["rejection_reason"] = f"{type(error).__name__}: {error}"
@@ -337,6 +404,10 @@ def execute_chunk(
         row["measured_q_after_rad"] = q_after.tolist()
         row["measured_dq_after_rad_s"] = dq_after.tolist()
         row["tcp_pose_after"] = _pose(*get_tcp_pose(config))
+        if robotiq:
+            row["gripper_state_after"] = gripper.report(handles, config)
+            if contact_monitor is not None:
+                row["contact_summary_after"] = contact_monitor.summary()
         rows.append(row)
         if on_action is not None:
             on_action(row)
@@ -345,16 +416,10 @@ def execute_chunk(
     if failed is not None:
         # Stop an active finger ramp after an arm safety rejection. The
         # previously requested binary intent remains recorded for provenance.
-        fingers, _, _ = _finger_state(handles)
         try:
-            handles.fr3.set_dof_position_targets(
-                np.asarray([fingers], dtype=np.float32),
-                dof_indices=handles.finger_indices,
-            )
-            hold["gripper_width_frozen_m"] = float(np.sum(fingers))
+            hold.update(gripper.freeze(handles, config))
         except (ValueError, RuntimeError) as error:
             hold["gripper_freeze_error"] = f"{type(error).__name__}: {error}"
-        gripper.ramp_origin_width_m = None
     try:
         fresh_q, _ = _arm_state(handles)
         hold_q = terminal_hold_target(fresh_q, lower, upper)
@@ -396,7 +461,6 @@ def execute_chunk(
         "rows": rows,
         "gripper_transitions": transitions,
         "gripper_intent_after": gripper.intent,
-        "gripper_ramp_steps_after": gripper.ramp_steps,
         "terminal_hold": hold,
         "initial_tcp_pose": tcp_before,
         "final_tcp_pose": _pose(*get_tcp_pose(config)),
@@ -407,4 +471,10 @@ def execute_chunk(
         "simulated_execution_seconds": simulated_steps * physics_dt,
         "wall_execution_seconds": time.perf_counter() - wall_start,
     }
+    if robotiq:
+        result["gripper_state_after"] = gripper.report(handles, config)
+        if contact_monitor is not None:
+            result["contact_summary"] = contact_monitor.summary()
+    else:
+        result["gripper_ramp_steps_after"] = gripper.ramp_steps
     return result

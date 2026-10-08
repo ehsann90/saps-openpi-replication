@@ -535,10 +535,9 @@ after the run.
 
 `sim/configs/fr3_droid_robotiq_scene.json` selects the derived
 `sim/assets/fr3_robotiq_droid.usda` assembly. The original
-`fr3_droid_scene.json` still selects the NVIDIA FR3 with Franka Hand. This
-Robotiq scene is an OpenPI-off asset and mechanical validation condition; the
-SIM-P6 policy rollout entry point still uses the Franka-specific gripper
-executor. Do not use that entry point with the Robotiq configuration yet.
+`fr3_droid_scene.json` still selects the NVIDIA FR3 with Franka Hand. SIM-P7
+established this scene with OpenPI off; SIM-P8 adds the policy rollout adapter
+described below.
 
 The assembly references the Isaac Sim 6.1 FR3 and an unchanged copy of
 [Robotiq's 2F-85 Isaac asset](https://github.com/robotiq/isaacsim_assets/tree/ef313b8416096d50c3ab56d67adb21f92d086660/grippers/Robotiq_2F_85)
@@ -614,6 +613,57 @@ work surface, but scene content, lighting, and material appearance differ;
 this qualitative comparison is not camera-pose ground truth.
 
 **Validation status:** The SIM-P7 focused unit tests (17/17), standalone Robotiq grasp validation, and Franka-Hand mechanical regression passed. The repository-wide `make check` did not pass: two archived-sweep tests use `str.removeprefix`, which is unavailable in the Docker Python 3.8 runtime, and one presentation-scene fixture expects a different HOME joint value. These failures remain unresolved and were not addressed by SIM-P7.
+
+## SIM-P8 Robotiq policy rollout
+
+Start `make droid-policy-server` and wait for the pinned `pi05_droid` server to
+listen. Use the Isaac client dependency setup in SIM-P4, then run the same
+one-chunk or repeated scripts with
+`--config sim/configs/fr3_droid_robotiq_scene.json`. For example:
+
+```bash
+cd ~/isaacsim
+PYTHONPATH=/tmp/isaac-openpi-client-deps ./python.sh -u \
+  ~/MyProjects/saps-openpi-replication/sim/scripts/policy_rollout.py \
+  --config ~/MyProjects/saps-openpi-replication/sim/configs/fr3_droid_robotiq_scene.json \
+  --host 127.0.0.1 --port 8000 --prompt 'Pick up the red object' \
+  --policy-episode-seed 20260827 --headless
+```
+
+The default remains unlimited; Ctrl-C finalizes the episode. The one-chunk
+script is `policy_one_chunk.py` with the same configuration and a
+`--replan-index`. Robotiq output goes to unique
+`outputs/isaac_droid_robotiq_one_chunk/` and
+`outputs/isaac_droid_robotiq_rollout/` paths, separate from Franka-Hand runs.
+The policy request still contains exactly seven measured FR3 arm joints, one
+normalized pad-opening scalar, two RGB images, and the prompt. The gripper
+controller commands only `finger_joint` on a change of binary intent and lets
+the joint drive continue across actions and replans. Its 10 N m authored
+torque is not equivalent to the Franka Hand's 20 N active-finger effort.
+The five passive Robotiq joints receive no position commands.
+
+The arm mapping, first-eight selection, 15 Hz timing, four physics steps per
+action, terminal hold, and zero simulation stepping during inference are shared
+with SIM-P6. Each completed repeated chunk advances exactly 32 steps, or
+0.533333 s. Per-action and episode evidence contains driver radians, measured
+pad width, normalized observation, intent/transition state, faults, cube pose,
+and loaded pad/cube contact counts. `bilateral_loaded_reports` requires both
+pads to carry load in the same PhysX contact report; left and right contacts
+at different times are not a grasp. A one-chunk run retains SIM-P5's separate
+eight-step terminal evidence settle. Task outcome remains `not_evaluated`;
+commanded closure alone is never labeled successful grasp.
+
+In the 2026-10-08 pilot
+`outputs/isaac_droid_robotiq_rollout/20261008T081653Z_78a9f018`, 13 complete
+replans executed 104 actions at exactly 0.533333 s per chunk. The fourteenth
+replan stopped after six actions because its next measured-q arm target would
+exceed a joint limit. One pad contacted the cube, but there was no bilateral
+loaded contact. The cube moved about 0.076 m laterally and its final height
+did not increase; this is neither a grasp nor a lift result. The earlier long
+pilot demonstrated continuous execution but had a cumulative side-contact
+flag that could be mistaken for simultaneous bilateral contact. The current
+monitor records bilateral contact only within one PhysX report. These pilots
+are diagnostic evidence, not task-success measurements.
 
 ## Known warnings
 

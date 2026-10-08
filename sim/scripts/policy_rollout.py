@@ -47,10 +47,11 @@ sys.path.insert(0, str(REPO_ROOT / "third_party/openpi/packages/openpi-client/sr
 from isaac_fr3.cameras import camera_metadata, create_cameras
 from isaac_fr3.droid_observation import capture_observation
 from isaac_fr3.policy_execution import (
-    GripperRuntime, InvalidPolicyResponse, command_fresh_hold,
+    InvalidPolicyResponse, command_fresh_hold, create_gripper_controller,
     execute_chunk, run_rollout_loop,
     select_actions,
 )
+from isaac_fr3.robotiq_contacts import RobotiqContactMonitor
 from isaac_fr3.scene import (
     CUBE_SETTLE_STEPS, HOME_SETTLE_STEPS, command_home, create_scene,
     get_tcp_pose, load_config, settle,
@@ -132,6 +133,7 @@ def main() -> None:
     if args.max_replans is not None and args.max_replans <= 0:
         raise ValueError("max_replans must be positive")
     config = load_config(args.config)
+    robotiq = config.get("gripper", {}).get("kind") == "robotiq_2f85"
     if config["droid"]["control_hz"] != 15.0:
         raise ValueError("Rollout requires the validated 15 Hz DROID baseline")
     policy = OpenPiDroidPolicy(host=args.host, port=args.port)
@@ -151,11 +153,18 @@ def main() -> None:
     physics_dt = SimulationManager.get_physics_dt()
     run_id = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     run_id += "_" + uuid.uuid4().hex[:8]
-    output = REPO_ROOT / "outputs" / "isaac_droid_rollout" / run_id
+    output_kind = (
+        "isaac_droid_robotiq_rollout" if robotiq else "isaac_droid_rollout"
+    )
+    output = REPO_ROOT / "outputs" / output_kind / run_id
     (output / "replans").mkdir(parents=True, exist_ok=False)
     wall_start = time.perf_counter()
     gpu_before, ram_before = gpu_snapshot(), ram_snapshot()
-    gripper = GripperRuntime()
+    gripper = create_gripper_controller(config)
+    contact_monitor = (
+        RobotiqContactMonitor(handles.world.stage, config) if robotiq else None
+    )
+    initial_objects = object_poses(handles)
     hold_records = {}
     terminal_step_before_next_observation = None
     pause_starts = {}
@@ -185,15 +194,35 @@ def main() -> None:
         "policy_episode_seed": args.policy_episode_seed,
         "max_replans": args.max_replans,
         "initial_arm_q_rad": measured_dofs(handles, handles.arm_indices),
-        "initial_finger_positions_m": measured_dofs(handles, handles.finger_indices),
+        **({"initial_gripper_driver_position_rad": measured_dofs(
+            handles, handles.finger_indices
+        )[0], "embodiment": "fr3_robotiq_2f85"} if robotiq else {
+            "initial_finger_positions_m": measured_dofs(
+                handles, handles.finger_indices
+            )}),
         "initial_tcp_pose": pose(*get_tcp_pose(config)),
-        "initial_objects": object_poses(handles),
+        "initial_objects": initial_objects,
     })
 
     def current_dir(index: int) -> Path:
         return output / "replans" / f"{index:04d}"
 
     def persist_progress(summary: dict) -> None:
+        final_objects = object_poses(handles)
+        embodiment_evidence = {}
+        if robotiq:
+            before = np.asarray(initial_objects[0]["position_xyz_m"])
+            after = np.asarray(final_objects[0]["position_xyz_m"])
+            contacts = contact_monitor.summary()
+            embodiment_evidence = {
+                "gripper_state": gripper.report(handles, config),
+                "bilateral_loaded_contact_observed": (
+                    contacts["bilateral_loaded_reports"] > 0
+                ),
+                "contact_summary": contacts,
+                "cube_displacement_m": float(np.linalg.norm(after - before)),
+                "cube_height_change_m": float(after[2] - before[2]),
+            }
         write_json(output / "episode.json", {
             **summary, "task_outcome": "not_evaluated",
             "replans": per_replan,
@@ -205,9 +234,14 @@ def main() -> None:
             "gripper_transitions": transitions,
             "gripper_intent": gripper.intent,
             "final_arm_q_rad": measured_dofs(handles, handles.arm_indices),
-            "final_finger_positions_m": measured_dofs(handles, handles.finger_indices),
+            **({"final_gripper_driver_position_rad": measured_dofs(
+                handles, handles.finger_indices
+            )[0]} if robotiq else {"final_finger_positions_m": measured_dofs(
+                handles, handles.finger_indices
+            )}),
             "final_tcp_pose": pose(*get_tcp_pose(config)),
-            "final_objects": object_poses(handles),
+            "final_objects": final_objects,
+            **embodiment_evidence,
         })
         write_json(output / "timing.json", {
             "per_replan": [{key: row.get(key) for key in (
@@ -269,7 +303,9 @@ def main() -> None:
             "measured_arm_q_rad": request[
                 "observation/joint_position"
             ].tolist(),
-            "finger_positions_m": fingers.tolist(), "finger_width_m": width,
+            **({"gripper_driver_position_rad": float(fingers[0])}
+               if robotiq else {"finger_positions_m": fingers.tolist()}),
+            "finger_width_m": width,
             "droid_gripper_scalar": request["observation/gripper_position"].tolist(),
             "tcp_pose": pose(*get_tcp_pose(config)),
             "objects": object_poses(handles),
@@ -338,8 +374,13 @@ def main() -> None:
             "simulation_step_after": int(handles.world.current_time_step_index),
             "arm_q_before_inference_rad": arm_q_before.tolist(),
             "arm_q_after_inference_rad": arm_q_after,
-            "finger_positions_before_inference_m": fingers_before.tolist(),
-            "finger_positions_after_inference_m": fingers_after,
+            **({
+                "gripper_driver_before_inference_rad": float(fingers_before[0]),
+                "gripper_driver_after_inference_rad": float(fingers_after[0]),
+            } if robotiq else {
+                "finger_positions_before_inference_m": fingers_before.tolist(),
+                "finger_positions_after_inference_m": fingers_after,
+            }),
             "held_without_evolution": held,
         }
         np.save(path / "actions.npy", response.actions, allow_pickle=False)
@@ -384,6 +425,7 @@ def main() -> None:
             handles, config, payload["selected"], physics_dt=physics_dt,
             render=not args.headless, gripper_runtime=gripper,
             on_action=save_action, terminal_evidence_steps=0,
+            contact_monitor=contact_monitor,
         )
         result["replan_index"] = index
         result["paused_wall_seconds"] = paused
@@ -407,9 +449,11 @@ def main() -> None:
             "arm_q_before_inference_rad": response[
                 "arm_q_before_inference_rad"
             ],
-            "finger_positions_before_inference_m": response[
+            **({"gripper_driver_before_inference_rad": response[
+                "gripper_driver_before_inference_rad"
+            ]} if robotiq else {"finger_positions_before_inference_m": response[
                 "finger_positions_before_inference_m"
-            ],
+            ]}),
             "finger_width_m": obs["finger_width_m"],
             "gripper_scalar": obs["droid_gripper_scalar"],
             "tcp_before": obs["tcp_pose"], "objects_before": obs["objects"],
@@ -429,12 +473,17 @@ def main() -> None:
             "actions_executed": execution["actions_executed"],
             "terminal_hold": execution["terminal_hold"],
             "arm_q_after_rad": execution["final_q_rad"],
-            "finger_positions_after_m": measured_dofs(
+            **({"gripper_driver_after_rad": measured_dofs(
                 handles, handles.finger_indices
-            ),
+            )[0]} if robotiq else {"finger_positions_after_m": measured_dofs(
+                handles, handles.finger_indices
+            )}),
             "tcp_after": execution["final_tcp_pose"],
             "objects_after": object_poses(handles),
             "gripper_transitions": execution["gripper_transitions"],
+            **({"gripper_state_after": execution["gripper_state_after"],
+                "contact_summary": execution["contact_summary"]}
+               if robotiq else {}),
             "status": execution["status"],
         }
         per_replan.append(row)

@@ -53,6 +53,7 @@ def build_observation(
     joint_names: list[str], joint_positions: np.ndarray,
     finger_positions: np.ndarray, prompt: str,
     maximum_width_m: float = 0.08,
+    measured_gripper_state: tuple[float, np.ndarray] | None = None,
 ) -> tuple[dict[str, Any], float]:
     """Validate source shapes and use the shared DROID request constructor."""
     for name, image in (("exterior", exterior_image), ("wrist", wrist_image)):
@@ -61,7 +62,17 @@ def build_observation(
         if image.dtype != np.uint8:
             raise TypeError(f"{name} image must have dtype uint8")
     arm = measured_arm(joint_names, joint_positions)
-    width, gripper = measured_gripper(finger_positions, maximum_width_m)
+    if measured_gripper_state is None:
+        width, gripper = measured_gripper(finger_positions, maximum_width_m)
+    else:
+        width, gripper = measured_gripper_state
+        gripper = np.asarray(gripper, dtype=np.float32)
+        if (not np.isfinite(width) or width < 0 or width > maximum_width_m
+                or gripper.shape != (1,) or not np.isfinite(gripper).all()
+                or not 0 <= gripper[0] <= 1
+                or not np.isclose(gripper[0],
+                                  1 - width / maximum_width_m, atol=1e-5)):
+            raise ValueError("Invalid measured gripper state")
     request = prepare_droid_observation(
         exterior_image=exterior_image, wrist_image=wrist_image,
         joint_position=arm, gripper_position=gripper, prompt=prompt,
@@ -76,8 +87,10 @@ def capture_observation(handles: Any, rig: Any, config: dict, prompt: str):
     from isaac_fr3.cameras import capture_rgb
 
     names = config["robot"]["arm_dof_names"] + config["robot"]["finger_dof_names"]
-    if tuple(config["robot"]["finger_dof_names"]) != FINGER_JOINT_NAMES:
-        raise ValueError("Unexpected FR3 finger joint order")
+    robotiq = config.get("gripper", {}).get("kind") == "robotiq_2f85"
+    expected_fingers = ("finger_joint",) if robotiq else FINGER_JOINT_NAMES
+    if tuple(config["robot"]["finger_dof_names"]) != expected_fingers:
+        raise ValueError("Unexpected configured gripper joint order")
     dof_indices = np.asarray(
         handles.fr3.get_dof_indices(names), dtype=np.int64
     ).reshape(-1)
@@ -95,6 +108,11 @@ def capture_observation(handles: Any, rig: Any, config: dict, prompt: str):
     arm = selected[:7]
     stamps["gripper_state_read_ns"] = time.time_ns()
     fingers = selected[7:]
+    measured_state = None
+    if robotiq:
+        from isaac_fr3.robotiq_gripper import measured_opening
+        measured_state = measured_opening(handles, config)
+        stamps["gripper_state_read_ns"] = time.time_ns()
     capture_seconds = (time.perf_counter_ns() - capture_start) / 1e9
     prepare_start = time.perf_counter_ns()
     request, width = build_observation(
@@ -102,6 +120,7 @@ def capture_observation(handles: Any, rig: Any, config: dict, prompt: str):
         joint_names=names, joint_positions=selected,
         finger_positions=fingers, prompt=prompt,
         maximum_width_m=float(config["droid"]["gripper_max_width_m"]),
+        measured_gripper_state=measured_state,
     )
     stamps["request_construction_ns"] = time.time_ns()
     preparation_seconds = (time.perf_counter_ns() - prepare_start) / 1e9

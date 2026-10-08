@@ -4,14 +4,17 @@ from __future__ import annotations
 
 from pathlib import Path
 import sys
+from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "sim/src"))
 
 from isaac_fr3.droid_observation import (
-    ARM_JOINT_NAMES, build_observation, measured_arm, measured_gripper,
+    ARM_JOINT_NAMES, build_observation, capture_observation,
+    measured_arm, measured_gripper,
 )
 from saps.policies.openpi_droid import DROID_POLICY_INPUT_KEYS
 
@@ -69,6 +72,52 @@ class SimDroidObservationTest(unittest.TestCase):
             self.build(exterior_image=self.external.astype(np.float32))
         with self.assertRaisesRegex(ValueError, "prompt"):
             self.build(prompt=" ")
+
+    def test_robotiq_capture_keeps_seven_arm_joints_and_pad_scalar(self) -> None:
+        names = [*ARM_JOINT_NAMES, "finger_joint"]
+
+        class Articulation:
+            def get_dof_indices(self, selected):
+                return np.asarray([names.index(name) for name in selected])
+
+            def get_dof_positions(self):
+                return np.asarray([0.1] * 7 + [0.4], dtype=np.float32)
+
+        handles = SimpleNamespace(fr3=Articulation())
+        rig = SimpleNamespace(external=object(), wrist=object())
+        config = {
+            "robot": {"arm_dof_names": list(ARM_JOINT_NAMES),
+                      "finger_dof_names": ["finger_joint"]},
+            "gripper": {"kind": "robotiq_2f85"},
+            "droid": {"gripper_max_width_m": 0.08708},
+            "cameras": {"external": {"resolution_wh": [320, 180]},
+                        "wrist": {"resolution_wh": [320, 180]}},
+        }
+        camera_module = SimpleNamespace(
+            capture_rgb=lambda camera, resolution: self.external
+        )
+        with patch.dict(sys.modules, {"isaac_fr3.cameras": camera_module}), \
+                patch("isaac_fr3.robotiq_gripper.measured_opening",
+                      return_value=(0.04, np.asarray([1 - 0.04 / 0.08708],
+                                                     dtype=np.float32))):
+            request, driver, width, _, _, _ = capture_observation(
+                handles, rig, config, "Pick up the red object"
+            )
+        self.assertEqual(tuple(request), DROID_POLICY_INPUT_KEYS)
+        np.testing.assert_allclose(
+            request["observation/joint_position"], [0.1] * 7
+        )
+        self.assertEqual(request["observation/joint_position"].shape, (7,))
+        np.testing.assert_allclose(driver, [0.4])
+        self.assertAlmostEqual(width, 0.04)
+        self.assertAlmostEqual(
+            float(request["observation/gripper_position"][0]),
+            1 - 0.04 / 0.08708, places=6,
+        )
+        with self.assertRaisesRegex(ValueError, "Invalid measured gripper"):
+            self.build(
+                measured_gripper_state=(0.04, np.asarray([0.0])),
+            )
 
 
 if __name__ == "__main__":

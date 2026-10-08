@@ -44,6 +44,7 @@ sys.path.insert(0, str(REPO_ROOT / "third_party/openpi/packages/openpi-client/sr
 from isaac_fr3.cameras import camera_metadata, create_cameras
 from isaac_fr3.droid_observation import capture_observation
 from isaac_fr3.policy_execution import execute_chunk, select_actions
+from isaac_fr3.robotiq_contacts import RobotiqContactMonitor
 from isaac_fr3.scene import (
     CUBE_SETTLE_STEPS, HOME_SETTLE_STEPS, command_home, create_scene,
     load_config, settle,
@@ -90,6 +91,7 @@ def main() -> None:
     if args.host == "0.0.0.0":
         raise ValueError("Use a reachable policy-server address, not 0.0.0.0")
     config = load_config(args.config)
+    robotiq = config.get("gripper", {}).get("kind") == "robotiq_2f85"
     if config["droid"]["control_hz"] != 15.0:
         raise ValueError("SIM-P5 requires the 15 Hz DROID baseline")
     policy = OpenPiDroidPolicy(host=args.host, port=args.port)
@@ -111,7 +113,10 @@ def main() -> None:
 
     run_id = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     run_id += "_" + uuid.uuid4().hex[:8]
-    output = REPO_ROOT / "outputs" / "isaac_droid_one_chunk" / run_id
+    output_kind = (
+        "isaac_droid_robotiq_one_chunk" if robotiq else "isaac_droid_one_chunk"
+    )
+    output = REPO_ROOT / "outputs" / output_kind / run_id
     output.mkdir(parents=True, exist_ok=False)
     gpu_before, ram_before = gpu_snapshot(), ram_snapshot()
     request, fingers, width, stamps, capture_seconds, prep_seconds = (
@@ -132,7 +137,9 @@ def main() -> None:
             if isinstance(value, np.ndarray)
         },
         "joint_position_rad": observed_q.tolist(),
-        "finger_positions_m": fingers.tolist(), "finger_width_m": width,
+        **({"gripper_driver_position_rad": float(fingers[0])}
+           if robotiq else {"finger_positions_m": fingers.tolist()}),
+        "finger_width_m": width,
         "gripper_position": request["observation/gripper_position"].tolist(),
         "capture_timestamps_unix_ns": stamps,
         "exterior_image_path": "exterior_raw.png", "wrist_image_path": "wrist_raw.png",
@@ -154,6 +161,7 @@ def main() -> None:
         "checkpoint": POLICY_CHECKPOINT, "prompt": args.prompt,
         "policy_episode_seed": args.policy_episode_seed,
         "replan_index": args.replan_index,
+        **({"embodiment": "fr3_robotiq_2f85"} if robotiq else {}),
         "initial_cube_pose": {
             "position_xyz_m": np.asarray(cube_position).reshape(-1).tolist(),
             "orientation_wxyz": np.asarray(cube_orientation).reshape(-1).tolist(),
@@ -190,9 +198,13 @@ def main() -> None:
         "inference_hold_q_after": infer_q_after.tolist(),
     })
 
+    contact_monitor = (
+        RobotiqContactMonitor(handles.world.stage, config) if robotiq else None
+    )
     execution = execute_chunk(
         handles, config, selected,
         physics_dt=SimulationManager.get_physics_dt(), render=False,
+        contact_monitor=contact_monitor,
     )
     execution["native_horizon"] = int(response.actions.shape[0])
     execution["selected_action_count"] = len(selected)

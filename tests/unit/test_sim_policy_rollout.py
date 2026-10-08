@@ -14,11 +14,101 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "sim/src"))
 
 from isaac_fr3.policy_execution import (
     GripperRuntime, InvalidPolicyResponse, command_fresh_hold,
+    create_gripper_controller,
     execute_chunk, run_rollout_loop,
 )
 
 
 class RolloutLoopTest(unittest.TestCase):
+    def test_robotiq_driver_target_persists_across_exact_32_step_chunks(self) -> None:
+        class World:
+            current_time_step_index = 0
+            current_time = 0.0
+
+            def step(self, *, render):
+                self.current_time_step_index += 1
+                self.current_time = self.current_time_step_index / 60
+
+        class Articulation:
+            def __init__(self):
+                self.q = np.zeros(13, dtype=np.float32)
+                self.targets = self.q.copy()
+                self.driver_commands = 0
+
+            def get_dof_positions(self):
+                return self.q
+
+            def get_dof_velocities(self):
+                return np.zeros(13, dtype=np.float32)
+
+            def get_dof_limits(self, *, dof_indices):
+                return np.full((1, 7), -2.0), np.full((1, 7), 2.0)
+
+            def set_dof_position_targets(self, values, *, dof_indices):
+                indices = np.asarray(dof_indices)
+                self.targets[indices] = np.asarray(values).reshape(-1)
+                if indices.size == 1 and indices[0] == 7:
+                    self.driver_commands += 1
+
+            def get_dof_position_targets(self, *, dof_indices):
+                return self.targets[np.asarray(dof_indices)].reshape(1, -1)
+
+            def set_dof_max_efforts(self, *args, **kwargs):
+                raise AssertionError("Robotiq must use authored 10 N m drive")
+
+        world = World()
+        fr3 = Articulation()
+        handles = SimpleNamespace(
+            world=world, fr3=fr3, arm_indices=np.arange(7),
+            finger_indices=np.asarray([7]),
+            target=SimpleNamespace(get_world_pose=lambda: (
+                np.zeros(3), np.array([1.0, 0.0, 0.0, 0.0])
+            )),
+        )
+        config = {"droid": {"gripper_max_width_m": 0.08708},
+                  "gripper": {"kind": "robotiq_2f85",
+                              "open_joint_rad": 0.0,
+                              "closed_joint_rad": 0.8203047484373349}}
+        controller = create_gripper_controller(config)
+        selected = np.zeros((8, 8), dtype=np.float32)
+        selected[:, 7] = 0.9
+        scene = SimpleNamespace(get_tcp_pose=lambda config: (
+            np.zeros(3), np.array([1.0, 0.0, 0.0, 0.0])
+        ))
+        simulation_manager = SimpleNamespace(
+            SimulationManager=SimpleNamespace(get_physics_dt=lambda: 1 / 60)
+        )
+        with patch.dict(sys.modules, {
+            "isaac_fr3.scene": scene,
+            "isaacsim": SimpleNamespace(),
+            "isaacsim.core": SimpleNamespace(),
+            "isaacsim.core.simulation_manager": simulation_manager,
+        }), patch("isaac_fr3.robotiq_gripper.measured_opening",
+                  return_value=(0.08708, np.asarray([0.0], dtype=np.float32))):
+            first = execute_chunk(
+                handles, config, selected, physics_dt=1 / 60,
+                gripper_runtime=controller, terminal_evidence_steps=0,
+            )
+            second = execute_chunk(
+                handles, config, selected, physics_dt=1 / 60,
+                gripper_runtime=controller, terminal_evidence_steps=0,
+            )
+        self.assertEqual(fr3.driver_commands, 1)
+        self.assertEqual(world.current_time_step_index, 64)
+        for result in (first, second):
+            self.assertEqual(result["status"], "complete")
+            self.assertEqual(result["simulated_execution_seconds"], 8 / 15)
+            self.assertEqual(result["actions_executed"], 8)
+            self.assertEqual(result["gripper_state_after"]["target_joint_rad"],
+                             config["gripper"]["closed_joint_rad"])
+            self.assertEqual(len(result["rows"]), 8)
+            self.assertTrue(all("measured_gripper_driver_position_rad" in row
+                                for row in result["rows"]))
+            self.assertTrue(all("measured_finger_positions_m" not in row
+                                for row in result["rows"]))
+        self.assertEqual(len(first["gripper_transitions"]), 1)
+        self.assertEqual(len(second["gripper_transitions"]), 0)
+
     def test_next_capture_has_no_step_after_terminal_hold(self) -> None:
         class World:
             current_time_step_index = 0
