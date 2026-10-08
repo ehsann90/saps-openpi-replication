@@ -1,0 +1,10 @@
+diff --git a/polymetis/polymetis/torch_isolation/include/torch_server_ops.hpp b/polymetis/polymetis/torch_isolation/include/torch_server_ops.hpp
+--- a/polymetis/polymetis/torch_isolation/include/torch_server_ops.hpp
++++ b/polymetis/polymetis/torch_isolation/include/torch_server_ops.hpp
+@@ -5,5 +5,6 @@
+ #ifndef TORCH_SERVER_OPS_H
+ #define TORCH_SERVER_OPS_H
+ 
++#include <cstddef>
+ #include <map>
+ #include <vector>

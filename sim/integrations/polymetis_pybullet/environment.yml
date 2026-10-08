@@ -1,0 +1,26 @@
+name: polymetis-pinned
+channels:
+  - pytorch
+  - fair-robotics
+  - conda-forge
+dependencies:
+  - python=3.8
+  - pytorch=1.13.1
+  - cpuonly
+  - mkl=2022.0.1
+  - mkl-include=2022.0.1
+  - cmake
+  - ninja
+  - eigen=3.3.9
+  - pinocchio=2.5.2
+  - grpc-cpp=1.41.1
+  - libprotobuf=3.18.1
+  - protobuf=3.18.1
+  - yaml-cpp=0.6.3
+  - spdlog=1.10.0
+  - numpy=1.23.5
+  - grpcio=1.46.0
+  - hydra-core=1.0.6
+  - pybullet=3.17
+  - scipy
+  - pip
