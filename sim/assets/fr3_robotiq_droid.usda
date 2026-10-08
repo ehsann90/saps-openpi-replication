@@ -49,6 +49,24 @@ def Xform "fr3" (
             }
         }
 
+        # Visual-only GRP-CPL-062 coupling.
+        # Placement was aligned in Isaac Sim; not yet CAD-face verified.
+        # No collision, rigid body, or articulation properties are added.
+        def Xform "GRP_CPL_062_visual" (
+            prepend references = @./robotiq_2f85_upstream/GRP-CPL-062.usd@
+        )
+        {
+            quatd xformOp:orient = (0.7071067811865476, 0, 0, 0.7071067811865475)
+            double3 xformOp:scale = (1, 1, 1)
+            double3 xformOp:translate = (0.00207, 0.06565, -0.20265)
+            uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:orient", "xformOp:scale"]
+
+            over "GRP_CPL_062_20190819"
+            {
+                double3 xformOp:translate = (0.0001, 0.0001, 0)
+            }
+        }
+
         def PhysicsFixedJoint "robotiq_mount_joint"
         {
             rel physics:body0 = </fr3/fr3_link8>
