@@ -614,6 +614,33 @@ this qualitative comparison is not camera-pose ground truth.
 
 **Validation status:** The SIM-P7 focused unit tests (17/17), standalone Robotiq grasp validation, and Franka-Hand mechanical regression passed. The repository-wide `make check` did not pass: two archived-sweep tests use `str.removeprefix`, which is unavailable in the Docker Python 3.8 runtime, and one presentation-scene fixture expects a different HOME joint value. These failures remain unresolved and were not addressed by SIM-P7.
 
+### SIM-P11 soft-light inspection scene
+
+`sim/configs/fr3_droid_robotiq_soft_light_scene.json` copies the Robotiq
+baseline and changes only its lighting. It broadens Isaac's existing default
+ground-plane SphereLight from 0.25 to 1.0 m radius, lowers its USD intensity
+from 100000 to 6250, and reduces its specular contribution from 1.0 to 0.25.
+This softens concentrated shadows and highlights while keeping the robot,
+cube, table, cameras, and control settings identical. No global renderer
+settings change. Inspect it with the existing scene launcher; no policy server
+is needed:
+
+```bash
+~/isaacsim/python.sh -u sim/scripts/launch_scene.py \
+  --config sim/configs/fr3_droid_robotiq_soft_light_scene.json
+```
+
+Run the rollout with the same command as before, changing only the config file while the policy server is running:
+
+```bash
+cd ~/isaacsim
+PYTHONPATH=/tmp/isaac-openpi-client-deps ./python.sh -u \
+  ~/MyProjects/saps-openpi-replication/sim/scripts/policy_rollout.py \
+  --config ~/MyProjects/saps-openpi-replication/sim/configs/fr3_droid_robotiq_soft_light_scene.json \
+  --host 127.0.0.1 --port 8000 --prompt 'Pick up the cube' \
+  --policy-episode-seed 20260827 --headless
+```
+
 ## SIM-P8 Robotiq policy rollout
 
 Start `make droid-policy-server` and wait for the pinned `pi05_droid` server to

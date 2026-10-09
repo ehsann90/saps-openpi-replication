@@ -48,6 +48,26 @@ def create_scene(config: dict) -> SceneHandles:
 
     world = World(stage_units_in_meters=1.0)
     world.scene.add_default_ground_plane()
+    if "lighting" in config:
+        from pxr import UsdLux
+
+        light_config = config["lighting"]["default_ground_sphere"]
+        radius = float(light_config["radius_m"])
+        intensity = float(light_config["intensity"])
+        specular = float(light_config["specular"])
+        if (not np.isfinite([radius, intensity, specular]).all()
+                or radius <= 0 or intensity <= 0
+                or not 0 <= specular <= 1):
+            raise ValueError("Invalid default ground sphere light settings")
+        light_prim = world.stage.GetPrimAtPath(
+            "/World/defaultGroundPlane/SphereLight"
+        )
+        if not light_prim.IsA(UsdLux.SphereLight):
+            raise RuntimeError("Default ground sphere light is missing")
+        light = UsdLux.SphereLight(light_prim)
+        light.GetRadiusAttr().Set(radius)
+        light.GetIntensityAttr().Set(intensity)
+        light.GetSpecularAttr().Set(specular)
     if "floor" in config:
         floor_cfg = config["floor"]
         world.scene.add(
