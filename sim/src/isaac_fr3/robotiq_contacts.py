@@ -9,15 +9,18 @@ import numpy as np
 
 
 class RobotiqContactMonitor:
-    """Accumulate loaded pad/cube contacts without storing every event."""
+    """Accumulate loaded pad/target contacts without storing every event."""
 
-    def __init__(self, stage: Any, config: dict) -> None:
+    def __init__(
+        self, stage: Any, config: dict,
+        target_prim_path: str = "/World/TargetCube",
+    ) -> None:
         from omni.physics.core import get_physics_simulation_interface
         from pxr import PhysxSchema
 
         spec = config["gripper"]
         self.root = spec["body_prim"].rsplit("/base_link", 1)[0]
-        self.cube = "/World/TargetCube"
+        self.cube = target_prim_path
         self.sides = {
             side: {"loaded_events": 0, "total_impulse_ns": 0.0,
                    "minimum_separation_m": None, "last_colliders": None}

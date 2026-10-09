@@ -9,7 +9,7 @@ from pathlib import Path
 import numpy as np
 
 from isaacsim.core.api import World
-from isaacsim.core.api.objects import DynamicCuboid, FixedCuboid
+from isaacsim.core.api.objects import DynamicCuboid, DynamicCylinder, FixedCuboid
 from isaacsim.core.experimental.prims import Articulation, XformPrim
 from isaacsim.core.utils.stage import add_reference_to_stage
 from isaacsim.storage.native import get_assets_root_path
@@ -24,15 +24,30 @@ class SceneHandles:
     world: World
     fr3: Articulation
     table: FixedCuboid
-    target: DynamicCuboid
+    target: DynamicCuboid | DynamicCylinder
     arm_indices: np.ndarray
     finger_indices: np.ndarray
-    cubes: list[DynamicCuboid]
+    cubes: list[DynamicCuboid | DynamicCylinder]
 
 
 def load_config(path: Path) -> dict:
     with path.open("r", encoding="utf-8") as config_file:
         return json.load(config_file)
+
+
+def select_active_target(config: dict) -> dict:
+    """Choose the one active package or mug in a single-target scene."""
+    package = config["target_object"]
+    mug = config.get("optional_mug", {"enabled": False})
+    package_enabled = package.get("enabled", True)
+    mug_enabled = mug["enabled"]
+    if not isinstance(package_enabled, bool) or not isinstance(mug_enabled, bool):
+        raise ValueError("Target enabled flags must be booleans")
+    if package_enabled == mug_enabled:
+        raise ValueError("Enable exactly one package or mug target")
+    if mug_enabled:
+        return {**mug, "type": "usd_visual_mug"}
+    return package
 
 
 def create_scene(config: dict) -> SceneHandles:
@@ -41,10 +56,10 @@ def create_scene(config: dict) -> SceneHandles:
     table_cfg = config["table"]
     object_cfgs = (
         config["objects"] if "objects" in config
-        else [config["target_object"]]
+        else [select_active_target(config)]
     )
     if not object_cfgs:
-        raise ValueError("Scene must contain at least one cube")
+        raise ValueError("Scene must contain at least one object")
 
     world = World(stage_units_in_meters=1.0)
     world.scene.add_default_ground_plane()
@@ -112,28 +127,61 @@ def create_scene(config: dict) -> SceneHandles:
 
     cubes = []
     for index, object_cfg in enumerate(object_cfgs):
-        if object_cfg["type"] != "cube":
-            raise ValueError("Only cube scene objects are supported")
-        cubes.append(
-            world.scene.add(
-                DynamicCuboid(
-                    prim_path=(
-                        "/World/TargetCube" if index == 0
-                        else f"/World/Cube{index}"
-                    ),
-                    name=("target_cube" if index == 0 else f"cube_{index}"),
-                    position=np.asarray(
-                        object_cfg["position_m"], dtype=np.float64
-                    ),
-                    scale=np.asarray(object_cfg["size_m"], dtype=np.float64),
-                    color=np.asarray(
-                        object_cfg.get("color_rgb", [1.0, 0.0, 0.0]),
-                        dtype=np.float64,
-                    ),
-                    mass=float(object_cfg["mass_kg"]),
-                )
-            )
+        object_type = object_cfg["type"]
+        if object_type not in ("cube", "usd_visual_box", "usd_visual_mug"):
+            raise ValueError(f"Unsupported scene object: {object_type}")
+        prim_path = (
+            ("/World/TargetMug" if object_type == "usd_visual_mug"
+             else "/World/TargetCube")
+            if index == 0 else f"/World/Cube{index}"
         )
+        if object_type == "usd_visual_mug":
+            target = DynamicCylinder(
+                prim_path=prim_path,
+                name="target_mug",
+                position=np.asarray(object_cfg["position_m"], dtype=np.float64),
+                radius=float(object_cfg["body_radius_m"]),
+                height=float(object_cfg["height_m"]),
+                mass=float(object_cfg["mass_kg"]),
+            )
+        else:
+            target = DynamicCuboid(
+                prim_path=prim_path,
+                name=("target_cube" if index == 0 else f"cube_{index}"),
+                position=np.asarray(
+                    object_cfg["position_m"], dtype=np.float64
+                ),
+                scale=np.asarray(object_cfg["size_m"], dtype=np.float64),
+                color=np.asarray(
+                    object_cfg.get("color_rgb", [1.0, 0.0, 0.0]),
+                    dtype=np.float64,
+                ),
+                mass=float(object_cfg["mass_kg"]),
+            )
+        cubes.append(world.scene.add(target))
+        if object_type in ("usd_visual_box", "usd_visual_mug"):
+            from pxr import UsdGeom
+
+            visual_path = (
+                Path(__file__).resolve().parents[2]
+                / object_cfg["visual_asset"]
+            ).resolve()
+            if not visual_path.is_file():
+                raise FileNotFoundError(f"Missing target visual: {visual_path}")
+            # Keep the configured primitive as the sole collision body.
+            collision_prim = world.stage.GetPrimAtPath(prim_path)
+            # Isaac's primitive material overrides descendant bindings.
+            # The referenced asset must supply its own visible material.
+            collision_prim.RemoveProperty("material:binding")
+            UsdGeom.Imageable(collision_prim).CreatePurposeAttr(
+                UsdGeom.Tokens.guide
+            )
+            child_path = prim_path + "/Visual"
+            add_reference_to_stage(str(visual_path), child_path)
+            visual_prim = world.stage.GetPrimAtPath(child_path)
+            UsdGeom.Imageable(visual_prim).CreatePurposeAttr(
+                UsdGeom.Tokens.render
+            )
 
     if "basket" in config:
         basket_cfg = config["basket"]
@@ -176,6 +224,28 @@ def create_scene(config: dict) -> SceneHandles:
                     scale=np.asarray(size, dtype=np.float64),
                     color=color,
                 )
+            )
+        if "visual_asset" in basket_cfg:
+            from pxr import Gf, UsdGeom
+
+            visual_path = (
+                Path(__file__).resolve().parents[2]
+                / basket_cfg["visual_asset"]
+            ).resolve()
+            if not visual_path.is_file():
+                raise FileNotFoundError(f"Missing basket visual: {visual_path}")
+            for name, _, _ in parts:
+                collision_prim = world.stage.GetPrimAtPath(
+                    f"/World/Basket{name}"
+                )
+                UsdGeom.Imageable(collision_prim).CreatePurposeAttr(
+                    UsdGeom.Tokens.guide
+                )
+            basket_visual = "/World/BasketVisual"
+            add_reference_to_stage(str(visual_path), basket_visual)
+            visual_prim = world.stage.GetPrimAtPath(basket_visual)
+            visual_prim.GetAttribute("xformOp:translate").Set(
+                Gf.Vec3d(float(center[0]), float(center[1]), table_top)
             )
 
     world.reset()

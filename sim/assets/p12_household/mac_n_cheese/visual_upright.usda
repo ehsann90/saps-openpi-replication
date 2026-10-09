@@ -1,0 +1,19 @@
+#usda 1.0
+(
+    defaultPrim = "Visual"
+    metersPerUnit = 1
+    upAxis = "Z"
+)
+
+def Xform "Visual"
+{
+    def Xform "Asset" (
+        prepend references = @./mac_n_cheese_render.usd@
+    )
+    {
+        float xformOp:rotateX = 90
+        float3 xformOp:scale = (10.733526, 24.073568, 5.4075465)
+        double3 xformOp:translate = (-0.04472160394640903, -0.08559655373732246, -0.5)
+        uniform token[] xformOpOrder = ["xformOp:translate", "xformOp:scale", "xformOp:rotateX"]
+    }
+}

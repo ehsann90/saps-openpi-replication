@@ -63,6 +63,7 @@ def load_scene_module() -> types.ModuleType:
     }
     modules["isaacsim.core.api"].World = FakeWorld
     modules["isaacsim.core.api.objects"].DynamicCuboid = FakePrim
+    modules["isaacsim.core.api.objects"].DynamicCylinder = FakePrim
     modules["isaacsim.core.api.objects"].FixedCuboid = FakePrim
     modules["isaacsim.core.experimental.prims"].Articulation = FakeArticulation
     modules["isaacsim.core.experimental.prims"].XformPrim = FakePrim
@@ -138,6 +139,42 @@ class PresentationSceneTest(unittest.TestCase):
             - 2 * config["basket"]["wall_thickness_m"],
             2 * handles.cubes[0].scale[0],
         )
+
+
+class CatalogTargetSelectionTest(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.scene = load_scene_module()
+        cls.package = cls.scene.load_config(
+            CONFIG_DIR / "fr3_droid_robotiq_pick_place_catalog_scene.json"
+        )
+        cls.mug = cls.scene.load_config(
+            CONFIG_DIR / "fr3_droid_robotiq_mug_target_scene.json"
+        )
+
+    def test_package_only_remains_selected(self) -> None:
+        self.assertIs(
+            self.scene.select_active_target(self.package),
+            self.package["target_object"],
+        )
+
+    def test_disabled_package_selects_only_mug(self) -> None:
+        target = self.scene.select_active_target(self.mug)
+        self.assertEqual(target["type"], "usd_visual_mug")
+        self.assertEqual(target["visual_asset"],
+                         self.mug["optional_mug"]["visual_asset"])
+        self.assertEqual(target["position_m"],
+                         self.mug["optional_mug"]["position_m"])
+
+    def test_rejects_both_enabled_or_disabled(self) -> None:
+        for enabled in (True, False):
+            with self.subTest(mug_enabled=enabled):
+                config = {
+                    "target_object": {"enabled": enabled},
+                    "optional_mug": {"enabled": enabled},
+                }
+                with self.assertRaisesRegex(ValueError, "exactly one"):
+                    self.scene.select_active_target(config)
 
 
 if __name__ == "__main__":

@@ -162,7 +162,9 @@ def main() -> None:
     gpu_before, ram_before = gpu_snapshot(), ram_snapshot()
     gripper = create_gripper_controller(config)
     contact_monitor = (
-        RobotiqContactMonitor(handles.world.stage, config) if robotiq else None
+        RobotiqContactMonitor(
+            handles.world.stage, config, handles.target.prim_path
+        ) if robotiq else None
     )
     initial_objects = object_poses(handles)
     hold_records = {}
@@ -497,7 +499,7 @@ def main() -> None:
         persist_progress(last_summary)
         print("replan", index, "actions", execution["actions_executed"],
               "gripper", gripper.intent, "q", execution["final_q_rad"],
-              "cube", row["objects_after"][0]["position_xyz_m"], flush=True)
+              "target", row["objects_after"][0]["position_xyz_m"], flush=True)
 
     def emergency_hold() -> None:
         record = command_fresh_hold(handles)

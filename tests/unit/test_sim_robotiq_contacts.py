@@ -14,6 +14,37 @@ from isaac_fr3.robotiq_contacts import RobotiqContactMonitor
 
 
 class RobotiqContactsTest(unittest.TestCase):
+    def test_selected_mug_target_receives_contact_events(self) -> None:
+        monitor = RobotiqContactMonitor.__new__(RobotiqContactMonitor)
+        monitor.root = "/World/Robot/Gripper"
+        monitor.cube = "/World/TargetMug"
+        monitor.sides = {
+            side: {"loaded_events": 0, "total_impulse_ns": 0.0,
+                   "minimum_separation_m": None, "last_colliders": None}
+            for side in ("left", "right")
+        }
+        monitor.bilateral_loaded_reports = 0
+        point = SimpleNamespace(
+            impulse=SimpleNamespace(x=1.0, y=0.0, z=0.0),
+            separation=-0.001,
+        )
+        pxr = SimpleNamespace(PhysicsSchemaTools=SimpleNamespace(
+            intToSdfPath=lambda value: value
+        ))
+
+        def header(target: str):
+            return SimpleNamespace(
+                collider0="/World/Robot/Gripper/left_fingertip/collision",
+                collider1=target, contact_data_offset=0,
+                num_contact_data=1,
+            )
+
+        with patch.dict(sys.modules, {"pxr": pxr}):
+            monitor._on_events([header("/World/TargetCube")], [point], None)
+            self.assertEqual(monitor.summary()["left"]["loaded_events"], 0)
+            monitor._on_events([header("/World/TargetMug")], [point], None)
+        self.assertEqual(monitor.summary()["left"]["loaded_events"], 1)
+
     def test_contacts_at_different_times_are_not_bilateral(self) -> None:
         monitor = RobotiqContactMonitor.__new__(RobotiqContactMonitor)
         monitor.root = "/World/Robot/Gripper"

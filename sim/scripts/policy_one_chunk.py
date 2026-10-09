@@ -199,7 +199,9 @@ def main() -> None:
     })
 
     contact_monitor = (
-        RobotiqContactMonitor(handles.world.stage, config) if robotiq else None
+        RobotiqContactMonitor(
+            handles.world.stage, config, handles.target.prim_path
+        ) if robotiq else None
     )
     execution = execute_chunk(
         handles, config, selected,

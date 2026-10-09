@@ -1,0 +1,21 @@
+#usda 1.0
+(
+    defaultPrim = "Visual"
+    metersPerUnit = 1
+    upAxis = "Z"
+)
+
+def Xform "Visual"
+{
+    def Xform "Centered"
+    {
+        double3 xformOp:translate = (0, 0, -0.026792086956081825)
+        uniform token[] xformOpOrder = ["xformOp:translate"]
+
+        def Xform "Asset" (
+            prepend references = @./visual_half.usda@
+        )
+        {
+        }
+    }
+}

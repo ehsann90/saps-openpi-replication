@@ -1,0 +1,171 @@
+{
+  "schema_version": 1,
+
+  "robot": {
+    "asset": "assets/fr3_robotiq_droid.usda",
+    "asset_source": "local",
+    "prim_path": "/World/fr3",
+    "arm_dof_names": [
+      "fr3_joint1",
+      "fr3_joint2",
+      "fr3_joint3",
+      "fr3_joint4",
+      "fr3_joint5",
+      "fr3_joint6",
+      "fr3_joint7"
+    ],
+    "finger_dof_names": [
+      "finger_joint"
+    ],
+    "tcp_prim": "/World/fr3/fr3_link8/Robotiq_2F_85/Robotiq_2F_85/base_link/grip_frame",
+    "left_finger_prim": "/World/fr3/fr3_link8/Robotiq_2F_85/Robotiq_2F_85/left_fingertip",
+    "right_finger_prim": "/World/fr3/fr3_link8/Robotiq_2F_85/Robotiq_2F_85/right_fingertip",
+    "home_arm_rad": [
+      0.0,
+      -0.4,
+      0.0,
+      -1.9,
+      0.0,
+      1.5,
+      0.0
+    ]
+  },
+
+  "gripper": {
+    "kind": "robotiq_2f85",
+    "driver_joint": "finger_joint",
+    "open_joint_rad": 0.0,
+    "closed_joint_rad": 0.8203047484373349,
+    "open_width_m": 0.08708,
+    "body_prim": "/World/fr3/fr3_link8/Robotiq_2F_85/Robotiq_2F_85/base_link",
+    "left_pad_prim": "/World/fr3/fr3_link8/Robotiq_2F_85/Robotiq_2F_85/left_fingertip",
+    "right_pad_prim": "/World/fr3/fr3_link8/Robotiq_2F_85/Robotiq_2F_85/right_fingertip",
+    "source_revision": "ef313b8416096d50c3ab56d67adb21f92d086660"
+  },
+
+  "table": {
+    "position_m": [
+      0.55,
+      0.0,
+      0.375
+    ],
+    "size_m": [
+      0.70,
+      0.80,
+      0.05
+    ]
+  },
+
+  "target_object": {
+    "type": "usd_visual_box",
+    "visual_asset": "assets/p12_household/mac_n_cheese/visual_upright.usda",
+    "position_m": [
+      0.55,
+      0.0,
+      0.4369853496551514
+    ],
+    "size_m": [
+      0.037266410887241364,
+      0.01661573350429535,
+      0.07397069931030274
+    ],
+    "mass_kg": 0.05,
+    "color_rgb": [
+      0.8,
+      0.8,
+      0.8
+    ]
+  },
+
+  "basket": {
+    "center_xy_m": [0.70, -0.18],
+    "size_xy_m": [0.1385, 0.1760],
+    "bottom_thickness_m": 0.004,
+    "wall_thickness_m": 0.006,
+    "wall_height_m": 0.0704,
+    "color_rgb": [0.55, 0.43, 0.28],
+    "visual_asset": "assets/p12_household/plastic_basket_a01/visual_only.usd"
+  },
+
+  "optional_mug": {
+    "enabled": false,
+    "visual_asset": "assets/p12_household/mug_c1/visual_half.usda",
+    "position_m": [0.45, 0.18, 0.4]
+  },
+
+  "droid": {
+    "control_hz": 15.0,
+    "arm_action_clip": 1.0,
+    "max_joint_delta_rad": 0.2,
+    "gripper_max_width_m": 0.08708
+  },
+
+  "cameras": {
+    "wrist": {
+      "model": "zed_mini_droid_like",
+      "prim_path": "/World/fr3/fr3_link8/WristCamera",
+      "parent_prim": "/World/fr3/fr3_link8",
+      "position_xyz_m": [-0.07949159703315213, 0.031930911278668164, 0.0026506437531744823],
+      "orientation_wxyz": [0.1230990627419222, 0.6962792940640644, -0.696337096906156, -0.12311138404719145],
+      "resolution_wh": [320, 180],
+      "clipping_range_m": [0.01, 10.0],
+      "horizontal_fov_deg": 82.19068145751953,
+      "calibration": "T_flange_from_usd_camera_nominal from FR3_2F85_ZED_transforms; nominal ZED Mini left optical center; rectified LEFT intrinsic from selected DROID episode SVO factory calibration",
+      "source_calibration": {
+        "source": "DROID episode SVO via Stereolabs ZED SDK 5.5 factory calibration",
+        "episode_uuid": "IRIS+7dfa2da3+2023-12-04-15h-44m-25s",
+        "camera_serial": "19824535",
+        "camera_model": "ZED Mini",
+        "source_resolution_wh": [1280, 720],
+        "source_fps": 60.0,
+        "rectified_left": {
+          "fx_px": 733.6873779296875,
+          "fy_px": 733.6873779296875,
+          "cx_px": 650.0894775390625,
+          "cy_px": 354.6379699707031,
+          "horizontal_fov_deg": 82.19068145751953,
+          "vertical_fov_deg": 52.26985549926758,
+          "diagonal_fov_deg": 90.0509033203125,
+          "distortion": "all zeros"
+        }
+      }
+    },
+    "external": {
+      "model": "zed2_droid_like",
+      "prim_path": "/World/fr3/ExternalCamera",
+      "parent_prim": "/World/fr3",
+      "position_xyz_m": [0.18596379, -0.57591951, 0.74884339],
+      "orientation_wxyz": [0.74966453, 0.59876325, -0.18201043, -0.21530877],
+      "resolution_wh": [320, 180],
+      "clipping_range_m": [0.01, 10.0],
+      "horizontal_fov_deg": 101.5525131225586,
+      "calibration": "DROID-informed external side-placement adapted to the simulated tabletop: selected episode base-relative x/y and derived orientation, with height raised approximately 0.4 m; rectified LEFT intrinsic from selected DROID episode SVO factory calibration",
+      "source_calibration": {
+        "source": "DROID episode SVO via Stereolabs ZED SDK 5.5 factory calibration",
+        "episode_uuid": "IRIS+7dfa2da3+2023-12-04-15h-44m-25s",
+        "camera_serial": "23404442",
+        "camera_model": "ZED 2",
+        "source_resolution_wh": [1280, 720],
+        "source_fps": 60.0,
+        "rectified_left": {
+          "fx_px": 522.412841796875,
+          "fy_px": 522.412841796875,
+          "cx_px": 640.4915161132812,
+          "cy_px": 353.2311706542969,
+          "horizontal_fov_deg": 101.5525131225586,
+          "vertical_fov_deg": 69.13614654541016,
+          "diagonal_fov_deg": 109.14212036132812,
+          "distortion": "all zeros"
+        }
+      }
+    }
+  },
+
+  "lighting": {
+    "default_ground_sphere": {
+      "radius_m": 1.0,
+      "intensity": 6250.0,
+      "specular": 0.25
+    }
+  }
+}

@@ -634,11 +634,106 @@ Run the rollout with the same command as before, changing only the config file w
 
 ```bash
 cd ~/isaacsim
-PYTHONPATH=/tmp/isaac-openpi-client-deps ./python.sh -u \
-  ~/MyProjects/saps-openpi-replication/sim/scripts/policy_rollout.py \
-  --config ~/MyProjects/saps-openpi-replication/sim/configs/fr3_droid_robotiq_soft_light_scene.json \
-  --host 127.0.0.1 --port 8000 --prompt 'Pick up the cube' \
-  --policy-episode-seed 20260827 --headless
+PYTHONPATH=/tmp/isaac-openpi-client-deps ~/isaacsim/python.sh -u \
+  sim/scripts/policy_rollout.py \
+  --config sim/configs/fr3_droid_robotiq_soft_light_scene.json \
+  --host 127.0.0.1 --port 8000 --prompt 'Pick up the object' \
+  --policy-episode-seed 20260827
+```
+
+### SIM-P12 household-box pick-and-place scene
+
+`sim/configs/fr3_droid_robotiq_pick_place_scene.json` keeps the SIM-P11 robot,
+gripper, cameras, lighting, and policy settings. It places a small white
+household storage box at the original target position (0.55, 0, 0.42 m). The
+box has a 40 mm cuboid collision body and 50 g mass. A textured open-top basket
+is centered at (0.70, -0.18 m) on the table. Its fixed collision floor and four
+walls leave a 112 x 104 mm clear opening; the visual meshes have no collision.
+The meshes come from the pinned local LIBERO assets and are documented in
+`sim/assets/p12_household/README.md`.
+
+Inspect the scene with the existing launcher from the repository root:
+
+```bash
+cd ~/MyProjects/saps-openpi-replication
+~/isaacsim/python.sh -u sim/scripts/launch_scene.py \
+  --config sim/configs/fr3_droid_robotiq_pick_place_scene.json
+```
+
+For a manual policy rollout, start `make droid-policy-server` in a separate
+terminal, then use the exact task prompt:
+
+```bash
+cd ~/MyProjects/saps-openpi-replication
+PYTHONPATH=/tmp/isaac-openpi-client-deps ~/isaacsim/python.sh -u \
+  sim/scripts/policy_rollout.py \
+  --config sim/configs/fr3_droid_robotiq_pick_place_scene.json \
+  --host 127.0.0.1 --port 8000 \
+  --prompt 'Pick up the small box and place it in the basket.' \
+  --policy-episode-seed 20260827
+```
+
+### SIM-P12 Isaac catalog household-asset variant
+
+`sim/configs/fr3_droid_robotiq_pick_place_catalog_scene.json` keeps the
+earlier SIM-P12 scene for comparison and changes only the target package,
+basket, and disabled optional mug. The active target is an upright 37.27 x
+16.62 x 73.97 mm mac-and-cheese package at (0.55, 0, 0.436985) m with a
+50 g cuboid rigid body. The blue basket is centered at (0.70, -0.18) m,
+measures 138.5 x 176.0 x 74.4 mm, and has a fixed floor and four separate
+walls. Its collision opening is 126.5 x 164.0 mm. The mug is disabled in this
+condition. Asset sources and local dependencies are listed in
+`sim/assets/p12_household/README.md`.
+
+Inspect this scene from the repository root:
+
+```bash
+cd ~/MyProjects/saps-openpi-replication
+~/isaacsim/python.sh -u sim/scripts/launch_scene.py \
+  --config sim/configs/fr3_droid_robotiq_pick_place_catalog_scene.json
+```
+
+For a manual rollout, start `make droid-policy-server` in another terminal,
+then use this scene's exact task instruction:
+
+```bash
+cd ~/MyProjects/saps-openpi-replication
+PYTHONPATH=/tmp/isaac-openpi-client-deps ~/isaacsim/python.sh -u \
+  sim/scripts/policy_rollout.py \
+  --config sim/configs/fr3_droid_robotiq_pick_place_catalog_scene.json \
+  --host 127.0.0.1 --port 8000 \
+  --prompt 'Pick up the mac and cheese box and place it in the blue basket.' \
+  --policy-episode-seed 20260827
+```
+
+`sim/configs/fr3_droid_robotiq_mug_target_scene.json` selects the yellow mug
+instead: `target_object.enabled` is false and `optional_mug.enabled` is true.
+The mug is the only tracked dynamic target, at (0.55, 0, 0.426792) m. A
+22.23 mm radius, 53.58 mm tall cylinder collides with its cup body; the
+visible handle has no separate collider. The basket and all robot, camera,
+lighting, and policy settings are unchanged. Both flags cannot have the same
+value. Existing rollout `objects[0]`, `initial_objects[0]`, and
+`handles.target` refer to the selected mug. Legacy `cube_*` fields in
+one-chunk and episode records retain their names but measure this target.
+
+Inspect the mug scene with:
+
+```bash
+cd ~/MyProjects/saps-openpi-replication
+~/isaacsim/python.sh -u sim/scripts/launch_scene.py \
+  --config sim/configs/fr3_droid_robotiq_mug_target_scene.json
+```
+
+For a manual mug-target rollout, start `make droid-policy-server` separately:
+
+```bash
+cd ~/MyProjects/saps-openpi-replication
+PYTHONPATH=/tmp/isaac-openpi-client-deps ~/isaacsim/python.sh -u \
+  sim/scripts/policy_rollout.py \
+  --config sim/configs/fr3_droid_robotiq_mug_target_scene.json \
+  --host 127.0.0.1 --port 8000 \
+  --prompt 'Pick up the yellow mug and place it in the blue basket.' \
+  --policy-episode-seed 20260827
 ```
 
 ## SIM-P8 Robotiq policy rollout
