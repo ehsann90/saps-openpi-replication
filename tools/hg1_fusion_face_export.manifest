@@ -1,0 +1,12 @@
+{
+  "autodeskProduct": "Fusion360",
+  "type": "script",
+  "id": "51c782ce-a482-4f58-aa15-f781f3d57982",
+  "author": "saps-openpi-replication",
+  "description": {
+    "": "Read-only HG1 planar face measurements for FR3, coupling, and Robotiq"
+  },
+  "version": "1.0.0",
+  "runOnStartup": false,
+  "supportedOS": "windows|mac"
+}

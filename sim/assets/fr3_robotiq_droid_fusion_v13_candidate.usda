@@ -1,0 +1,33 @@
+#usda 1.0
+(
+    defaultPrim = "fr3"
+    metersPerUnit = 1
+    upAxis = "Z"
+)
+
+# Candidate HG1-B1 remount. The referenced SIM-P7 assembly remains the
+# historical geometry; only the mount translation and matching joint anchor
+# are overridden. The coupling visual has no verified CAD-to-mesh registration.
+def Xform "fr3" (
+    prepend references = @./fr3_robotiq_droid_historical_hg1.usda@
+)
+{
+    over "fr3_link8"
+    {
+        over "Robotiq_2F_85"
+        {
+            double3 xformOp:translate = (0, 0, 0.010758)
+        }
+
+        over "robotiq_mount_joint"
+        {
+            point3f physics:localPos0 = (0, 0, 0.010758)
+        }
+
+        # Operator's 3 mm visual adjustment, independent of the physical mount.
+        over "GRP_CPL_062_visual"
+        {
+            double3 xformOp:translate = (0.00207, 0.06565, -0.20565)
+        }
+    }
+}

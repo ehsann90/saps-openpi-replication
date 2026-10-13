@@ -1,0 +1,141 @@
+--- a/outputs/isaac_joint5_diagnostics/matched_contact_comparison/protocol.py
++++ b/outputs/isaac_joint5_diagnostics/matched_contact_comparison/protocol.py
+@@ -3,6 +3,7 @@
+ 
+ from dataclasses import dataclass
+ from math import isfinite
++from pathlib import Path
+ 
+ TARGET_CLEARANCE_M = 0.006
+ CLEARANCE_TOLERANCE_M = 0.002
+@@ -13,6 +14,25 @@
+ MAX_JOINT_SPEED_RAD_S = 2.0
+ MAX_GEOMETRIC_PENETRATION_M = 0.004
+ MIN_LOADED_IMPULSE_NS = 1e-8
++
++
++def select_scene_config(root: Path, assembly: str,
++                        override: Path | None) -> Path:
++    """Keep the historical default unless a diagnostic opts into a scene."""
++    if assembly not in ("franka", "robotiq"):
++        raise ValueError("Unknown assembly")
++    if override is not None:
++        return override.resolve()
++    name = ("fr3_droid_scene.json" if assembly == "franka"
++            else "fr3_droid_robotiq_scene.json")
++    return root / "sim/configs" / name
++
++
++def require_selected_scene(reviewed: dict, selected: Path,
++                           label: str) -> None:
++    """Prevent a reviewed collider report or plan crossing scene revisions."""
++    if reviewed.get("source_config") != str(selected.resolve()):
++        raise ValueError(f"{label} scene config mismatch")
+ 
+ 
+ @dataclass(frozen=True)
+--- a/outputs/isaac_joint5_diagnostics/matched_contact_comparison/run_contact.py
++++ b/outputs/isaac_joint5_diagnostics/matched_contact_comparison/run_contact.py
+@@ -15,7 +15,8 @@
+ sys.path[:0] = [str(HERE), str(ROOT / 'sim' / 'src')]
+ from protocol import (CLEARANCE_TOLERANCE_M, DT_S, MAX_GEOMETRIC_PENETRATION_M,
+                       MAX_JOINT_SPEED_RAD_S, NORMAL_SPEED_M_S,
+-                      TARGET_CLEARANCE_M, contact_record)
++                      TARGET_CLEARANCE_M, contact_record,
++                      require_selected_scene, select_scene_config)
+ from collision_geometry import (FRANKA_FINGER_COLLIDER_SUFFIXES,
+                                 ROBOTIQ_PAD_COLLIDER_PATHS, SUPPORTED_SHAPES,
+                                 is_finger_collider_path,
+@@ -33,6 +34,8 @@
+ parser.add_argument('--assembly', choices=('franka', 'robotiq'), required=True)
+ parser.add_argument('--table', choices=('enabled', 'disabled'), required=True)
+ parser.add_argument('--output', type=Path, required=True)
++parser.add_argument('--config', type=Path,
++                    help='Opt-in scene config; omitted uses the original assembly scene')
+ parser.add_argument('--plan', type=Path,
+                     help='Required for disabled control; plan from enabled run')
+ parser.add_argument('--startup-log', type=Path,
+@@ -98,9 +101,7 @@
+ from isaac_fr3.scene import (CUBE_SETTLE_STEPS, HOME_SETTLE_STEPS,
+                              command_home, create_scene, load_config, settle)
+ 
+-CONFIG = ROOT / 'sim' / 'configs' / (
+-    'fr3_droid_scene.json' if args.assembly == 'franka'
+-    else 'fr3_droid_robotiq_scene.json')
++CONFIG = select_scene_config(ROOT, args.assembly, args.config)
+ SOURCE = ROOT / 'outputs/isaac_joint5_diagnostics/20261012_onset_replay/mug_per_step.json'
+ TABLE_TOP_M = 0.4
+ 
+@@ -679,6 +680,9 @@
+ def main():
+     checkpoint('config_source_load_start', config=str(CONFIG), source=str(SOURCE))
+     config = load_config(CONFIG)
++    if args.config and ((config.get('gripper', {}).get('kind') == 'robotiq_2f85')
++                        != (args.assembly == 'robotiq')):
++        raise ValueError('Selected scene gripper does not match --assembly')
+     if abs(config['table']['position_m'][2] +
+            config['table']['size_m'][2] / 2 - TABLE_TOP_M) > 1e-9:
+         raise RuntimeError('Unexpected table height')
+@@ -738,6 +742,8 @@
+                collider_count=len(meshes), selected=selected_info)
+     if args.verified_collider_report:
+         report = json.loads(args.verified_collider_report.read_text())
++        if args.config:
++            require_selected_scene(report, CONFIG, 'Collider report')
+         if (report['assembly'] != args.assembly or
+                 report['selected_fingertip_colliders'] != selected_info or
+                 report['discovery_error'] is not None or
+@@ -811,6 +817,8 @@
+         saved = json.loads(args.plan.read_text())
+         if saved['assembly'] != args.assembly:
+             raise RuntimeError('Plan assembly mismatch')
++        if args.config:
++            require_selected_scene(saved, CONFIG, 'Plan')
+         plan = saved['plan']
+         sequence = saved['calibration_probe_q_rad']
+         checkpoint('calibration_history_replay_start', count=len(sequence))
+@@ -936,6 +944,8 @@
+                    'calibration_report': (
+                        str(report_path.resolve()) if calibration_report else
+                        saved['calibration_report'])}
++    if args.config:
++        plan_record['source_config'] = str(CONFIG.resolve())
+     (args.output / 'plan.json').write_text(json.dumps(plan_record, indent=2) + '\n')
+     samples = [initial]
+     aborted = None
+--- a/outputs/isaac_joint5_diagnostics/matched_contact_comparison/test_protocol.py
++++ b/outputs/isaac_joint5_diagnostics/matched_contact_comparison/test_protocol.py
+@@ -3,7 +3,8 @@
+ from pathlib import Path
+ 
+ from protocol import (APPROACH_STEPS, RETREAT_STEPS, Probe, contact_record,
+-                      select_plan)
++                      require_selected_scene, select_plan,
++                      select_scene_config)
+ from collision_geometry import (FRANKA_FINGER_COLLIDER_SUFFIXES,
+                                 ROBOTIQ_PAD_COLLIDER_PATHS,
+                                 is_finger_collider_path,
+@@ -16,6 +17,23 @@
+ 
+ 
+ class ProtocolTests(unittest.TestCase):
++    def test_opt_in_scene_selection_preserves_default_and_rejects_cross_scene(self):
++        root = Path('/tmp/hg1_scene_test')
++        historical = root / 'sim/configs/fr3_droid_robotiq_scene.json'
++        candidate = root / 'sim/configs/fr3_droid_robotiq_fusion_v13_candidate_scene.json'
++        self.assertEqual(select_scene_config(root, 'robotiq', None), historical)
++        self.assertEqual(select_scene_config(root, 'robotiq', candidate),
++                         candidate.resolve())
++        self.assertEqual(select_scene_config(root, 'franka', None),
++                         root / 'sim/configs/fr3_droid_scene.json')
++        require_selected_scene({'source_config': str(candidate.resolve())},
++                               candidate, 'Plan')
++        with self.assertRaisesRegex(ValueError, 'scene config mismatch'):
++            require_selected_scene({'source_config': str(historical)},
++                                   candidate, 'Plan')
++        with self.assertRaisesRegex(ValueError, 'scene config mismatch'):
++            require_selected_scene({}, candidate, 'Collider report')
++
+     def test_bounded_seven_joint_search_and_direction_plan(self):
+         seed = [0.0, -0.2, 0.0, -1.9, 0.1, 1.5, 0.0]
+         poses = coarse_poses(seed)

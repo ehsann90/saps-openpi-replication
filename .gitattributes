@@ -1,0 +1,5 @@
+sim/cad_reference/fr3_robotiq_zed/native/FR3_2F85_ZED.f3z filter=lfs diff=lfs merge=lfs -text
+sim/cad_reference/fr3_robotiq_zed/step/FR3_2F85_ZED.step filter=lfs diff=lfs merge=lfs -text
+sim/cad_reference/fr3_robotiq_zed/measurements/*.json whitespace=-trailing-space
+sim/cad_reference/fr3_robotiq_zed/measurements/*.csv whitespace=-trailing-space
+patches/hg1_b2_contact_runner_scene_selector.patch whitespace=-trailing-space
