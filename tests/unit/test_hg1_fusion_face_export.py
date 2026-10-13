@@ -10,7 +10,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 
-SCRIPT = Path(__file__).resolve().parents[2] / "tools/hg1_fusion_face_export.py"
+SCRIPT = Path(__file__).resolve().parents[2] / "tools/diagnostics/cad/hg1_fusion_face_export.py"
 SPEC = importlib.util.spec_from_file_location("hg1_fusion_face_export", SCRIPT)
 EXPORT = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(EXPORT)

@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 SCRIPT = (Path(__file__).resolve().parents[2] /
-          "tools/hg1_compare_q5_contact.py")
+          "tools/analysis/hg1_compare_q5_contact.py")
 SPEC = importlib.util.spec_from_file_location("hg1_compare_q5_contact", SCRIPT)
 MODULE = importlib.util.module_from_spec(SPEC)
 assert SPEC and SPEC.loader

@@ -9,7 +9,7 @@ from pathlib import Path
 from pxr import Sdf, Usd, UsdGeom, UsdPhysics
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[3]
 ASSETS = ROOT / "sim/assets"
 BASE = ASSETS / "fr3_robotiq_droid_historical_hg1.usda"
 CANDIDATE = ASSETS / "fr3_robotiq_droid_fusion_v13_candidate.usda"

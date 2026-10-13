@@ -46,7 +46,7 @@ the historical geometry and must remain unchanged.
 
 ## Static validation
 
-`tools/hg1_validate_candidate_mount.py` uses the standalone OpenUSD libraries
+`tools/diagnostics/cad/hg1_validate_candidate_mount.py` uses the standalone OpenUSD libraries
 bundled with Isaac Sim 6.1, without `SimulationApp` or physics stepping. It
 checks scene selection, the candidate's three authored opinions, locally
 composed joint and fingertip properties, fixed-joint relationships, anchor
@@ -118,7 +118,7 @@ If ON qualifies, run its no-table control using the exact saved plan:
 Then run the pair comparison, writing a new output file:
 
 ```bash
-python3 tools/hg1_compare_q5_contact.py \
+python3 tools/analysis/hg1_compare_q5_contact.py \
   --historical-on outputs/isaac_joint5_diagnostics/matched_contact_comparison/robotiq_table_multijoint \
   --historical-off outputs/isaac_joint5_diagnostics/matched_contact_comparison/robotiq_no_table_multijoint \
   --candidate-on outputs/isaac_joint5_diagnostics/hg1_b2_candidate/robotiq_table \

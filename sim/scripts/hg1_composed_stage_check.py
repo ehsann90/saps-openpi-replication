@@ -15,7 +15,7 @@ from isaacsim import SimulationApp
 app = SimulationApp({"headless": True})
 try:
     check = (Path(__file__).resolve().parents[2] /
-             "tools/hg1_validate_candidate_mount.py")
+             "tools/diagnostics/cad/hg1_validate_candidate_mount.py")
     runpy.run_path(str(check), run_name="__main__")
 finally:
     app.close()
