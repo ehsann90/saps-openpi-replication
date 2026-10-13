@@ -276,3 +276,70 @@ unresolved.
 Fusion-v13 contact plan with additional logging of all gripper DOFs,
 their reported limits, and relevant constraints. The qualified
 baseline runner and original outputs must remain unchanged.
+
+## H3 exploratory investigation closeout
+
+**Status: exploratory investigation complete; physical fidelity unresolved.**
+
+The H3 investigation used the Fusion-v13 candidate FR3–Robotiq
+assembly, preserving the original gripper mechanics and nominal
+32-position-iteration articulation setting except in the explicitly
+identified solver ablation.
+
+### Completed diagnostic evidence
+
+| Test | Result |
+| --- | --- |
+| H3-C1: archived-plan replay | The 67-sample q5 ON-minus-OFF trajectory reproduced exactly; peak +0.1323665 rad at step 45. |
+| H3-C2: joint constraints | The driven finger reached -0.1794561 rad against a reported zero lower limit. Nominal mimic residuals reached 0.213999 rad under contact, while remaining close to zero without table contact. |
+| H3-D1: solver ablation | Increasing articulation position iterations from 32 to 64 increased peak q5 displacement from 0.132367 to 0.184897 rad. Summed contact-impulse magnitudes increased from 14.316 to 25.552 N s, and first contact shifted from step 20 to 22. The constraint deviations persisted. |
+| H3-D2: fingertip impulse | A dispatched 0.166667 N s upward impulse at the left fingertip produced a peak absolute q5 pulse-minus-control difference of 3.372e-5 rad, without reproducing the large finger-limit or mimic residuals. |
+| H3-D3: sustained force | A 10 N upward force was dispatched for steps 20–53 at a point derived from the left fingertip collision mesh. Both runs completed; peak absolute q5 force-minus-control difference was approximately 0.0002532 rad. The large tabletop constraint deviations were not reproduced. |
+
+The first H3-D3 attempt stopped before the experiment could
+complete because its archived world-frame application point failed
+a geometric qualification check. The completed revision used a
+fingertip-mesh-derived point instead. Its load-record JSON files
+contain literal trailing backslash-n characters, which the original
+execution archive preserves. Analysis must account for this formatting
+defect without changing the archived source files.
+
+### Interpretation
+
+The tabletop q5 response and gripper constraint deviations are
+reproducible features of this simulated contact scenario. The
+contact-free impulse and sustained-force protocols did not recreate
+them, but neither protocol reproduced the tabletop contact's spatial
+force distribution, resolved wrench history, or rigid-surface
+constraints.
+
+The solver ablation demonstrates sensitivity to numerical settings,
+but it also changed contact timing and accumulated impulse
+magnitudes substantially. It therefore cannot isolate the causal
+contribution of the mimic constraints or joint-limit excursions.
+
+The recorded nominal mimic residuals and driven-finger lower-limit
+excursion remain unexplained. The available results neither
+demonstrate an incorrect PhysX implementation nor validate the
+physical accuracy of the converted Robotiq mechanism. Successful
+force API dispatch was not an independent measurement of delivered
+force or impulse.
+
+### Decision and scope
+
+Exploratory H3 testing is closed without modifying gripper
+parameters, collision geometry, inertia, arm drives, or solver
+settings. The original 32-iteration configuration remains the
+reference. The candidate simulation is not qualified for claims
+requiring physically accurate fingertip contact forces, gripper
+constraint enforcement, or contact-induced arm compliance.
+
+The simulation may continue to support separately qualified
+software-level and policy-interface experiments. Any subsequent
+research claim depending on physical contact fidelity requires an
+independently justified validation or model correction.
+
+The H3-C1 through H3-D3 raw outputs, logs, diagnostic runners, and
+checksummed evidence manifest are preserved locally under
+`outputs/isaac_joint5_diagnostics/`. The earlier H3 evidence
+archive and this final evidence archive are not included in Git.
