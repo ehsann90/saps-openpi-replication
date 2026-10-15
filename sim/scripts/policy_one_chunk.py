@@ -25,6 +25,10 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--policy-episode-seed", type=int, default=20260827)
     parser.add_argument("--replan-index", type=int, default=0)
     parser.add_argument("--headless", action="store_true")
+    parser.add_argument("--arm-control-mode", default="position_reference",
+                        choices=("position_reference", "joint_velocity"))
+    parser.add_argument("--velocity-scale-rad-s-per-action-unit", type=float,
+                        default=1.0)
     return parser.parse_args()
 
 
@@ -43,7 +47,9 @@ sys.path.insert(0, str(REPO_ROOT / "third_party/openpi/packages/openpi-client/sr
 
 from isaac_fr3.cameras import camera_metadata, create_cameras
 from isaac_fr3.droid_observation import capture_observation
-from isaac_fr3.policy_execution import execute_chunk, select_actions
+from isaac_fr3.policy_execution import (
+    ArmVelocityDrive, execute_chunk, select_actions,
+)
 from isaac_fr3.robotiq_contacts import RobotiqContactMonitor
 from isaac_fr3.scene import (
     CUBE_SETTLE_STEPS, HOME_SETTLE_STEPS, command_home, create_scene,
@@ -110,6 +116,10 @@ def main() -> None:
     settle(handles, CUBE_SETTLE_STEPS, render=False)
     rig = create_cameras(config)
     settle(handles, 16, render=True)
+    velocity_drive = (
+        ArmVelocityDrive(handles) if args.arm_control_mode == "joint_velocity"
+        else None
+    )
 
     run_id = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     run_id += "_" + uuid.uuid4().hex[:8]
@@ -159,6 +169,13 @@ def main() -> None:
         "policy_host": args.host, "policy_port": args.port,
         "server_metadata": metadata, "policy_config": POLICY_CONFIG,
         "checkpoint": POLICY_CHECKPOINT, "prompt": args.prompt,
+        **({
+            "arm_control_mode": args.arm_control_mode,
+            "velocity_scale_rad_s_per_action_unit": (
+                args.velocity_scale_rad_s_per_action_unit
+            ),
+            "arm_drive": velocity_drive.report(),
+        } if velocity_drive is not None else {}),
         "policy_episode_seed": args.policy_episode_seed,
         "replan_index": args.replan_index,
         **({"embodiment": "fr3_robotiq_2f85"} if robotiq else {}),
@@ -203,11 +220,21 @@ def main() -> None:
             handles.world.stage, config, handles.target.prim_path
         ) if robotiq else None
     )
-    execution = execute_chunk(
-        handles, config, selected,
-        physics_dt=SimulationManager.get_physics_dt(), render=False,
-        contact_monitor=contact_monitor,
-    )
+    try:
+        execution = execute_chunk(
+            handles, config, selected,
+            physics_dt=SimulationManager.get_physics_dt(), render=False,
+            contact_monitor=contact_monitor,
+            arm_control_mode=args.arm_control_mode,
+            velocity_scale_rad_s_per_action_unit=(
+                args.velocity_scale_rad_s_per_action_unit
+            ),
+            velocity_drive=velocity_drive,
+            record_physics_steps=velocity_drive is not None,
+        )
+    finally:
+        if velocity_drive is not None:
+            velocity_drive.hold()
     execution["native_horizon"] = int(response.actions.shape[0])
     execution["selected_action_count"] = len(selected)
     execution["discarded_suffix_count"] = suffix_count
