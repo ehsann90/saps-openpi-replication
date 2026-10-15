@@ -142,5 +142,13 @@
         }
       }
     }
+  },
+
+  "lighting": {
+    "default_ground_sphere": {
+      "radius_m": 1.0,
+      "intensity": 6250.0,
+      "specular": 0.25
+    }
   }
 }
