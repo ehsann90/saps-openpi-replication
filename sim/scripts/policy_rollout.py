@@ -28,6 +28,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--headless", action="store_true")
     parser.add_argument("--max-replans", type=int, default=None,
                         help="Explicit diagnostic cap; default runs indefinitely")
+    parser.add_argument("--arm-control-mode", default="position_reference",
+                        choices=("position_reference", "joint_velocity"))
+    parser.add_argument("--velocity-scale-rad-s-per-action-unit", type=float,
+                        default=1.0)
+    parser.add_argument("--record-policy-video", action="store_true",
+                        help="Save policy-observation and action-motion videos")
     return parser.parse_args()
 
 
@@ -44,14 +50,18 @@ sys.path.insert(0, str(REPO_ROOT / "src"))
 sys.path.insert(0, str(REPO_ROOT / "sim" / "src"))
 sys.path.insert(0, str(REPO_ROOT / "third_party/openpi/packages/openpi-client/src"))
 
-from isaac_fr3.cameras import camera_metadata, create_cameras
+from isaac_fr3.cameras import camera_metadata, capture_rgb, create_cameras
 from isaac_fr3.droid_observation import capture_observation
 from isaac_fr3.policy_execution import (
-    InvalidPolicyResponse, command_fresh_hold, create_gripper_controller,
+    ArmVelocityDrive, InvalidPolicyResponse, command_fresh_hold,
+    create_gripper_controller,
     execute_chunk, run_rollout_loop,
     select_actions,
 )
 from isaac_fr3.robotiq_contacts import RobotiqContactMonitor
+from isaac_fr3.policy_video import (
+    PolicyVideoRecorder, archived_frames, export_video, write_metadata,
+)
 from isaac_fr3.scene import (
     CUBE_SETTLE_STEPS, HOME_SETTLE_STEPS, command_home, create_scene,
     get_tcp_pose, load_config, settle,
@@ -150,6 +160,10 @@ def main() -> None:
     settle(handles, CUBE_SETTLE_STEPS, render=False)
     rig = create_cameras(config)
     settle(handles, 16, render=True)
+    velocity_drive = (
+        ArmVelocityDrive(handles) if args.arm_control_mode == "joint_velocity"
+        else None
+    )
     physics_dt = SimulationManager.get_physics_dt()
     run_id = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     run_id += "_" + uuid.uuid4().hex[:8]
@@ -158,6 +172,9 @@ def main() -> None:
     )
     output = REPO_ROOT / "outputs" / output_kind / run_id
     (output / "replans").mkdir(parents=True, exist_ok=False)
+    video = (PolicyVideoRecorder(output / "videos",
+                                 source_rollout_id=run_id)
+             if args.record_policy_video else None)
     wall_start = time.perf_counter()
     gpu_before, ram_before = gpu_snapshot(), ram_snapshot()
     gripper = create_gripper_controller(config)
@@ -193,6 +210,14 @@ def main() -> None:
         "policy_host": args.host, "policy_port": args.port,
         "server_metadata": metadata, "policy_config": POLICY_CONFIG,
         "checkpoint": POLICY_CHECKPOINT, "prompt": args.prompt,
+        "record_policy_video": args.record_policy_video,
+        **({
+            "arm_control_mode": args.arm_control_mode,
+            "velocity_scale_rad_s_per_action_unit": (
+                args.velocity_scale_rad_s_per_action_unit
+            ),
+            "arm_drive": velocity_drive.report(),
+        } if velocity_drive is not None else {}),
         "policy_episode_seed": args.policy_episode_seed,
         "max_replans": args.max_replans,
         "initial_arm_q_rad": measured_dofs(handles, handles.arm_indices),
@@ -271,7 +296,10 @@ def main() -> None:
                 != terminal_step_before_next_observation):
             raise RuntimeError("Physics advanced after terminal hold")
         pause_starts[index] = time.perf_counter()
-        hold_records[index] = command_fresh_hold(handles)
+        hold_records[index] = (
+            velocity_drive.hold() if velocity_drive is not None
+            else command_fresh_hold(handles)
+        )
 
     def capture(index: int) -> dict:
         path = current_dir(index)
@@ -319,6 +347,21 @@ def main() -> None:
             "simulation_step_index": int(handles.world.current_time_step_index),
         }
         write_json(path / "observation.json", record)
+        if video is not None and index == 0:
+            start = time.perf_counter()
+            try:
+                video.append(
+                    replan_index=0, action_index=-1,
+                    simulation_time_seconds=record["simulation_time_seconds"],
+                    simulation_step_index=record["simulation_step_index"],
+                    exterior=request["observation/exterior_image_1_left"],
+                    wrist=request["observation/wrist_image_left"],
+                )
+            except (OSError, RuntimeError, ValueError) as error:
+                video.note_drop(replan_index=0, action_index=-1,
+                                error=f"{type(error).__name__}: {error}")
+            finally:
+                video.capture_wall_seconds += time.perf_counter() - start
         return request
 
     def infer(index: int, request: dict) -> dict:
@@ -422,15 +465,63 @@ def main() -> None:
                 ),
                 "rows": rows,
             })
+            if video is None or row.get("safety_result") != "accepted":
+                return
+            if video.dropped_frames:
+                video.note_drop(replan_index=index,
+                                action_index=row["action_index"],
+                                error="Recording stopped after earlier frame loss")
+                return
+            start = time.perf_counter()
+            step = int(handles.world.current_time_step_index)
+            try:
+                # GUI stepping already rendered the final physics substep.
+                # Headless stepping needs one render, which advances no physics.
+                if args.headless:
+                    handles.world.render()
+                if int(handles.world.current_time_step_index) != step:
+                    raise RuntimeError("Video render advanced physics")
+                video.append(
+                    replan_index=index, action_index=row["action_index"],
+                    simulation_time_seconds=float(handles.world.current_time),
+                    simulation_step_index=step,
+                    exterior=capture_rgb(
+                        rig.external,
+                        config["cameras"]["external"]["resolution_wh"],
+                    ),
+                    wrist=capture_rgb(
+                        rig.wrist, config["cameras"]["wrist"]["resolution_wh"],
+                    ),
+                )
+            except (OSError, RuntimeError, ValueError) as error:
+                video.note_drop(replan_index=index,
+                                action_index=row["action_index"],
+                                error=f"{type(error).__name__}: {error}")
+            finally:
+                video.capture_wall_seconds += time.perf_counter() - start
 
         result = execute_chunk(
             handles, config, payload["selected"], physics_dt=physics_dt,
             render=not args.headless, gripper_runtime=gripper,
             on_action=save_action, terminal_evidence_steps=0,
             contact_monitor=contact_monitor,
+            arm_control_mode=args.arm_control_mode,
+            velocity_scale_rad_s_per_action_unit=(
+                args.velocity_scale_rad_s_per_action_unit
+            ),
+            velocity_drive=velocity_drive,
         )
         result["replan_index"] = index
         result["paused_wall_seconds"] = paused
+        if velocity_drive is not None and result["status"] != "complete":
+            try:
+                result["abort_hold_recovery"] = velocity_drive.hold()
+            except (ValueError, RuntimeError) as error:
+                result["abort_hold_recovery_error"] = (
+                    f"{type(error).__name__}: {error}"
+                )
+                write_json(path / "execution.json", result)
+                raise RuntimeError("Velocity abort hold recovery failed") from error
         terminal_step_before_next_observation = result[
             "terminal_hold"
         ].get("simulation_step_index")
@@ -502,7 +593,8 @@ def main() -> None:
               "target", row["objects_after"][0]["position_xyz_m"], flush=True)
 
     def emergency_hold() -> None:
-        record = command_fresh_hold(handles)
+        record = (velocity_drive.hold() if velocity_drive is not None
+                  else command_fresh_hold(handles))
         write_json(output / "interrupt_hold.json", record)
 
     summary = run_rollout_loop(
@@ -510,6 +602,12 @@ def main() -> None:
         record=record, emergency_hold=emergency_hold,
         max_replans=args.max_replans,
     )
+    if video is not None:
+        video_result = video.finalize(
+            termination_reason=summary["termination_reason"]
+        )
+        print("motion video:", video_result["status"],
+              "frames:", video_result["frame_count"], flush=True)
     # A failed/interrupting request may have started but not reached record().
     summary["inference_requests"] = max(
         summary["inference_requests"],
@@ -533,6 +631,30 @@ def main() -> None:
         item["saved_actions_executed"] for item in partial_replans
     )
     persist_progress(summary)
+    if video is not None and summary["completed_replans"]:
+        try:
+            frames, period, missing = archived_frames(output)
+            observation_video = export_video(
+                frames, output / "videos", period_s=period,
+                label="replan-sampled policy observations",
+                video_name="policy_observations", source_rollout_id=run_id,
+            )
+            observation_video["missing_or_dropped_frames"] = missing
+            if missing:
+                observation_video["status"] = "partial"
+            write_metadata(output / "videos/policy_observations.json",
+                           observation_video)
+        except (OSError, RuntimeError, ValueError,
+                subprocess.CalledProcessError) as error:
+            write_metadata(output / "videos/policy_observations_error.json", {
+                "status": "incomplete",
+                "error": f"{type(error).__name__}: {error}",
+            })
+    elif video is not None:
+        write_metadata(output / "videos/policy_observations_error.json", {
+            "status": "incomplete",
+            "error": "No completed replan has a full observation interval",
+        })
     write_json(output / "termination.json", {
         "reason": summary["termination_reason"],
         "error": summary["error"],

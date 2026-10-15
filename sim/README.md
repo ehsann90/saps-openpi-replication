@@ -764,6 +764,48 @@ the joint drive continue across actions and replans. Its 10 N m authored
 torque is not equivalent to the Franka Hand's 20 N active-finger effort.
 The five passive Robotiq joints receive no position commands.
 
+For the experimental direct arm-velocity backend, add
+`--arm-control-mode joint_velocity --velocity-scale-rad-s-per-action-unit 1.0`
+to either policy script. The scale is an explicit engineering test value;
+OpenPI does not establish it as a DROID rad/s unit. The default
+`position_reference` mode is unchanged. The velocity backend uses arm-only
+velocity targets at the same 15 Hz cadence, limits commands by articulation
+velocity and joint-position bounds, records saturation, and restores the
+original arm position drives for inference and termination. Its first gate
+is the contact-free `sim/scripts/velocity_interface_smoke.py` with the same
+Robotiq scene config. Add `--gripper-transition` to that smoke command to
+check one close/open cycle while the arm velocity drive is active. See
+[action semantics](docs/droid_joint_velocity_semantics.md)
+for the source trace and control distinction.
+
+The official DROID-reference rollout uses `position_reference` by default;
+the direct `joint_velocity` backend remains experimental. For optional video,
+add `--record-policy-video` to a rollout. It writes synchronized paired
+`<run>/videos/policy_observations.mp4` from the exact saved OpenPI request
+images, and `<run>/videos/simulation_motion.mp4` from the initial camera state
+and each completed 15 Hz action. Inference wall time adds no video frames;
+simulated timestamps and capture/encoding wall costs are separate in the JSON
+metadata. Motion raw frames stay under `<run>/videos/raw/`, and request images
+stay under `<run>/replans/`. Export sparse observations from an existing run
+with `python3 tools/analysis/export_isaac_policy_video.py <run>`; this cannot
+recreate motion. Inspect an MP4 with `ffprobe -v error -show_streams
+<run>/videos/policy_observations.mp4`. The bounded camera/video smoke test is:
+
+```bash
+cd ~/isaacsim
+./python.sh -u ~/MyProjects/saps-openpi-replication/sim/scripts/policy_video_smoke.py \
+  --config ~/MyProjects/saps-openpi-replication/sim/configs/fr3_droid_robotiq_fusion_v13_candidate_scene.json \
+  --headless
+```
+
+The smoke makes no policy request and writes a unique
+`outputs/isaac_video_smoke/<run-id>/` directory. It checks camera changes,
+15 Hz simulation intervals, a wall-clock pause, encoder output and manual
+interruption. A real position-reference rollout with both videos was recorded
+at `outputs/isaac_droid_robotiq_rollout/20261015T131423Z_f1f5e228/`; see
+[video and gripper review](docs/rollout_video_and_gripper_review.md) for
+artifact checks and current camera/contact limitations.
+
 The arm mapping, first-eight selection, 15 Hz timing, four physics steps per
 action, terminal hold, and zero simulation stepping during inference are shared
 with SIM-P6. Each completed repeated chunk advances exactly 32 steps, or
