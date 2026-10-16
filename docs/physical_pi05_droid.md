@@ -29,6 +29,9 @@ Prepare the selected object-level subset:
 make droid-sample
 ```
 
+The target builds a small `saps_droid_sample` image from the existing
+`openpi_server` image with the system libraries required by OpenCV.
+
 This reads [`configs/droid_m1_sample.json`](../configs/droid_m1_sample.json),
 downloads exactly four public objects from the official `gresearch` bucket,
 and verifies their GCS size and MD5 fields before extraction:
@@ -68,7 +71,7 @@ docker run --rm \
   -v "$PWD":/workspace \
   -w /workspace \
   --entrypoint /bin/bash \
-  openpi_server:latest -lc \
+  saps_droid_sample:latest -lc \
   'source /.venv/bin/activate && python \
    tools/datasets/prepare_droid_m1_sample.py --skip-download \
    --skip-annotation-verification --force-rebuild'

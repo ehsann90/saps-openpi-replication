@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+
+  "robot": {
+    "asset": "/Isaac/Robots/FrankaRobotics/FrankaFR3/fr3.usd",
+    "prim_path": "/World/fr3",
+    "arm_dof_names": [
+      "fr3_joint1",
+      "fr3_joint2",
+      "fr3_joint3",
+      "fr3_joint4",
+      "fr3_joint5",
+      "fr3_joint6",
+      "fr3_joint7"
+    ],
+    "finger_dof_names": [
+      "fr3_finger_joint1",
+      "fr3_finger_joint2"
+    ],
+    "tcp_prim": "/World/fr3/fr3_hand_tcp",
+    "left_finger_prim": "/World/fr3/fr3_leftfinger",
+    "right_finger_prim": "/World/fr3/fr3_rightfinger",
+    "home_arm_rad": [
+      0.0,
+      -0.4,
+      0.0,
+      -1.9,
+      0.0,
+      1.5,
+      0.0
+    ],
+    "home_fingers_m": [
+      0.04,
+      0.04
+    ]
+  },
+
+  "table": {
+    "position_m": [
+      0.55,
+      0.0,
+      0.375
+    ],
+    "size_m": [
+      0.70,
+      0.80,
+      0.05
+    ]
+  },
+
+  "target_object": {
+    "type": "cube",
+    "position_m": [
+      0.55,
+      0.0,
+      0.42
+    ],
+    "size_m": [
+      0.04,
+      0.04,
+      0.04
+    ],
+    "mass_kg": 0.05,
+    "color_rgb": [
+      1.0,
+      0.0,
+      0.0
+    ]
+  },
+
+  "droid": {
+    "control_hz": 15.0,
+    "arm_action_clip": 1.0,
+    "max_joint_delta_rad": 0.2,
+    "gripper_max_width_m": 0.08
+  }
+}
