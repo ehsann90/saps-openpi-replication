@@ -115,7 +115,7 @@ class EpisodeTests(unittest.TestCase):
         self.result = {}
         self.metric = patch("saps.physical.single_action.singularity_metric",
                             return_value={"rejected": False})
-        self.metric.start()
+        self.metric_mock = self.metric.start()
         self.addCleanup(self.metric.stop)
         self.original_infer = self.client.infer
         self.main_hook = lambda: None
@@ -135,7 +135,7 @@ class EpisodeTests(unittest.TestCase):
     def run_episode(self, cap=1, provider=lambda _: TaskOutcome.CONTINUE,
                     max_replans=3, seed=20260917, analyzer=analyze, gripper=None,
                     stop_after_inference_replan=None,
-                    gripper_transition_timeout=3.):
+                    gripper_transition_timeout=3., singularity_limit=17.):
         run_policy_episode(
             boundary=self.boundary, collector=self.collector, policy=self.policy,
             config=load_shadow_config(CONFIG_PATH), output_dir=self.output,
@@ -147,6 +147,7 @@ class EpisodeTests(unittest.TestCase):
             spin_once=self.collector.spin, ros_now=lambda: self.boundary.now / 1e9,
             result=self.result, outcome_provider=provider, gripper=gripper,
             gripper_transition_timeout=gripper_transition_timeout,
+            singularity_limit=singularity_limit,
             stop_after_inference_replan=stop_after_inference_replan,
             now=lambda: self.boundary.now, sleep=self.boundary.sleep,
         )
@@ -262,6 +263,24 @@ class EpisodeTests(unittest.TestCase):
         self.assertEqual(audit["expected_targets"], 6)
         self.assertEqual(audit["analyzed_targets"], 6)
         self.assertEqual(audit["safety_rejected_unpublished_targets"], 1)
+
+    def test_singularity_limit_is_recorded_and_used_for_every_target(self):
+        self.run_episode(singularity_limit=25.)
+        self.assertEqual(self.result["status"], "success",
+                         self.result.get("error"))
+        self.assertEqual(self.result["episode"]["singularity_limit"], 25.)
+        self.assertEqual(self.metric_mock.call_count,
+                         2 * len(self.result["rows"]))
+        self.assertTrue(all(
+            call.kwargs["singularity_limit"] == 25.
+            for call in self.metric_mock.call_args_list
+        ))
+
+    def test_invalid_singularity_limit_fails_before_warmup(self):
+        for limit in (1., float("nan"), float("inf")):
+            with self.subTest(limit=limit), self.assertRaises(ValueError):
+                self.run_episode(singularity_limit=limit)
+            self.assertEqual(self.result.get("warmup_requests", 0), 0)
 
     def test_first_test_cap_and_separate_latency(self):
         self.run_episode()

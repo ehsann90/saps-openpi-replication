@@ -202,6 +202,24 @@ starts the server. Application confirmation defaults to 0.25 seconds; override
 protocol. `C1C2_MAX_REPLANS` remains an independent hard bound. The main seed is
 fixed in this command, unaffected by `DROID_POLICY_SEED` overrides.
 
+The measured and proposed arm poses are checked against a per-run Jacobian
+condition-number limit. The default is `17.0`; a condition number greater than
+or equal to the limit is rejected before publication. To change it for one
+supervised run, pass `C1C2_SINGULARITY_LIMIT=<finite-number-above-1>` to either
+`physical-c1c2` or `physical-c1c2-gripper`. For example, a value of `25`
+would admit a target at `17.239` if all other checks pass, but it makes no
+claim that subsequent targets or the run are safe. The selected limit is saved
+in `run.json` under `episode.singularity_limit` and in every row's
+`safety_gate.*_singularity.lower_threshold`. The recorded `hard_threshold=30`
+is a legacy diagnostic value and is not a second enforced stop limit.
+
+Changing this limit alters admissible physical trajectories and therefore
+evaluation outcomes. Use a new run ID and compare results separately by limit.
+The controller's own limits and error handling do not replace this target-pose
+check; the task operator must review the workspace and supervise any run with
+a raised limit. The other joint, freshness, readiness and Franka-health checks
+are unchanged.
+
 For supervised G2 runs with the validated G1B hand adapter, select the
 separately enabled entry point and set the chunk cap explicitly:
 
@@ -332,7 +350,8 @@ early closing. The corrected-side wrist view still does not include the
 gripper as in the DROID examples; moving the camera again will produce a new
 input configuration. Camera placement and starting pose both differ between
 these runs, so neither a visual causal explanation nor task success follows
-from the runtime audits. The 17.0 singularity threshold remains unchanged.
+from the runtime audits. The 17.0 singularity threshold was unchanged in those
+historical runs.
 
 ## Evidence
 

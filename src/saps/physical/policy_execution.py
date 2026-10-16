@@ -20,6 +20,7 @@ from saps.physical.live_shadow import (
     CameraPairGate, infer_live_request, prepare_live_request,
 )
 from saps.physical.policy_warmup import PolicyWarmup, prepare_warmed_observation
+from saps.physical.single_action import SINGULARITY_LOWER
 from saps.physical.streaming_playback import (
     PERIOD_NS, deadlines, prepare, selected_actions, wait_until,
 )
@@ -228,6 +229,7 @@ def run_policy_episode(
     gripper: Any | None = None,
     gripper_transition_timeout: float = 3.0,
     stop_after_inference_replan: int | None = None,
+    singularity_limit: float = SINGULARITY_LOWER,
     now: Callable[[], int] = time.monotonic_ns,
     sleep: Callable[[float], None] = time.sleep,
 ) -> None:
@@ -245,6 +247,11 @@ def run_policy_episode(
                    (application_timeout, observation_timeout,
                     gripper_transition_timeout))):
         raise ValueError("Positive finite bounds are required")
+    if (isinstance(singularity_limit, bool)
+            or not isinstance(singularity_limit, (int, float))
+            or not np.isfinite(singularity_limit)
+            or singularity_limit <= 1.0):
+        raise ValueError("singularity_limit must be finite and greater than 1")
     if stop_after_inference_replan is not None:
         if (type(stop_after_inference_replan) is not int
                 or stop_after_inference_replan < 0
@@ -266,6 +273,7 @@ def run_policy_episode(
                  "max_replans": max_replans,
                  "max_executed_policy_chunks": max_executed_policy_chunks,
                  "stop_after_inference_replan": stop_after_inference_replan,
+                 "singularity_limit": singularity_limit,
                  "gripper_actuation": ("droid_binary_franka_hand" if gripper is not None
                                        else "disabled_arm_only"),
                  "outcome_provider": getattr(outcome_provider, "__name__",
@@ -352,7 +360,8 @@ def run_policy_episode(
             scheduled = prepared
         row = prepare(action, state, limits, now_ns=prepared,
                       start_ns=origin, scheduled_ns=scheduled,
-                      kind=kind, action_index=index)
+                      kind=kind, action_index=index,
+                      singularity_limit=singularity_limit)
         row.update(preparation_eligible_monotonic_ns=eligible,
                    target_preparation_monotonic_ns=prepared)
         if action is None:

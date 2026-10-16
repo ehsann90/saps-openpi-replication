@@ -11,7 +11,9 @@ from typing import Any, Callable
 
 import numpy as np
 
-from saps.physical.single_action import first_action_from_chunk, safety_gate
+from saps.physical.single_action import (
+    SINGULARITY_LOWER, first_action_from_chunk, safety_gate,
+)
 
 NSEC_PER_SEC = 1_000_000_000
 POLICY_HZ = 15
@@ -91,7 +93,8 @@ class MeasuredState:
 def prepare(action: np.ndarray | None, state: MeasuredState,
             limits: dict[str, Any], *, now_ns: int, start_ns: int,
             scheduled_ns: int, kind: str,
-            action_index: int | None) -> dict[str, Any]:
+            action_index: int | None,
+            singularity_limit: float = SINGULARITY_LOWER) -> dict[str, Any]:
     """Reuse the unchanged safety gate, including for zero-displacement holds."""
     gate = safety_gate(
         np.zeros(8) if action is None else action, state.q, limits,
@@ -101,6 +104,7 @@ def prepare(action: np.ndarray | None, state: MeasuredState,
         # Holds are freshly created commands, not aged policy actions.
         action_age=0.0 if action is None else (now_ns - start_ns) / 1e9,
         readiness_reasons=list(state.readiness_reasons),
+        singularity_limit=singularity_limit,
     )
     return {
         "type": kind, "action_index": action_index,

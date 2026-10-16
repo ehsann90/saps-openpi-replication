@@ -47,6 +47,9 @@ def run_inference_hold(args: Any, *, policy_execution: bool = False) -> int:
             ))):
         raise ValueError("Explicit execution, prompt, seed and finite timeouts required")
     config = load_shadow_config(args.config)
+    if policy_execution and (not np.isfinite(args.singularity_limit)
+                             or args.singularity_limit <= 1.0):
+        raise ValueError("singularity_limit must be finite and greater than 1")
     args.output_dir.mkdir(parents=True, exist_ok=False)
     result: dict[str, Any] = {
         "schema_version": 1, "milestone": "physical_c1c1",
@@ -62,7 +65,8 @@ def run_inference_hold(args: Any, *, policy_execution: bool = False) -> int:
         },
     }
     if policy_execution:
-        result.update(milestone="physical_c1c2", warmup={}, episode={},
+        result.update(milestone="physical_c1c2", warmup={},
+                      episode={"singularity_limit": args.singularity_limit},
                       replans=[], termination={"task_outcome": "not_evaluated"},
                       runtime_health={}, warmup_requests=0,
                       main_policy_requests=0, completed_main_replans=0,
@@ -220,6 +224,7 @@ def run_inference_hold(args: Any, *, policy_execution: bool = False) -> int:
                 warmup_policy_seed=args.warmup_policy_seed,
                 max_replans=args.max_replans,
                 max_executed_policy_chunks=args.max_executed_policy_chunks,
+                singularity_limit=args.singularity_limit,
                 stop_after_inference_replan=getattr(
                     args, "stop_after_inference_replan", None),
                 spin_once=check_observers,

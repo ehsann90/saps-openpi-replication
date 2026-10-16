@@ -41,7 +41,9 @@ def first_action_from_chunk(actions: Any) -> np.ndarray:
     return selected
 
 
-def singularity_metric(q: Any) -> dict[str, Any]:
+def singularity_metric(
+    q: Any, *, singularity_limit: float = SINGULARITY_LOWER,
+) -> dict[str, Any]:
     """Evaluate the FR3 arm Jacobian condition number.
 
     The metric matches the MoveIt Servo convention previously inspected:
@@ -70,11 +72,11 @@ def singularity_metric(q: Any) -> dict[str, Any]:
         "singular_values": values,
         "base": "fr3_link0",
         "tip": "fr3_link8",
-        "lower_threshold": SINGULARITY_LOWER,
+        "lower_threshold": singularity_limit,
         "hard_threshold": SINGULARITY_HARD,
         "rejected": (
             condition is None
-            or condition >= SINGULARITY_LOWER
+            or condition >= singularity_limit
         ),
     }
 
@@ -88,8 +90,14 @@ def safety_gate(
     receive_age: float,
     action_age: float,
     readiness_reasons: list[str],
+    singularity_limit: float = SINGULARITY_LOWER,
 ) -> dict[str, Any]:
     """Validate one native DROID action without modifying its target."""
+    if (isinstance(singularity_limit, bool)
+            or not isinstance(singularity_limit, (int, float))
+            or not np.isfinite(singularity_limit)
+            or singularity_limit <= 1.0):
+        raise ValueError("singularity_limit must be finite and greater than 1")
 
     reasons = list(readiness_reasons)
 
@@ -149,14 +157,16 @@ def safety_gate(
                 evidence["proposed_q_target_rad"],
             ),
         ):
-            metric = singularity_metric(position)
+            metric = singularity_metric(
+                position, singularity_limit=singularity_limit,
+            )
             evidence[f"{label}_singularity"] = metric
 
             if metric["rejected"]:
                 reasons.append(
                     f"{label}_singularity_condition="
                     f"{metric['condition_number']} "
-                    f">={SINGULARITY_LOWER} "
+                    f">={singularity_limit} "
                     "or rank deficient"
                 )
 

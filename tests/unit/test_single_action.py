@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import ExitStack
 import unittest
 from unittest.mock import Mock, patch
 
@@ -10,6 +11,7 @@ import numpy as np
 from saps.physical.single_action import (
     first_action_from_chunk,
     safety_gate,
+    singularity_metric,
 )
 from saps.physical.single_action_ros import (
     JointTargetActionClient,
@@ -157,6 +159,48 @@ class SingleActionSafetyTest(unittest.TestCase):
             ),
             2,
         )
+
+    def test_configured_limit_changes_rejection_boundary(self) -> None:
+        jacobian = np.zeros((6, 7))
+        np.fill_diagonal(jacobian, [20., 4., 3., 2., 1.5, 1.])
+        transform = np.eye(4)
+        with ExitStack() as stack:
+            stack.enter_context(patch(
+                "saps.physical.single_action.fr3_tcp_jacobian",
+                return_value=jacobian,
+            ))
+            for name in ("fr3_flange_fk", "fr3_tcp_fk"):
+                stack.enter_context(patch(
+                    "saps.physical.single_action." + name,
+                    return_value=transform,
+                ))
+            lower = singularity_metric(np.zeros(7), singularity_limit=17.)
+            equal = singularity_metric(np.zeros(7), singularity_limit=20.)
+            higher = singularity_metric(np.zeros(7), singularity_limit=25.)
+            def gate(limit):
+                return safety_gate(
+                    np.zeros(8), np.zeros(7), self.limits,
+                    state_age=.01, receive_age=.01, action_age=.01,
+                    readiness_reasons=[], singularity_limit=limit,
+                )
+            lower_gate = gate(17.)
+            higher_gate = gate(25.)
+        self.assertEqual(lower["condition_number"], 20.)
+        self.assertTrue(lower["rejected"])
+        self.assertTrue(equal["rejected"])
+        self.assertFalse(higher["rejected"])
+        self.assertEqual(higher["lower_threshold"], 25.)
+        self.assertFalse(lower_gate["accepted"])
+        self.assertTrue(higher_gate["accepted"])
+
+    def test_invalid_singularity_limit_is_rejected(self) -> None:
+        for limit in (0., 1., float("nan"), float("inf"), True):
+            with self.subTest(limit=limit), self.assertRaises(ValueError):
+                safety_gate(
+                    np.zeros(8), np.zeros(7), self.limits,
+                    state_age=.01, receive_age=.01, action_age=.01,
+                    readiness_reasons=[], singularity_limit=limit,
+                )
 
 
 class SingleActionRosBoundaryTest(unittest.TestCase):

@@ -7,6 +7,7 @@ import argparse
 from pathlib import Path
 
 from saps.physical.live_inference_hold_ros import run_inference_hold
+from saps.physical.single_action import SINGULARITY_LOWER
 
 
 def parse_args() -> argparse.Namespace:
@@ -23,6 +24,10 @@ def parse_args() -> argparse.Namespace:
                         help="Hard finite safety bound; never a task failure")
     parser.add_argument("--max-executed-policy-chunks", type=int, default=1,
                         help="Test-only cap; initial physical validation requires 1")
+    parser.add_argument("--singularity-limit", type=float,
+                        default=SINGULARITY_LOWER,
+                        help="Reject measured or proposed Jacobian condition "
+                             "numbers at or above this value; default 17.0")
     parser.add_argument(
         "--stop-after-inference-replan", type=int, default=None,
         help=(

@@ -72,10 +72,12 @@ G1B_RUN_ID ?= g1b_grasp_release_$(shell date +%Y%m%d_%H%M%S)
 C1C1_APPLICATION_CONFIRMATION_TIMEOUT ?= 0.25
 C1C2_APPLICATION_CONFIRMATION_TIMEOUT ?= 0.25
 C1C2_MAX_EXECUTED_POLICY_CHUNKS ?= 1
+C1C2_SINGULARITY_LIMIT ?= 17.0
 C1C2_STOP_AFTER_INFERENCE_REPLAN ?=
 C1C2_STOP_AFTER_INFERENCE_REPLAN_ARG = $(if $(strip $(C1C2_STOP_AFTER_INFERENCE_REPLAN)),--stop-after-inference-replan $(C1C2_STOP_AFTER_INFERENCE_REPLAN),)
 C1C2_MAX_REPLANS ?= 100
 export C1C2_APPLICATION_CONFIRMATION_TIMEOUT C1C2_MAX_EXECUTED_POLICY_CHUNKS
+export C1C2_SINGULARITY_LIMIT
 export C1C2_MAX_REPLANS
 export C1C1_APPLICATION_CONFIRMATION_TIMEOUT
 export PHYSICAL_RUN_ID PHYSICAL_PROMPT PHYSICAL_REQUESTS PHYSICAL_PYTHON
@@ -144,6 +146,7 @@ help:
 	@echo "  make physical-c1c2 PHYSICAL_RUN_ID=<unique> PHYSICAL_PROMPT=<instruction>  # arm-only execution"
 	@echo "  make physical-g1b-grasp-release [G1B_RUN_ID=<unique>]  # stationary-arm gripper validation"
 	@echo "  make physical-c1c2-gripper PHYSICAL_RUN_ID=<unique> PHYSICAL_PROMPT=<instruction>  # opt-in arm+gripper"
+	@echo "    C1C2_SINGULARITY_LIMIT=<finite-number-above-1>  # default 17; per-run gate"
 	@echo "  make physical-cameras PHYSICAL_CONFIG=<local-json>  # RealSense RGB drivers only"
 	@echo "  make autonomous-smoke"
 	@echo "  make autonomous-sweep NUM_TRIALS=20"
@@ -443,6 +446,7 @@ physical-c1c2:
 		--warmup-policy-seed "$$PHYSICAL_WARMUP_POLICY_SEED" \
 		--max-replans "$$C1C2_MAX_REPLANS" \
 		--max-executed-policy-chunks "$$C1C2_MAX_EXECUTED_POLICY_CHUNKS" $(C1C2_STOP_AFTER_INFERENCE_REPLAN_ARG) \
+		--singularity-limit "$$C1C2_SINGULARITY_LIMIT" \
 		--application-confirmation-timeout "$$C1C2_APPLICATION_CONFIRMATION_TIMEOUT"'
 
 
@@ -476,6 +480,7 @@ physical-c1c2-gripper:
 		--warmup-policy-seed "$$PHYSICAL_WARMUP_POLICY_SEED" \
 		--max-replans "$$C1C2_MAX_REPLANS" \
 		--max-executed-policy-chunks "$$C1C2_MAX_EXECUTED_POLICY_CHUNKS" $(C1C2_STOP_AFTER_INFERENCE_REPLAN_ARG) \
+		--singularity-limit "$$C1C2_SINGULARITY_LIMIT" \
 		--application-confirmation-timeout "$$C1C2_APPLICATION_CONFIRMATION_TIMEOUT"'
 
 .PHONY: operator-smoke
