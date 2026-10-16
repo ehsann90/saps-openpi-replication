@@ -36,15 +36,23 @@ def load_shadow_config(path: Path) -> dict[str, Any]:
             robot["maximum_finger_position_m"]) != (
                 "fr3_link0", "fr3_hand_tcp", 0.04):
         raise ValueError("P0 frame and gripper conventions are frozen.")
-    for key, role, serial in (
-        ("wrist_camera", "wrist", "342222073510"),
-        ("exterior_camera", "exterior", "244222076317"),
+    for key, role in (
+        ("wrist_camera", "wrist"),
+        ("exterior_camera", "exterior"),
     ):
         camera = config[key]
-        if (camera["role"], camera["serial"]) != (role, serial):
-            raise ValueError("P0 camera serial-role mapping is frozen.")
-        if not camera["node"].startswith("/"):
-            raise ValueError("Camera node must be fully qualified.")
+        if camera["role"] != role:
+            raise ValueError("Camera roles must match their configured slots.")
+        for name in ("node", "topic"):
+            value = camera[name]
+            if not isinstance(value, str) or not value.startswith("/"):
+                raise ValueError(f"Camera {name} must be fully qualified.")
+        parameter = camera.get("serial_parameter", "serial_no")
+        prefix = camera.get("serial_parameter_prefix", "_")
+        if not isinstance(parameter, str) or not parameter.strip():
+            raise ValueError("Camera serial_parameter must be non-empty.")
+        if not isinstance(prefix, str):
+            raise ValueError("Camera serial_parameter_prefix must be a string.")
     wrist, exterior = config["wrist_camera"], config["exterior_camera"]
     if wrist["topic"] == exterior["topic"] or wrist["node"] == exterior["node"]:
         raise ValueError("P0 requires distinct camera topics and nodes.")

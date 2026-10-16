@@ -65,6 +65,9 @@ Add asynchronous Franka Hand Move and Grasp runtime
 
 Gripper-enabled SAPS execution is pinned to that exact clean commit. The historical
 arm-only C1-C2 runtime retains its original `9e535b6` arm-baseline pin.
+Camera replacements do not require changing this pin: use a local
+`PHYSICAL_CONFIG` and the SAPS camera launcher described in
+[camera configuration](physical_c1c2_runtime.md#camera-configuration-without-lab-code-changes).
 
 The reusable `RosFrankaHand` library attaches to a caller-owned ROS node and
 executor. It owns:

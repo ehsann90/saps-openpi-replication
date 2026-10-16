@@ -145,6 +145,11 @@ class ConfigTest(unittest.TestCase):
             ("policy", "action_shape", [10, 8]),
             ("policy", "checkpoint", "other"),
             ("wrist_camera", "serial", "244222076317"),
+            ("wrist_camera", "serial", ""),
+            ("wrist_camera", "serial", 243322070397),
+            ("wrist_camera", "role", "exterior"),
+            ("wrist_camera", "serial_parameter", ""),
+            ("wrist_camera", "serial_parameter_prefix", None),
             ("wrist_camera", "topic", "/camera/external_camera/color/image_raw"),
             ("robot", "maximum_finger_position_m", .05),
         ):
@@ -155,6 +160,18 @@ class ConfigTest(unittest.TestCase):
                 path.write_text(json.dumps(config))
                 with self.assertRaises(ValueError):
                     load_shadow_config(path)
+
+    def test_replacement_camera_config_is_preserved(self) -> None:
+        config = load_shadow_config(CONFIG_PATH)
+        config["wrist_camera"]["serial"] = "243322070397"
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "config.json"
+            path.write_text(json.dumps(config))
+            loaded = load_shadow_config(path)
+        self.assertEqual(loaded, config)
+        self.assertEqual(
+            observation_contract(loaded).wrist_camera.serial, "243322070397",
+        )
 
     def test_native_16_by_9_preserved_without_crop(self) -> None:
         observation = make_observation()
@@ -426,6 +443,21 @@ class RosPreflightTest(unittest.TestCase):
             self.assertEqual(record["wrist_camera"]["serial"], "342222073510")
             self.assertEqual(run.call_count, 2)
             run.side_effect = [SimpleNamespace(stdout="_244222076317\n")]
+            with self.assertRaises(RuntimeError):
+                camera_serial_evidence(config)
+
+    def test_driver_specific_identity_parameter(self) -> None:
+        config = load_shadow_config(CONFIG_PATH)
+        camera = config["wrist_camera"]
+        camera.update(serial="123456", serial_parameter="device.serial",
+                      serial_parameter_prefix="")
+        with patch("saps.physical.shadow_ros.subprocess.run") as run:
+            run.side_effect = [SimpleNamespace(stdout="123456\n"),
+                               SimpleNamespace(stdout="_244222076317\n")]
+            record = camera_serial_evidence(config)
+            self.assertEqual(record["wrist_camera"]["serial"], "123456")
+            self.assertEqual(run.call_args_list[0].args[0][-1], "device.serial")
+            run.side_effect = [SimpleNamespace(stdout="_123456\n")]
             with self.assertRaises(RuntimeError):
                 camera_serial_evidence(config)
 

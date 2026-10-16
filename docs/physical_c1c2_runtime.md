@@ -139,6 +139,52 @@ does not establish that the policy grasps the object at the right time or
 completes the task; the runtime still reports CONTINUE until a test cap or
 safety abort.
 
+## Camera configuration without lab-code changes
+
+Keep the lab checkout at its clean runtime pin. Camera selection belongs in a
+local JSON profile, not `fr3_lab_stack/launch/dual_realsense.launch.py`.
+Create a copy once (do not overwrite an existing profile):
+
+```bash
+mkdir -p configs/local
+cp -n configs/physical_pi05_fr3.json configs/local/physical_pi05_fr3.json
+export PHYSICAL_CONFIG="$PWD/configs/local/physical_pi05_fr3.json"
+```
+
+Edit the profile's `wrist_camera` and `exterior_camera` serial, model, node and
+topic fields for the installed hardware. `configs/local/` is ignored by Git.
+The checked-in default remains the historical camera pair; no local profile
+is selected automatically. Export `PHYSICAL_CONFIG` in each relevant terminal
+or pass it to each Make invocation. The resolved config is saved in `run.json`.
+
+With the previous camera launcher stopped, launch the RealSense RGB streams
+from the same profile in a separate terminal:
+
+```bash
+make physical-cameras PHYSICAL_CONFIG="$PWD/configs/local/physical_pi05_fr3.json"
+```
+
+This starts only cameras, with the existing 1280x720 RGB8/30 profile and depth
+disabled. Do not run it alongside the old dual-camera launcher. It uses the
+configured node names and requires topics of the form `<node>/color/image_raw`.
+Subsequent shadow, warm-up and execution commands use the same `PHYSICAL_CONFIG`.
+No lab rebuild or commit is needed when changing camera serials.
+
+Other drivers must be launched separately. The runtime accepts explicit
+`serial_parameter` and `serial_parameter_prefix` fields in each camera entry;
+defaults are `serial_no` and `_` for RealSense. An empty prefix means an exact
+parameter-value comparison. Set these to the actual driver device-selection
+parameter and its encoding, together with the correct node, topic and model.
+There is no identity-check bypass. A future ZED integration must verify that
+the selected parameter binds the physical device and that its stream satisfies
+the existing RGB8/720p/30 contract; this change does not validate ZED hardware
+or supply a ZED launcher. Different image formats require a separately
+validated adapter, not relabeling the stream.
+
+Camera replacement or relocation changes policy input and run comparability.
+Use a new run ID and treat runs as different camera configurations. Policy
+seeds, action semantics, preprocessing, safety gates and lab pins are unchanged.
+
 ## Progressive physical validation
 
 With the existing supervised physical stack and policy server already ready,

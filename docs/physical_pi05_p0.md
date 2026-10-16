@@ -19,12 +19,16 @@ retain their original topics, profiles, and acceptance meaning.
 | `/franka_gripper/joint_states` | Franka Hand fingers | `observation/gripper_position` |
 | Explicit CLI instruction | verbatim string | `prompt` |
 
-Camera serial-role assignments are frozen. Topics and camera node names are
+The table describes the checked-in default camera pair. Camera serial-role
+assignments can be selected through a local `PHYSICAL_CONFIG`; see
+[camera configuration](physical_c1c2_runtime.md#camera-configuration-without-lab-code-changes).
+Topics and camera node names are
 explicit configuration fields, verified against the running graph. Exactly
 one publisher is required per source. Camera topic publishers must belong to
 the configured camera nodes. Read-only `ros2 param get --hide-type <camera>
 serial_no` queries verify their serial selection, including RealSense's
-leading underscore convention. The same graph endpoint IDs and camera serials
+leading underscore convention. Other drivers can specify `serial_parameter`
+and `serial_parameter_prefix` explicitly. The same graph endpoint IDs and camera serials
 are checked at completion. Image messages contain no serial; identity evidence
 comes from the driver selection parameter combined with publisher binding.
 It is not an independent optical identification of the device.

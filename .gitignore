@@ -11,6 +11,9 @@ __pycache__/
 .venv/
 .venv-physical/
 
+# Machine-specific physical hardware profiles (captured in run provenance)
+configs/local/
+
 # Experiment outputs
 outputs/
 results/*

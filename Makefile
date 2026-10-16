@@ -144,6 +144,7 @@ help:
 	@echo "  make physical-c1c2 PHYSICAL_RUN_ID=<unique> PHYSICAL_PROMPT=<instruction>  # arm-only execution"
 	@echo "  make physical-g1b-grasp-release [G1B_RUN_ID=<unique>]  # stationary-arm gripper validation"
 	@echo "  make physical-c1c2-gripper PHYSICAL_RUN_ID=<unique> PHYSICAL_PROMPT=<instruction>  # opt-in arm+gripper"
+	@echo "  make physical-cameras PHYSICAL_CONFIG=<local-json>  # RealSense RGB drivers only"
 	@echo "  make autonomous-smoke"
 	@echo "  make autonomous-sweep NUM_TRIALS=20"
 	@echo "  make teleop CONDITION=nominal TRIAL=0"
@@ -418,6 +419,13 @@ physical-c1c1:
 		--prompt "$$PHYSICAL_PROMPT" \
 		--policy-episode-seed "$$DROID_POLICY_SEED" \
 		--application-confirmation-timeout "$$C1C1_APPLICATION_CONFIRMATION_TIMEOUT"'
+
+.PHONY: physical-cameras
+physical-cameras:
+	bash -c 'source /opt/ros/jazzy/setup.bash && \
+		source "$$FRANKA_ROS2_INSTALL/setup.bash" && \
+		export PYTHONPATH="$$PWD/src:$${PYTHONPATH}" && \
+		ros2 launch "$$PWD/scripts/physical_cameras.launch.py" "config:=$$PHYSICAL_CONFIG"'
 
 .PHONY: physical-c1c2
 physical-c1c2: export PHYSICAL_WARMUP_POLICY_SEED := $(PHYSICAL_WARMUP_POLICY_SEED)

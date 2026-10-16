@@ -91,25 +91,32 @@ def camera_serial_evidence(config: dict[str, Any]) -> dict[str, Any]:
 
     ROS Image carries no device serial. A configured label alone cannot prove
     identity. Pair these read-only parameter results with graph endpoint
-    binding; the RealSense driver selects the physical device by serial_no.
+    binding. Parameter name and optional prefix are driver-specific config;
+    legacy configs use RealSense serial_no and its optional underscore.
     """
 
     evidence = {}
     for role in ("wrist_camera", "exterior_camera"):
         camera = config[role]
-        command = ["ros2", "param", "get", "--hide-type", camera["node"], "serial_no"]
+        parameter = camera.get("serial_parameter", "serial_no")
+        prefix = camera.get("serial_parameter_prefix", "_")
+        command = ["ros2", "param", "get", "--hide-type", camera["node"], parameter]
         result = subprocess.run(
             command, check=True, capture_output=True, text=True, timeout=15,
         )
         raw = result.stdout.strip()
         # RealSense launch uses one leading underscore to prevent YAML from
         # interpreting the serial as an integer; the driver removes it.
-        serial = raw[1:] if raw.startswith("_") else raw
+        serial = raw[len(prefix):] if prefix and raw.startswith(prefix) else raw
         if serial != camera["serial"]:
-            raise RuntimeError(f"{role} serial_no={raw!r}, expected {camera['serial']!r}.")
+            raise RuntimeError(f"{role} {parameter}={raw!r}, expected {camera['serial']!r}.")
         evidence[role] = {
             "command": command, "raw_parameter": raw, "serial": serial,
-            "read_utc": utc_now(), "identity_source": "RealSense serial_no parameter",
+            "read_utc": utc_now(),
+            "identity_source": (
+                "RealSense serial_no parameter" if parameter == "serial_no"
+                else f"ROS {parameter} parameter"
+            ),
         }
     return evidence
 
