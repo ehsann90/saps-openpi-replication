@@ -18,8 +18,8 @@ ACTION_AGE = 1.0
 JOINT_MARGIN = 0.1
 NATIVE_ACTION_SHAPE = (15, 8)
 
-SINGULARITY_LOWER = 17.0
-SINGULARITY_HARD = 30.0
+SINGULARITY_LOWER = 30.0
+SINGULARITY_HARD = 80.0
 
 
 def first_action_from_chunk(actions: Any) -> np.ndarray:
