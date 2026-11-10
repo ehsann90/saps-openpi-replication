@@ -268,3 +268,16 @@ When using this replication, cite the original SAPS paper and identify the
 exact repository milestone, collection commit, analysis commit, submodule
 revisions, checkpoint, and frozen protocol hashes. A machine-readable citation
 template is provided in [CITATION.cff](CITATION.cff).
+
+The dedicated ZED Mini/ZED 2 + Robotiq physical profile and staged researcher
+commissioning commands are in [docs/physical_zed_robotiq.md](docs/physical_zed_robotiq.md).
+Hardware validation is pending; the new profile blocks arm execution until
+measured tool geometry is integrated and reviewed.
+
+
+C4 integrates the commissioned ZED Mini/ZED 2i identities and existing Robotiq
+server into subscriber-only observation and warmed shadow workflows. The
+[terminal-by-terminal C4 guide](docs/physical_c4.md) contains the runtime audit,
+new local-profile preparation, observation/shadow commands and geometry/source
+integrity NO-GO gates. It preserves the historical policy/controller contract;
+it does not authorize physical execution.

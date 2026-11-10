@@ -153,6 +153,8 @@ def run_verifier(args: Any) -> None:
                 args.max_state_age, args.max_action_age, args.max_lateness))):
         raise ValueError("Require 1..100 requests, prompt, seed and finite positive bounds.")
     config = load_shadow_config(args.config)
+    from saps.physical.hardware_provenance import require_supported_arm_geometry
+    require_supported_arm_geometry(config)
     args.output_dir.mkdir(parents=True, exist_ok=False)
     started = time.monotonic()
     record = {"schema_version": 1, "milestone": "physical_pi05_droid_p1a",

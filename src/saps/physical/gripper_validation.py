@@ -67,6 +67,8 @@ def run_validation(args: Any) -> int:
             values = selected_actions(data["actions"])[:, 7].tolist()
 
     config = load_shadow_config(args.config)
+    from saps.physical.hardware_provenance import require_supported_arm_geometry
+    require_supported_arm_geometry(config)
     maximum_width_m = (
         2.0 * config["robot"]["maximum_finger_position_m"]
     )

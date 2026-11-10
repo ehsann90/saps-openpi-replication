@@ -93,7 +93,7 @@ def observation_record(observation: Any) -> dict[str, Any]:
         cameras[role] = {
             name: getattr(frame, name) for name in (
                 "serial", "model", "topic", "source_encoding",
-                "native_shape", "preprocessing",
+                "native_shape", "preprocessing", "source_frame_id",
             )
         }
         cameras[role]["stamp"] = dataclasses.asdict(frame.stamp)
@@ -106,7 +106,7 @@ def observation_record(observation: Any) -> dict[str, Any]:
     gripper["finger_position_order"] = next(
         pair for pair in ACCEPTED_FR3_FINGER_JOINT_NAME_PAIRS
         if set(pair) == set(gripper["joint_names"])
-    )
+    ) if gripper["joint_names"] else ()
     return {
         "assembly_utc": utc_now(),
         "timing": dataclasses.asdict(observation.timing),
@@ -184,7 +184,7 @@ def prepare_live_request(
     for frame in (observation.wrist_frame, observation.exterior_frame):
         if (list(frame.native_shape) != config["native_images"]["shape"]
                 or frame.source_encoding.lower() != config["native_images"]["encoding"]):
-            raise ValueError("Live camera profile differs from configured RGB8 1280x720.")
+            raise ValueError("Live camera profile differs from configured native profile.")
         if frame.native_image_rgb is None:
             raise ValueError("P0 requires retained native RGB evidence.")
     gate.commit(signature)

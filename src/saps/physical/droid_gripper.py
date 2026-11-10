@@ -62,6 +62,8 @@ class DroidGripper:
 
     def check_inference(self) -> None:
         self.check()
+        if getattr(self.hand, 'inference_pending', False):
+            raise RuntimeError('gripper_replacement_pending_before_inference')
         if any(
             request['disposition'] == 'queued'
             for request in self.hand.evidence()['requests']
@@ -72,7 +74,9 @@ class DroidGripper:
         decision = droid_gripper_decision(value)
         before = self.measured()
 
-        if decision.binary_closure == 0.0:
+        if hasattr(self.hand, 'request_binary'):
+            request = self.hand.request_binary(bool(decision.binary_closure))
+        elif decision.binary_closure == 0.0:
             request = self.hand.request_move(self.maximum_width_m)
         else:
             if (

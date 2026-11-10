@@ -47,6 +47,15 @@ def run_inference_hold(args: Any, *, policy_execution: bool = False) -> int:
             ))):
         raise ValueError("Explicit execution, prompt, seed and finite timeouts required")
     config = load_shadow_config(args.config)
+    from saps.physical.rollout_provenance import (
+        capture_provenance, readiness_report, require_qualified_sources, validate_mode,
+    )
+    provenance_mode = getattr(args, 'provenance_mode', 'strict')
+    if provenance_mode == 'development' and not policy_execution:
+        raise ValueError('Development execution is available through the bounded policy rollout entry point')
+    validate_mode(provenance_mode, config, execution=provenance_mode == 'development',
+                  max_replans=getattr(args, 'max_replans', None),
+                  max_chunks=getattr(args, 'max_executed_policy_chunks', None))
     if policy_execution and (not np.isfinite(args.singularity_limit)
                              or args.singularity_limit <= 1.0):
         raise ValueError("singularity_limit must be finite and greater than 1")
@@ -57,6 +66,7 @@ def run_inference_hold(args: Any, *, policy_execution: bool = False) -> int:
         "start_utc": utc_now(), "policy_actions_executed": 0,
         "gripper_commands_issued": 0, "completed_requests": 0,
         "config": config, "prompt": args.prompt,
+        "provenance_mode": provenance_mode,
         "policy_episode_seed": args.policy_episode_seed,
         "timeouts_seconds": {
             "observation": args.observation_timeout,
@@ -82,26 +92,47 @@ def run_inference_hold(args: Any, *, policy_execution: bool = False) -> int:
     observer_errors: list[str] = []
     try:
         root = Path(__file__).resolve().parents[3]
-        if enable_gripper:
+        if config.get('integration_stage') == 'c4':
+            # Persist evidence even when physical readiness subsequently rejects
+            # startup. Do this before loading checkout code or creating ROS clients.
+            provenance = capture_provenance(root, args.lab_stack_dir, args.igd_control_dir, args.config, config)
+            result['provenance'] = provenance
+            result['readiness'] = readiness_report(config, provenance)
+            write_json(args.output_dir / 'provenance.json', provenance)
+            write_json(args.output_dir / 'startup_readiness.json', result['readiness'])
+            if provenance_mode == 'strict':
+                require_qualified_sources(provenance)
+            # Policy identity is invariant even during source development.
+            if provenance['openpi'].get('commit') != OPENPI_COMMIT or provenance['openpi'].get('dirty', True):
+                raise ValueError('OpenPI must be clean at the frozen pin')
+        if provenance_mode == 'development':
+            from saps.physical.hardware_provenance import hardware_timing_helpers
+            timing, lab_identity = hardware_timing_helpers(args.lab_stack_dir, strict=False)
+        elif enable_gripper:
             from saps.physical.gripper_ros import gripper_timing_helpers
-            timing, lab_identity = gripper_timing_helpers(args.lab_stack_dir)
+            timing, lab_identity = gripper_timing_helpers(args.lab_stack_dir, config)
+        elif config.get('hardware_profile') == 'zed_robotiq_2f85':
+            from saps.physical.hardware_provenance import hardware_timing_helpers
+            timing, lab_identity = hardware_timing_helpers(args.lab_stack_dir)
         else:
             timing, lab_identity = pinned_timing_helpers(args.lab_stack_dir)
-        provenance = {
-            "repository": git_identity(root),
-            "openpi": git_identity(root / "third_party/openpi"),
-            "fr3_lab_stack": lab_identity,
-            "igd_fr3_control": git_identity(args.igd_control_dir),
-            "c1b_base_commit": C1B_BASE_COMMIT,
-            "clock": timing.clock_provenance(),
-        }
+        if config.get('integration_stage') != 'c4':
+            provenance = {
+                "repository": git_identity(root), "openpi": git_identity(root / "third_party/openpi"),
+                "igd_fr3_control": git_identity(args.igd_control_dir),
+                "c1b_base_commit": C1B_BASE_COMMIT,
+            }
+        provenance.update(fr3_lab_stack=lab_identity, clock=timing.clock_provenance())
         result["provenance"] = provenance
-        write_json(args.output_dir / "provenance.json", provenance)
+        # Startup snapshot is immutable; loaded helper/clock evidence is separate.
+        write_json(args.output_dir / ('runtime_provenance.json' if config.get('integration_stage') == 'c4'
+                                     else 'provenance.json'), provenance)
         if (provenance["openpi"]["commit"] != OPENPI_COMMIT
                 or provenance["openpi"]["dirty"]):
             raise ValueError("OpenPI must be clean at the frozen pin")
-        subprocess.run(["git", "-C", str(root), "merge-base", "--is-ancestor",
-                        C1B_BASE_COMMIT, "HEAD"], check=True, timeout=10)
+        if provenance_mode == 'strict':
+            subprocess.run(["git", "-C", str(root), "merge-base", "--is-ancestor",
+                            C1B_BASE_COMMIT, "HEAD"], check=True, timeout=10)
         write_json(args.output_dir / "start.json", result)
         query = subprocess.run(
             ["ros2", "param", "get", "--hide-type",
@@ -112,6 +143,10 @@ def run_inference_hold(args: Any, *, policy_execution: bool = False) -> int:
         limits = limits_from_urdf(xml)
         (args.output_dir / "robot_description.urdf").write_text(xml)
         write_json(args.output_dir / "joint_limits.json", limits)
+        if 'readiness' in result:
+            from saps.physical.rollout_provenance import file_hash
+            provenance['effective_hardware'].update(
+                robot_description_sha256=file_hash(args.output_dir / 'robot_description.urdf'))
 
         import rclpy
         from rclpy.executors import SingleThreadedExecutor
@@ -126,10 +161,13 @@ def run_inference_hold(args: Any, *, policy_execution: bool = False) -> int:
                                  start_parameter_services=False)
         executor = SingleThreadedExecutor()
         executor.add_node(node)
+        from saps.physical.c4_readiness import camera_qos
         collector = RosPhysicalObservationCollector(
             SubscriptionBoundary(node), observation_contract(config),
             prompt=args.prompt,
             freshness=ObservationFreshness(**config["freshness"]),
+            camera_qos_profile=(camera_qos(config)
+                                if config.get('integration_stage') == 'c4' else None),
             preserve_native_images=True, joint_state_type=JointState,
             image_type=Image, qos_profile=QoSProfile(
                 depth=1, reliability=ReliabilityPolicy.BEST_EFFORT,
@@ -142,6 +180,9 @@ def run_inference_hold(args: Any, *, policy_execution: bool = False) -> int:
                 node, collector, config, args.lab_stack_dir,
                 speed=args.gripper_speed, timeout=args.gripper_timeout)
         allowed_service_clients = (
+            frozenset(config['gripper']['namespace'] + '/' + kind for kind in ('open', 'close', 'stop'))
+            if gripper is not None and config.get('hardware_profile') == 'zed_robotiq_2f85' else
+
             frozenset({"/franka_gripper/stop"})
             if gripper is not None else frozenset()
         )
@@ -159,10 +200,12 @@ def run_inference_hold(args: Any, *, policy_execution: bool = False) -> int:
         result["initial_observation_interfaces"] = node_interface_evidence(
             node, allowed_service_clients=allowed_service_clients,
         )
-        result["camera_identity"] = camera_serial_evidence(config)
+        result["camera_identity"] = camera_serial_evidence(config, node=node)
         transport = BoundedWebsocketClient(args.host, args.port, args.policy_timeout)
         policy = OpenPiDroidPolicy(client=transport)
         validate_live_policy(policy, result)
+        if 'readiness' in result:
+            result['readiness']['policy_inference']['status'] = 'identity_verified_inference_not_tested'
         boundary = StreamingBoundary(result["run"], provenance["clock"])
         time.sleep(2.0)  # C1-B discovery convention; no commands.
         with boundary.lock:
@@ -180,6 +223,11 @@ def run_inference_hold(args: Any, *, policy_execution: bool = False) -> int:
                     raise
                 time.sleep(0.01)
         result["expected_controller_identity"] = expected_identity
+        if 'readiness' in result:
+            provenance['effective_hardware'].update(
+                status='read_only_startup_evidence', camera_identity=result['camera_identity'],
+                controller_identity=expected_identity,
+                limitation='Does not establish controller/tool load approval or independent safety protection')
         if not policy_execution:
             observation, sample_dir = prepare_live_request(
                 collector=collector, output_dir=args.output_dir, index=0,
@@ -225,6 +273,7 @@ def run_inference_hold(args: Any, *, policy_execution: bool = False) -> int:
                 max_replans=args.max_replans,
                 max_executed_policy_chunks=args.max_executed_policy_chunks,
                 singularity_limit=args.singularity_limit,
+                provenance_mode=provenance_mode,
                 stop_after_inference_replan=getattr(
                     args, "stop_after_inference_replan", None),
                 spin_once=check_observers,
@@ -250,7 +299,7 @@ def run_inference_hold(args: Any, *, policy_execution: bool = False) -> int:
         result["final_observation_interfaces"] = node_interface_evidence(
             node, allowed_service_clients=allowed_service_clients,
         )
-        result["final_camera_identity"] = camera_serial_evidence(config)
+        result["final_camera_identity"] = camera_serial_evidence(config, node=node)
         if result["final_ros_graph"] != result["initial_ros_graph"]:
             raise RuntimeError("Source publisher endpoints changed")
     except (Exception, KeyboardInterrupt) as error:
@@ -345,10 +394,33 @@ def run_inference_hold(args: Any, *, policy_execution: bool = False) -> int:
             cleanup_errors.append(str(error))
             result["status"] = "failed"
         result["end_utc"] = utc_now()
+        if 'readiness' in result:
+            result['readiness']['physical_runtime']['runtime_checks'] = (
+                'passed' if result['status'] == 'success' else
+                'failed' if boundary is not None else 'not_reached')
+            if result.get('completed_main_replans', 0):
+                result['readiness']['observation']['status'] = 'passed'
+                result['readiness']['policy_inference']['status'] = 'passed'
+            write_json(args.output_dir / 'readiness.json', result['readiness'])
+            write_json(args.output_dir / 'effective_hardware.json', result['provenance']['effective_hardware'])
         if policy_execution:
             result["runtime_validation_status"] = (
                 "passed" if result["status"] == "success" else "failed")
             if result["status"] != "success":
                 result["termination"]["termination_reason"] = "runtime_abort"
         write_json(args.output_dir / "run.json", result)
+    if policy_execution:
+        # Print only after final delivery checks and cleanup have determined
+        # the saved outcome; a quiet return must not look like no actuation.
+        summary = dict(
+            status=result['status'],
+            policy_actions_executed=result['policy_actions_executed'],
+            gripper_commands_issued=result['gripper_commands_issued'],
+            terminal_holds_applied=result['terminal_holds_applied'],
+            termination_reason=result['termination'].get('termination_reason'),
+            output=str(args.output_dir),
+        )
+        if 'error' in result:
+            summary['error'] = result['error']
+        print(json.dumps(summary, allow_nan=False), flush=True)
     return 0 if result["status"] == "success" else 1

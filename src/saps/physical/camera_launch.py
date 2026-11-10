@@ -44,6 +44,18 @@ def generate_launch_description() -> Any:
         config = load_shadow_config(
             Path(LaunchConfiguration("config").perform(context))
         )
+        if config.get('hardware_profile') == 'zed_robotiq_2f85':
+            driver = PathJoinSubstitution([
+                FindPackageShare('fr3_lab_stack'), 'launch', 'dual_zed.launch.py'])
+            return [IncludeLaunchDescription(
+                PythonLaunchDescriptionSource(driver), launch_arguments={
+                    'exterior_model': config['exterior_camera']['camera_model'],
+                    'wrist_serial': config['wrist_camera']['serial'],
+                    'exterior_serial': config['exterior_camera']['serial'],
+                    'wrapper_version': config['zed']['wrapper_version'] or '',
+                    'resolution': config['zed']['resolution'],
+                    'fps': str(config['zed']['fps']),
+                }.items())]
         driver = PathJoinSubstitution([
             FindPackageShare("realsense2_camera"), "launch", "rs_launch.py",
         ])

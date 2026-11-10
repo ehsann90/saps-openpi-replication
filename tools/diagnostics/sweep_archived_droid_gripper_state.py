@@ -132,7 +132,9 @@ def load_archive(request_dir: Path) -> tuple[dict[str, Any], np.ndarray, int, in
     seed = int(request["policy_episode_seed"])
     replan = int(request["replan_index"])
     sampling = response["sampling_metadata"]
-    if (replan != int(request_dir.name.removeprefix("request_"))
+    name = request_dir.name
+    directory_index = int(name[len("request_"):] if name.startswith("request_") else name)
+    if (replan != directory_index
             or int(request["request_index"]) != replan
             or int(response["replan_index"]) != replan
             or int(sampling["replan_index"]) != replan

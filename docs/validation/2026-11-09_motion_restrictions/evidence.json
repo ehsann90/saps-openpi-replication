@@ -1,0 +1,333 @@
+{
+  "audit_date": "2026-11-09",
+  "decision": "NO-GO",
+  "scope": "Source/local-library checks plus fresh researcher-provided runtime snapshot; configured values are not physical verification",
+  "files": [
+    {
+      "path": "/home/hvl-robotics2404/franka_ehsan_ros2_ws/src/fr3_lab_stack/src/streaming_joint_impedance_controller.cpp",
+      "resolved": "/home/hvl-robotics2404/franka_ehsan_ros2_ws/src/fr3_lab_stack/src/streaming_joint_impedance_controller.cpp",
+      "sha256": "385d927c54e1a26e65f01dad9c3ce83fe0e1308dc1656cfe705011b545f3ab05"
+    },
+    {
+      "path": "/home/hvl-robotics2404/franka_ehsan_ros2_ws/src/fr3_lab_stack/include/fr3_lab_stack/streaming_joint_impedance_core.hpp",
+      "resolved": "/home/hvl-robotics2404/franka_ehsan_ros2_ws/src/fr3_lab_stack/include/fr3_lab_stack/streaming_joint_impedance_core.hpp",
+      "sha256": "90970c76b35522ce77118fc04b04bdf1e5494d03a441e0741269844d91131694"
+    },
+    {
+      "path": "/home/hvl-robotics2404/franka_ehsan_ros2_ws/src/fr3_lab_stack/include/fr3_lab_stack/hybrid_impedance_math.hpp",
+      "resolved": "/home/hvl-robotics2404/franka_ehsan_ros2_ws/src/fr3_lab_stack/include/fr3_lab_stack/hybrid_impedance_math.hpp",
+      "sha256": "34487d47925024ebf8e455e93e08b5e14336de4b1e108ede2c49dfbbbbcf72c7"
+    },
+    {
+      "path": "/home/hvl-robotics2404/franka_ehsan_ros2_ws/src/fr3_lab_stack/fr3_lab_stack_runtime/streaming_joint_target_forwarder.py",
+      "resolved": "/home/hvl-robotics2404/franka_ehsan_ros2_ws/src/fr3_lab_stack/fr3_lab_stack_runtime/streaming_joint_target_forwarder.py",
+      "sha256": "17eb11f13630e7ac5ef3feb1d842fdd1abe720489266a6207b140df590a5b5bb"
+    },
+    {
+      "path": "/home/hvl-robotics2404/franka_ehsan_ros2_ws/src/fr3_lab_stack/config/streaming_joint_impedance_controller.yaml",
+      "resolved": "/home/hvl-robotics2404/franka_ehsan_ros2_ws/src/fr3_lab_stack/config/streaming_joint_impedance_controller.yaml",
+      "sha256": "a80d7efd017d5993306938a68b5e97fd4a39de01ce2d7d0524fa9f3ce5a1f6df"
+    },
+    {
+      "path": "/home/hvl-robotics2404/franka_ehsan_ros2_ws/src/franka_hardware/src/robot.cpp",
+      "resolved": "/home/hvl-robotics2404/franka_ehsan_ros2_ws/src/franka_hardware/src/robot.cpp",
+      "sha256": "502a3b30c9e72a9f7c55978530b2da2bfa264d6a054ffad97b9f5b29fd5bb4aa"
+    },
+    {
+      "path": "/home/hvl-robotics2404/franka_ehsan_ros2_ws/src/franka_hardware/include/franka_hardware/robot.hpp",
+      "resolved": "/home/hvl-robotics2404/franka_ehsan_ros2_ws/src/franka_hardware/include/franka_hardware/robot.hpp",
+      "sha256": "c52848bcc00d60cc048b44e51cc8ad4fc5dd048385e544bd38b8ef04032d3c49"
+    },
+    {
+      "path": "/home/hvl-robotics2404/franka_ehsan_ros2_ws/src/franka_hardware/include/franka_hardware/model.hpp",
+      "resolved": "/home/hvl-robotics2404/franka_ehsan_ros2_ws/src/franka_hardware/include/franka_hardware/model.hpp",
+      "sha256": "2c3ec038857f92343e5e56ca4dad8a21af1d20b409574ed7deb85b62cd7948ed"
+    },
+    {
+      "path": "/home/hvl-robotics2404/franka_ehsan_ros2_ws/src/controller_manager/src/controller_manager.cpp",
+      "resolved": "/home/hvl-robotics2404/franka_ehsan_ros2_ws/src/controller_manager/src/controller_manager.cpp",
+      "sha256": "db81fceda91acf5f426786bb6c7396a5154db0561e7974b926b50b936c446726"
+    },
+    {
+      "path": "/home/hvl-robotics2404/franka_ehsan_ros2_ws/src/controller_manager/src/controller_manager_parameters.yaml",
+      "resolved": "/home/hvl-robotics2404/franka_ehsan_ros2_ws/src/controller_manager/src/controller_manager_parameters.yaml",
+      "sha256": "c7f4222fe1725514c7d16d1f4dd8c61297b900dd72e3727b1ee0995618ae636c"
+    },
+    {
+      "path": "/home/hvl-robotics2404/franka_ehsan_ros2_ws/src/franka_description/robots/fr3/joint_limits.yaml",
+      "resolved": "/home/hvl-robotics2404/franka_ehsan_ros2_ws/src/franka_description/robots/fr3/joint_limits.yaml",
+      "sha256": "ae3cc3148dc7d917a6f5317547b27831b37ee290dfd5c362aee8012904ef7767"
+    },
+    {
+      "path": "/home/hvl-robotics2404/franka_ehsan_ros2_ws/build/franka_hardware/libfranka_hardware.so",
+      "resolved": "/home/hvl-robotics2404/franka_ehsan_ros2_ws/build/franka_hardware/libfranka_hardware.so",
+      "sha256": "d949a6add9ad635f05a431a9c35e177af5d77dba4fcccbb76edd124e6d8d9227"
+    },
+    {
+      "path": "/usr/local/lib/libfranka.so.0.15.0",
+      "resolved": "/usr/local/lib/libfranka.so.0.15.0",
+      "sha256": "77b67d074a536267733434f8a9cf6bb3f7d2e0bb287b15b40bd107ad468a2761"
+    },
+    {
+      "path": "/opt/ros/jazzy/lib/libjoint_limits_helpers.so",
+      "resolved": "/opt/ros/jazzy/lib/libjoint_limits_helpers.so",
+      "sha256": "22fd9c54f5af4605049742b33cd22f0b8410674aacc2a804f9e7abb7d7572e84"
+    }
+  ],
+  "native_probe": {
+    "torque_rate_nm_s": 999.999,
+    "nominal_period_s": 0.001,
+    "maximum_torque_step_nm": 0.999999,
+    "slew_is_not_absolute_clamp": true,
+    "nonfinite_rejected": true,
+    "optional_effort_bounds": [
+      -87,
+      87
+    ],
+    "optional_effort_bounds_above_speed": [
+      -87,
+      0
+    ],
+    "robot_objects_created": 0,
+    "passed": true
+  },
+  "live_tool_capture": {
+    "physical_rollout_readiness": "NO-GO",
+    "hardware_match_verified": false,
+    "called_write_services": [],
+    "created_command_publishers": [],
+    "model_node": "/robot_state_publisher",
+    "requested_state_topic": null,
+    "state_topic_candidates": [],
+    "services": [],
+    "capture_status": "failed",
+    "error": "TimeoutError: Capture incomplete: require published URDF and current FrankaRobotState"
+  },
+  "live_controller_parameter_query": "Node not found",
+  "configured_hybrid_query": "Node not found",
+  "new_motion_limiter_added": false,
+  "controller_or_forwarder_modified": false,
+  "physical_motion_executed": false,
+  "provenance_development_preserved": true,
+  "fresh_researcher_runtime_evidence": {
+    "directory": "/home/hvl-robotics2404/franka_ehsan_ros2_ws/c4_runtime_inspection_20261109T161032Z",
+    "inputs": [
+      {
+        "path": "/home/hvl-robotics2404/franka_ehsan_ros2_ws/c4_runtime_inspection_20261109T161032Z/controller_manager.yaml",
+        "sha256": "03add90ab65cf88c7e06d1f572433541b3c691b759fde0c748a4777371a7540c"
+      },
+      {
+        "path": "/home/hvl-robotics2404/franka_ehsan_ros2_ws/c4_runtime_inspection_20261109T161032Z/impedance_controller.yaml",
+        "sha256": "b3ddb3239d9dd02d0c18649173805ee29bc606d01359601b11cdfd825bc881b0"
+      },
+      {
+        "path": "/home/hvl-robotics2404/franka_ehsan_ros2_ws/c4_runtime_inspection_20261109T161032Z/active_controllers.txt",
+        "sha256": "391cb41a5b8993902720e8e22295f4b5c00b772929b139d5cfdd7ae264504f2b"
+      },
+      {
+        "path": "/home/hvl-robotics2404/franka_ehsan_ros2_ws/c4_runtime_inspection_20261109T161032Z/forwarder_info.txt",
+        "sha256": "a8ed97bb4d6852114c3da9eb3d6ba723bb75278d624ea9bbbac43eb70ba958d9"
+      },
+      {
+        "path": "/home/hvl-robotics2404/franka_ehsan_ros2_ws/c4_runtime_inspection_20261109T161032Z/tool_state/inspection.json",
+        "sha256": "ddea980839bce819116b4bf2d219090a8348a419cf83dbc8a0e9c2fe14a78757"
+      },
+      {
+        "path": "/home/hvl-robotics2404/franka_ehsan_ros2_ws/c4_runtime_inspection_20261109T161032Z/tool_state/robot_description.urdf",
+        "sha256": "786bc09d444ff22052e15f87c4f517229d581c6ab9c9faeb21eb15e4aa3a5dd3"
+      }
+    ],
+    "capture_status": "complete_read_only_capture",
+    "state_header": {
+      "stamp": {
+        "sec": 1794240661,
+        "nanosec": 226689915
+      },
+      "frame_id": ""
+    },
+    "controller_parameters": {
+      "arm_prefix": "",
+      "cartesian_d_gains": [
+        37.0,
+        37.0,
+        37.0,
+        2.0,
+        2.0,
+        2.0
+      ],
+      "cartesian_k_gains": [
+        750.0,
+        750.0,
+        750.0,
+        15.0,
+        15.0,
+        15.0
+      ],
+      "d_gains": [
+        4.0,
+        6.0,
+        5.0,
+        5.0,
+        3.0,
+        2.0,
+        1.0
+      ],
+      "hybrid_impedance_enabled": true,
+      "is_async": false,
+      "k_gains": [
+        40.0,
+        30.0,
+        50.0,
+        25.0,
+        35.0,
+        25.0,
+        10.0
+      ],
+      "robot_type": "fr3",
+      "start_type_description_service": true,
+      "target_future_tolerance_s": 0.05,
+      "target_max_age_s": 0.25,
+      "telemetry_rate_hz": 100.0,
+      "thread_priority": -100,
+      "update_rate": 1000,
+      "use_sim_time": false
+    },
+    "controller_manager_parameters": {
+      "/controller_manager": {
+        "ros__parameters": {}
+      }
+    },
+    "controller_status": [
+      "fr3_streaming_joint_impedance_controller fr3_lab_stack/StreamingJointImpedanceController             active  ",
+      "fr3_arm_controller                       joint_trajectory_controller/JointTrajectoryController       inactive",
+      "joint_state_broadcaster                  joint_state_broadcaster/JointStateBroadcaster               active  ",
+      "franka_robot_state_broadcaster           franka_robot_state_broadcaster/FrankaRobotStateBroadcaster  active  "
+    ],
+    "tool_state": {
+      "f_t_ee": {
+        "header": {
+          "stamp": {
+            "sec": 1794240661,
+            "nanosec": 226689915
+          },
+          "frame_id": "fr3_link6"
+        },
+        "pose": {
+          "position": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.10339999943971634
+          },
+          "orientation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": -0.38268342717215614,
+            "w": 0.9238795292366128
+          }
+        }
+      },
+      "ee_t_k": {
+        "header": {
+          "stamp": {
+            "sec": 1794240661,
+            "nanosec": 226689915
+          },
+          "frame_id": "fr3_hand_tcp"
+        },
+        "pose": {
+          "position": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "orientation": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0,
+            "w": 1.0
+          }
+        }
+      },
+      "inertia_ee": {
+        "header": {
+          "stamp": {
+            "sec": 1794240661,
+            "nanosec": 226689915
+          },
+          "frame_id": "fr3_hand_tcp"
+        },
+        "inertia": {
+          "m": 0.7300000190734863,
+          "com": {
+            "x": -0.009999999776482582,
+            "y": 0.0,
+            "z": 0.029999999329447746
+          },
+          "ixx": 0.0010000000474974513,
+          "ixy": 0.0,
+          "ixz": 0.0,
+          "iyy": 0.0024999999441206455,
+          "iyz": 0.0,
+          "izz": 0.0017000000225380063
+        }
+      },
+      "inertia_load": {
+        "header": {
+          "stamp": {
+            "sec": 1794240661,
+            "nanosec": 226689915
+          },
+          "frame_id": "fr3_link6"
+        },
+        "inertia": {
+          "m": 0.0,
+          "com": {
+            "x": 0.0,
+            "y": 0.0,
+            "z": 0.0
+          },
+          "ixx": 0.0,
+          "ixy": 0.0,
+          "ixz": 0.0,
+          "iyy": 0.0,
+          "iyz": 0.0,
+          "izz": 0.0
+        }
+      },
+      "inertia_total": {
+        "header": {
+          "stamp": {
+            "sec": 1794240661,
+            "nanosec": 226689915
+          },
+          "frame_id": "fr3_hand_tcp"
+        },
+        "inertia": {
+          "m": 0.7300000190734863,
+          "com": {
+            "x": -0.009999999776482582,
+            "y": 0.0,
+            "z": 0.029999999329447746
+          },
+          "ixx": 0.0010000000474974513,
+          "ixy": 0.0,
+          "ixz": 0.0,
+          "iyy": 0.0024999999441206455,
+          "iyz": 0.0,
+          "izz": 0.0017000000225380063
+        }
+      }
+    },
+    "urdf_sha256": "786bc09d444ff22052e15f87c4f517229d581c6ab9c9faeb21eb15e4aa3a5dd3",
+    "urdf_franka_hand_links": [
+      "fr3_hand",
+      "fr3_hand_tcp",
+      "fr3_leftfinger",
+      "fr3_rightfinger"
+    ],
+    "mounted_hardware_properties_verified": false,
+    "independent_workspace_protection_verified": false,
+    "source_gain_and_target_timing_match": true,
+    "captured_urdf_check": "check_urdf passed; structural validity does not validate mounted-tool geometry"
+  }
+}

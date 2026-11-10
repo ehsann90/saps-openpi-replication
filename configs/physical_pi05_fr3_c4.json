@@ -1,0 +1,141 @@
+{
+  "schema_version": 1,
+  "milestone": "physical_fr3_c4_observation_shadow",
+  "execution_enabled": false,
+  "policy": {
+    "config": "pi05_droid",
+    "checkpoint": "gs://openpi-assets/checkpoints/pi05_droid",
+    "openpi_commit": "15a9616a00943ada6c20a0f158e3adb39df2ccac",
+    "action_shape": [
+      15,
+      8
+    ],
+    "reference_future_open_loop_horizon": 8
+  },
+  "wrist_camera": {
+    "role": "wrist",
+    "serial": "15330503",
+    "model": "ZED Mini",
+    "topic": "/wrist_camera/zed_node/rgb/color/rect/image",
+    "node": "/wrist_camera/zed_node",
+    "driver": "zed",
+    "camera_model": "zedm",
+    "serial_parameter": "general.serial_number",
+    "serial_parameter_prefix": "",
+    "orientation": "native_no_flip_rotate_mirror"
+  },
+  "exterior_camera": {
+    "role": "exterior",
+    "serial": "32919961",
+    "model": "ZED 2i",
+    "topic": "/external_camera/zed_node/rgb/color/rect/image",
+    "node": "/external_camera/zed_node",
+    "driver": "zed",
+    "camera_model": "zed2i",
+    "serial_parameter": "general.serial_number",
+    "serial_parameter_prefix": "",
+    "orientation": "native_no_flip_rotate_mirror"
+  },
+  "robot": {
+    "joint_state_topic": "/franka/joint_states",
+    "gripper_state_topic": "/robotiq/status",
+    "maximum_finger_position_m": 0.0425,
+    "base_frame": "fr3_link0",
+    "tcp_frame": null
+  },
+  "native_images": {
+    "shape": [
+      720,
+      1280,
+      3
+    ],
+    "encoding": "bgra8",
+    "expected_rate_hz": 30,
+    "hardware_synchronized": false
+  },
+  "client_images": {
+    "shape": [
+      180,
+      320,
+      3
+    ],
+    "dtype": "uint8",
+    "color_order": "RGB",
+    "preprocessing": "existing centre crop to 16:9 then OpenCV INTER_AREA downsize; INTER_LINEAR for upsize"
+  },
+  "freshness": {
+    "maximum_source_age_seconds": 0.5,
+    "maximum_cross_source_skew_seconds": 0.25
+  },
+  "hardware_profile": "zed_robotiq_2f85",
+  "zed": {
+    "wrapper_version": "5.5.0",
+    "resolution": "HD720",
+    "fps": 30,
+    "sdk_version": "5.5.1",
+    "cuda_version": null
+  },
+  "gripper": {
+    "backend": "robotiq_2f85",
+    "port": "REQUIRED_/dev/serial/by-id/IDENTITY",
+    "slave": 9,
+    "baudrate": 115200,
+    "serial_timeout_seconds": 0.2,
+    "command_timeout_seconds": 3.0,
+    "namespace": "/robotiq",
+    "node": "/saps_robotiq",
+    "state_topic": "/robotiq/status",
+    "open_command": 0,
+    "close_command": 255,
+    "speed_register": 64,
+    "force_register": 32,
+    "calibration": {
+      "verified": false,
+      "evidence": null,
+      "open_position": null,
+      "closed_position": null,
+      "maximum_width_m": 0.085
+    }
+  },
+  "geometry": {
+    "execution_ready": false,
+    "reason": "Measured Robotiq mounting/TCP, collision geometry and payload are pending; existing Franka geometry cannot be reused"
+  },
+  "mounted_tool": {
+    "configuration_scope": "catalog reference data; not applied robot settings",
+    "assembly_verified": false,
+    "robotiq_2f85": {
+      "mass_kg": 0.921,
+      "manufacturer_center_of_mass_m": [0.0, 0.0, 0.06],
+      "mass_scope": "manufacturer table includes a coupling; installed coupling equivalence unresolved",
+      "manufacturer_inertia_kg_m2_column_major": [0.00418, 0.0, 0.0, 0.0, 0.00508, 0.0, 0.0, 0.0, 0.00125],
+      "inertia_scope": "approximate fully-open-finger table; origin/axes not established for SDK use",
+      "source": "https://blog.robotiq.com/hubfs/support-files/2F-85_2F-140_General_PDF_20210623.pdf#page=82"
+    },
+    "zed_mini": {
+      "mass_kg": 0.0629,
+      "center_of_mass_m": null,
+      "inertia_kg_m2_column_major": null,
+      "source": "https://support.stereolabs.com/hc/article_attachments/27901442262551"
+    },
+    "mount": {
+      "assembly_reference": "https://droid-dataset.github.io/droid/hardware-setup/assembly.html#mounting-hand-camera-on-robot",
+      "mass_kg": null,
+      "flange_to_component_transforms": null
+    },
+    "sdk_fixed_assembly": {
+      "mass_kg": null,
+      "flange_center_of_mass_m": null,
+      "com_inertia_flange_axes_kg_m2_column_major": null
+    },
+    "controller_frames": "preserve current F_T_EE and EE_T_K; no frame setter implied"
+  },
+  "integration_stage": "c4",
+  "camera_interface": {
+    "selection": "latest_advancing",
+    "qos": "reliable",
+    "history_depth": 2,
+    "source_clock": "SYSTEM_CLOCK",
+    "preserve_historical_freshness": true
+  }
+}

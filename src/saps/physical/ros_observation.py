@@ -45,6 +45,9 @@ class RosObservationContract:
     wrist_camera: RosCameraContract
     exterior_camera: RosCameraContract
     maximum_finger_position_m: float = 0.04
+    gripper_config: dict[str, Any] | None = None
+    native_image_profile: dict[str, Any] | None = None
+    gripper_owner_required: bool = False
 
     def __post_init__(self) -> None:
         if not self.joint_state_topic.strip():
@@ -347,6 +350,7 @@ class RosPhysicalObservationCollector:
         image_type: Any | None = None,
         qos_profile: Any | None = None,
         preserve_native_images: bool = False,
+        camera_qos_profile: Any | None = None,
     ) -> None:
         if (
             joint_state_type is None
@@ -370,12 +374,21 @@ class RosPhysicalObservationCollector:
         self.preserve_native_images = preserve_native_images
         self.latest_joint: JointSnapshot | None = None
         self.latest_gripper: Any | None = None
+        self.gripper_owner: tuple | None = None
+        self.gripper_owner_changed = False
+        self.latest_gripper_status: dict | None = None
+        self.last_camera_metadata: dict[str, dict] = {}
         self.latest_wrist: Any | None = None
         self.latest_exterior: Any | None = None
         self.errors: dict[str, str] = {}
         self.rate_state = {
             name: SourceRateState() for name in self.SOURCE_NAMES
         }
+        gripper_type = joint_state_type
+        if contract.gripper_config is not None:
+            from std_msgs.msg import String
+            gripper_type = String
+        camera_qos = qos_profile if camera_qos_profile is None else camera_qos_profile
         self._subscriptions = (
             node.create_subscription(
                 joint_state_type,
@@ -384,7 +397,7 @@ class RosPhysicalObservationCollector:
                 qos_profile,
             ),
             node.create_subscription(
-                joint_state_type,
+                gripper_type,
                 contract.gripper_state_topic,
                 self._gripper_callback,
                 qos_profile,
@@ -396,7 +409,7 @@ class RosPhysicalObservationCollector:
                     message,
                     contract.wrist_camera,
                 ),
-                qos_profile,
+                camera_qos,
             ),
             node.create_subscription(
                 image_type,
@@ -405,7 +418,7 @@ class RosPhysicalObservationCollector:
                     message,
                     contract.exterior_camera,
                 ),
-                qos_profile,
+                camera_qos,
             ),
         )
 
@@ -432,12 +445,55 @@ class RosPhysicalObservationCollector:
             )
             self.rate_state[source].update(stamp)
             self.errors.pop(source, None)
-        except (TypeError, ValueError) as error:
+        except (KeyError, TypeError, ValueError) as error:
             self.errors[source] = str(error)
 
     def _gripper_callback(self, message: Any) -> None:
         source = "gripper_state"
         try:
+            if self.contract.gripper_config is not None:
+                import json
+                from saps.physical.robotiq import calibrated_width
+                from saps.physical.live_observation import GripperSnapshot
+                status = json.loads(message.data)
+                config = self.contract.gripper_config
+                if not isinstance(status, dict):
+                    raise ValueError('Robotiq feedback must be a status object')
+                self.latest_gripper_status = dict(status)
+                if (status.get('activated') is not True
+                        or status.get('activation_state') != 3):
+                    raise ValueError('Robotiq activation feedback not ready')
+                if status.get('error') or status.get('ready') is not True or status.get('fault') != 0:
+                    raise ValueError('Robotiq feedback unavailable, unactivated or faulted')
+                for key in ('port', 'slave', 'speed_register', 'force_register', 'open_command', 'close_command'):
+                    if status.get(key) != config[key]:
+                        raise ValueError('Robotiq driver identity/configuration mismatch: ' + key)
+                if self.contract.gripper_owner_required:
+                    owner = (status.get('server_instance'), status.get('serial_owner_pid'))
+                    if (status.get('serial_exclusive') is not True or not owner[0]
+                            or type(owner[1]) is not int or owner[1] <= 0):
+                        raise ValueError('C4 missing exclusive serial-owner evidence')
+                    if self.gripper_owner is None:
+                        self.gripper_owner = owner
+                    elif self.gripper_owner != owner:
+                        self.gripper_owner_changed = True
+                    if self.gripper_owner_changed:
+                        raise ValueError('C4 gripper server identity changed; restart observation lifecycle')
+                stamp = SourceStamp(float(status['source_ros_seconds']), time.monotonic())
+                width, closure = calibrated_width(status['actual_position'], config['calibration'])
+                calibration = config['calibration']
+                raw_closure = ((status['actual_position'] - calibration['open_position']) /
+                               (calibration['closed_position'] - calibration['open_position']))
+                self.latest_gripper = GripperSnapshot(
+                    joint_names=(), finger_position_m=np.array([], dtype=np.float32),
+                    width_m=width, maximum_width_m=config['calibration']['maximum_width_m'],
+                    unclipped_closure=raw_closure, closure=closure, closure_clipped=raw_closure != closure,
+                    stamp=stamp, feedback_metadata=dict(status,
+                        width_source='calibrated_motor_position_estimate',
+                        calibration=config['calibration']))
+                self.rate_state[source].update(stamp)
+                self.errors.pop(source, None)
+                return
             stamp = self._source_stamp(message)
             self.latest_gripper = gripper_snapshot_from_joint_state(
                 message.name,
@@ -449,7 +505,7 @@ class RosPhysicalObservationCollector:
             )
             self.rate_state[source].update(stamp)
             self.errors.pop(source, None)
-        except (TypeError, ValueError) as error:
+        except (KeyError, TypeError, ValueError) as error:
             self.errors[source] = str(error)
 
     def _camera_callback(
@@ -460,6 +516,11 @@ class RosPhysicalObservationCollector:
         source = f"{camera.role}_image"
         try:
             stamp = self._source_stamp(message)
+            preprocessing_start = time.monotonic()
+            self.last_camera_metadata[camera.role] = dict(
+                width=int(message.width), height=int(message.height), encoding=str(message.encoding),
+                step=int(message.step), stamp=dataclasses.asdict(stamp),
+                frame_id=str(getattr(message.header, 'frame_id', '')))
             image_rgb = decode_ros_rgb_image(
                 height=int(message.height),
                 width=int(message.width),
@@ -467,6 +528,11 @@ class RosPhysicalObservationCollector:
                 step=int(message.step),
                 data=message.data,
             )
+            profile = self.contract.native_image_profile
+            if profile is not None and (
+                    list(image_rgb.shape) != profile['shape']
+                    or message.encoding.lower() != profile['encoding']):
+                raise ValueError('Camera native image profile differs from explicit configuration')
             frame = make_camera_frame(
                 image_rgb,
                 stamp=stamp,
@@ -476,13 +542,16 @@ class RosPhysicalObservationCollector:
                 source_encoding=str(message.encoding),
                 preserve_native_image=self.preserve_native_images,
             )
+            frame = dataclasses.replace(
+                frame, source_frame_id=str(getattr(message.header, "frame_id", "")),
+                preprocessing_seconds=time.monotonic() - preprocessing_start)
             if camera.role == "wrist":
                 self.latest_wrist = frame
             else:
                 self.latest_exterior = frame
             self.rate_state[source].update(stamp)
             self.errors.pop(source, None)
-        except (TypeError, ValueError) as error:
+        except (KeyError, TypeError, ValueError) as error:
             self.errors[source] = str(error)
 
     def missing_sources(self) -> tuple[str, ...]:
@@ -511,6 +580,13 @@ class RosPhysicalObservationCollector:
     def assemble(self) -> PhysicalPolicyObservation:
         """Assemble the latest complete observation with fresh ROS time."""
 
+        if self.contract.gripper_config is not None:
+            if 'gripper_state' in self.errors:
+                raise RuntimeError('invalid_gripper_feedback: ' + self.errors['gripper_state'])
+            if self.latest_gripper is not None:
+                age = time.monotonic() - self.latest_gripper.stamp.receive_monotonic_seconds
+                if not 0 <= age <= self.freshness.maximum_source_age_seconds:
+                    raise ValueError('stale gripper feedback receive timestamp')
         missing = self.missing_sources()
         if missing:
             raise RuntimeError(f"missing physical sources: {list(missing)}")

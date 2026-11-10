@@ -193,7 +193,7 @@ class ImageContractTest(unittest.TestCase):
         np.testing.assert_array_equal(decoded[1, 1], [12, 11, 10])
 
     def test_unsupported_encoding_and_bad_buffer_are_rejected(self) -> None:
-        with self.assertRaisesRegex(ValueError, "rgb8 or bgr8"):
+        with self.assertRaisesRegex(ValueError, "rgb8, bgr8, rgba8 or bgra8"):
             decode_ros_rgb_image(
                 height=2,
                 width=2,

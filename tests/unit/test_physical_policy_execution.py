@@ -64,6 +64,7 @@ class Collector(FakeCollector):
         super().__init__()
         self.boundary = boundary
         self.old_source = None
+        self.camera_config = None
 
     def spin(self):
         self.boundary.sleep(.01)
@@ -82,6 +83,11 @@ class Collector(FakeCollector):
                 stamp = 1.
             changes[name] = dataclasses.replace(
                 source, stamp=dataclasses.replace(source.stamp, ros_seconds=stamp))
+            if self.camera_config is not None and name in ('wrist_frame','exterior_frame'):
+                camera=self.camera_config['wrist_camera' if name=='wrist_frame' else 'exterior_camera']
+                changes[name]=dataclasses.replace(changes[name],serial=camera['serial'],
+                    model=camera['model'],topic=camera['topic'],
+                    source_encoding=self.camera_config['native_images']['encoding'])
         changes["timing"] = dataclasses.replace(
             observation.timing, oldest_source_ros_seconds=self.boundary.now / 1e9)
         return dataclasses.replace(observation, **changes)
@@ -135,10 +141,12 @@ class EpisodeTests(unittest.TestCase):
     def run_episode(self, cap=1, provider=lambda _: TaskOutcome.CONTINUE,
                     max_replans=3, seed=20260917, analyzer=analyze, gripper=None,
                     stop_after_inference_replan=None,
-                    gripper_transition_timeout=3., singularity_limit=17.):
+                    gripper_transition_timeout=3., singularity_limit=17.,
+                    config=None, provenance_mode='strict'):
+        self.collector.camera_config=config
         run_policy_episode(
             boundary=self.boundary, collector=self.collector, policy=self.policy,
-            config=load_shadow_config(CONFIG_PATH), output_dir=self.output,
+            config=load_shadow_config(CONFIG_PATH) if config is None else config, output_dir=self.output,
             limits={"lower_rad": np.full(7, -3.), "upper_rad": np.full(7, 3.)},
             analyzer=analyzer, expected_identity=IDENTITY, analysis_start=0,
             application_timeout=.25, observation_timeout=.05,
@@ -148,9 +156,52 @@ class EpisodeTests(unittest.TestCase):
             result=self.result, outcome_provider=provider, gripper=gripper,
             gripper_transition_timeout=gripper_transition_timeout,
             singularity_limit=singularity_limit,
+            provenance_mode=provenance_mode,
             stop_after_inference_replan=stop_after_inference_replan,
             now=lambda: self.boundary.now, sleep=self.boundary.sleep,
         )
+
+    def test_c4_development_executes_one_mock_chunk_without_hand_geometry(self):
+        from unittest.mock import Mock
+        config = load_shadow_config(Path(__file__).resolve().parents[2]/'configs/physical_pi05_fr3_c4.json')
+        self.assertIsNone(config['robot']['tcp_frame'])
+        self.assertFalse(config['geometry']['execution_ready'])
+        gripper=Mock()
+        gripper.command.return_value={'request_id':0}
+        gripper.evidence.return_value={'requests':[{'request_id':0,'command_issued':True}],
+                                       'events':[],'error':None}
+        self.run_episode(max_replans=1,config=config,provenance_mode='development',gripper=gripper)
+        self.assertEqual(self.result['status'],'success',self.result.get('error'))
+        self.assertEqual(self.result['policy_actions_executed'],8)
+        self.assertEqual(self.result['terminal_holds_applied'],1)
+        self.assertEqual(self.result['completed_main_replans'],1)
+        self.assertEqual(gripper.command.call_count,8)
+        self.assertEqual(self.result['episode']['gripper_actuation'],'droid_binary_robotiq_2f85')
+        gripper.stop.assert_called_once()
+        for row in self.result['rows']:
+            if row['type']=='policy_action':
+                np.testing.assert_allclose(row['q_target'],row['q_ref']+.2*np.clip(row['raw_policy_action'][:7],-1,1))
+
+    def test_c4_development_multi_chunk_run_obeys_selected_cap(self):
+        config = load_shadow_config(Path(__file__).resolve().parents[2]/'configs/physical_pi05_fr3_c4.json')
+        self.run_episode(cap=2, max_replans=1000, config=config,
+                         provenance_mode='development')
+        self.assertEqual(self.result['status'], 'success', self.result.get('error'))
+        self.assertEqual(self.result['completed_main_replans'], 2)
+        self.assertEqual(self.result['policy_actions_executed'], 16)
+        self.assertEqual(self.result['terminal_holds_applied'], 2)
+        self.assertEqual(self.result['termination']['termination_reason'],
+                         'test_chunk_limit_reached')
+
+    def test_c4_native_fault_during_inference_blocks_first_policy_target(self):
+        config = load_shadow_config(Path(__file__).resolve().parents[2]/'configs/physical_pi05_fr3_c4.json')
+        def fault():
+            self.boundary.records.append(dict(kind='franka_state',health_reasons=['collision'],
+                                              receive_monotonic_ns=self.boundary.now))
+        self.main_hook=fault
+        self.run_episode(max_replans=1,config=config,provenance_mode='development')
+        self.assertNotEqual(self.result['status'],'success')
+        self.assertEqual(self.result['policy_actions_executed'],0)
 
     def test_gripper_requests_follow_eight_actions_and_preserve_hold_schedule(self):
         from unittest.mock import Mock
@@ -220,6 +271,38 @@ class EpisodeTests(unittest.TestCase):
         self.assertEqual(self.result["terminal_holds_applied"], 1)
         self.assertEqual(self.result["rows"][-1]["type"], "terminal_hold")
         self.assertNotIn("failure_hold", self.result)
+        self.assertTrue(gripper.stop.called)
+
+    def test_gripper_transition_readiness_loss_records_reason_and_stops_before_next_chunk(self):
+        from unittest.mock import Mock
+        gripper = Mock()
+        gripper.command.return_value = {'request_id': 0}
+        gripper.evidence.return_value = dict(
+            requests=[dict(request_id=0, command_issued=True)], events=[], error=None)
+        reason = 'controller_state_invalid_inactive_or_stale'
+
+        def check_inference():
+            if (self.result.get('replans')
+                    and 'gripper_transition' in self.result['replans'][0]):
+                self.boundary.readiness = (reason,)
+                raise RuntimeError('gripper_replacement_pending_before_inference')
+
+        gripper.check_inference.side_effect = check_inference
+        self.run_episode(cap=2, gripper=gripper)
+        self.assertEqual(self.result['status'], 'failed')
+        self.assertEqual(self.result['failed_phase'], 'gripper_transition')
+        self.assertIn('gripper_transition_arm_readiness_lost: ' + reason,
+                      self.result['error'])
+        transition = self.result['replans'][0]['gripper_transition']
+        self.assertEqual(transition['last_readiness_reasons'], [reason])
+        self.assertFalse(transition['accepted'])
+        self.assertIn('measured_state_receive_age_seconds', transition)
+        self.assertGreaterEqual(transition['last_snapshot_end_monotonic_ns'],
+                                transition['last_snapshot_start_monotonic_ns'])
+        self.assertEqual(self.result['main_policy_requests'], 1)
+        self.assertEqual(self.result['policy_actions_executed'], 8)
+        self.assertEqual(self.result['terminal_holds_applied'], 1)
+        self.assertEqual(gripper.command.call_count, 8)
         self.assertTrue(gripper.stop.called)
 
     def test_gripper_failure_prevents_remaining_actions_and_uses_abort_hold(self):

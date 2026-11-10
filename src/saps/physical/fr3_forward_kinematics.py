@@ -149,6 +149,23 @@ def fr3_tcp_jacobian(joint_position_rad: np.ndarray) -> np.ndarray:
     return jacobian
 
 
+def fr3_flange_jacobian(joint_position_rad: np.ndarray) -> np.ndarray:
+    """Return the base-resolved geometric Jacobian at ``fr3_link8``.
+
+    Uses only the seven arm joints and link7-to-flange offset. No hand/TCP
+    transform, tool mass, or Cartesian target is involved.
+    """
+    joint_transforms = fr3_joint_transforms(joint_position_rad)
+    flange_position = fr3_flange_fk(joint_position_rad)[:3, 3]
+    jacobian = np.zeros((6, 7), dtype=np.float64)
+    for index, base_to_joint in enumerate(joint_transforms):
+        axis = base_to_joint[:3, 2]
+        jacobian[:3, index] = np.cross(
+            axis, flange_position - base_to_joint[:3, 3])
+        jacobian[3:, index] = axis
+    return jacobian
+
+
 def _joint_vector(value: np.ndarray) -> np.ndarray:
     """Validate and copy one seven-joint vector in radians."""
 

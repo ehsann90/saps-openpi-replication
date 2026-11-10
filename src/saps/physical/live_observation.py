@@ -64,6 +64,7 @@ class GripperSnapshot:
     closure: float
     closure_clipped: bool
     stamp: SourceStamp
+    feedback_metadata: dict[str, Any] | None = None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -79,6 +80,8 @@ class CameraFrame:
     native_shape: tuple[int, int, int]
     preprocessing: str
     native_image_rgb: np.ndarray | None = None
+    source_frame_id: str = ""
+    preprocessing_seconds: float | None = None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -226,16 +229,17 @@ def decode_ros_rgb_image(
     step: int,
     data: bytes | bytearray | memoryview,
 ) -> np.ndarray:
-    """Decode an rgb8/bgr8 ROS Image, including padded row strides."""
+    """Decode an RGB/BGR/RGBA/BGRA ROS Image, including padded row strides."""
 
     if height <= 0 or width <= 0:
         raise ValueError("ROS image height and width must be positive.")
-    if encoding not in {"rgb8", "bgr8"}:
+    if encoding not in {"rgb8", "bgr8", "rgba8", "bgra8"}:
         raise ValueError(
-            "M3 RGB input supports only explicit rgb8 or bgr8 encodings; "
+            "RGB input requires rgb8, bgr8, rgba8 or bgra8; "
             f"received {encoding!r}."
         )
-    packed_step = width * 3
+    channels = 4 if encoding in {"rgba8", "bgra8"} else 3
+    packed_step = width * channels
     if step < packed_step:
         raise ValueError(
             f"ROS image step {step} is smaller than packed RGB row "
@@ -248,8 +252,8 @@ def decode_ros_rgb_image(
             f"ROS image data has {flat.size} bytes; expected {required}."
         )
     rows = flat.reshape(height, step)
-    image = rows[:, :packed_step].reshape(height, width, 3)
-    if encoding == "bgr8":
+    image = rows[:, :packed_step].reshape(height, width, channels)[:, :, :3]
+    if encoding in {"bgr8", "bgra8"}:
         image = image[:, :, ::-1]
     return np.ascontiguousarray(image)
 

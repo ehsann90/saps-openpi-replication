@@ -147,7 +147,7 @@ help:
 	@echo "  make physical-g1b-grasp-release [G1B_RUN_ID=<unique>]  # stationary-arm gripper validation"
 	@echo "  make physical-c1c2-gripper PHYSICAL_RUN_ID=<unique> PHYSICAL_PROMPT=<instruction>  # opt-in arm+gripper"
 	@echo "    C1C2_SINGULARITY_LIMIT=<finite-number-above-1>  # default 17; per-run gate"
-	@echo "  make physical-cameras PHYSICAL_CONFIG=<local-json>  # RealSense RGB drivers only"
+	@echo "  make physical-cameras PHYSICAL_CONFIG=<local-json>  # Configured RealSense/ZED RGB drivers only"
 	@echo "  make autonomous-smoke"
 	@echo "  make autonomous-sweep NUM_TRIALS=20"
 	@echo "  make teleop CONDITION=nominal TRIAL=0"
@@ -668,3 +668,30 @@ fixed-blend:
 .PHONY: cosine-blend
 cosine-blend:
 	$(call RUN_SHARED_AUTONOMY,cosine_blend)
+
+# These commands never start the policy or arm controller.
+.PHONY: physical-robotiq-status physical-robotiq-serve
+physical-robotiq-status:
+	PYTHONPATH=src "$(PHYSICAL_PYTHON)" -m saps.physical.robotiq_node --config "$(PHYSICAL_CONFIG)" --mode status
+
+physical-robotiq-serve:
+	bash -c 'source /opt/ros/jazzy/setup.bash && \
+		export PYTHONPATH="$$PWD/src:$${PYTHONPATH}" && \
+		"$$PHYSICAL_PYTHON" -m saps.physical.robotiq_node --config "$$PHYSICAL_CONFIG" --mode serve'
+
+# C4 camera/gripper observations and shadow inference only. No --execute path.
+C4_CONFIG ?= configs/local/c4_zed_robotiq.json
+C4_SAMPLES ?= 1
+export C4_CONFIG C4_SAMPLES
+.PHONY: physical-c4-observations physical-c4-shadow physical-c4-readiness physical-c4-run
+physical-c4-observations: export C4_MODE := observations
+physical-c4-shadow: export C4_MODE := shadow
+physical-c4-readiness: export C4_MODE := readiness
+physical-c4-observations physical-c4-shadow physical-c4-readiness: physical-c4-run
+physical-c4-run:
+	@test -n "$$PHYSICAL_RUN_ID" -a -n "$$PHYSICAL_PROMPT" || \
+		{ echo "Set an explicit unique PHYSICAL_RUN_ID and PHYSICAL_PROMPT."; exit 2; }
+	bash -c 'source tools/activate_physical_env.sh && \
+		"$$PHYSICAL_PYTHON" scripts/physical_c4.py --mode "$$C4_MODE" \
+		--config "$$C4_CONFIG" --samples "$$C4_SAMPLES" --prompt "$$PHYSICAL_PROMPT" \
+		--output-dir "outputs/physical_c4/$$PHYSICAL_RUN_ID"'

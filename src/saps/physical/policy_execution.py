@@ -230,6 +230,7 @@ def run_policy_episode(
     gripper_transition_timeout: float = 3.0,
     stop_after_inference_replan: int | None = None,
     singularity_limit: float = SINGULARITY_LOWER,
+    provenance_mode: str = 'strict',
     now: Callable[[], int] = time.monotonic_ns,
     sleep: Callable[[float], None] = time.sleep,
 ) -> None:
@@ -239,6 +240,9 @@ def run_policy_episode(
     bound and bounded observation, transport and confirmation waits limit the
     episode. Runtime acceptance never implies manipulation-task success.
     """
+    from saps.physical.rollout_provenance import validate_mode
+    validate_mode(provenance_mode, config, execution=provenance_mode == 'development',
+                  max_replans=max_replans, max_chunks=max_executed_policy_chunks)
     if (type(max_replans) is not int or max_replans <= 0
             or (max_executed_policy_chunks is not None and
                 (type(max_executed_policy_chunks) is not int
@@ -270,11 +274,12 @@ def run_policy_episode(
     result.update(
         status="running", warmup=warmup.record, rows=rows, replans=[],
         episode={"policy_episode_seed": policy_episode_seed,
+                 "provenance_mode": provenance_mode,
                  "max_replans": max_replans,
                  "max_executed_policy_chunks": max_executed_policy_chunks,
                  "stop_after_inference_replan": stop_after_inference_replan,
                  "singularity_limit": singularity_limit,
-                 "gripper_actuation": ("droid_binary_franka_hand" if gripper is not None
+                 "gripper_actuation": ("droid_binary_" + config.get("gripper", {}).get("backend", "franka_hand") if gripper is not None
                                        else "disabled_arm_only"),
                  "outcome_provider": getattr(outcome_provider, "__name__",
                                              type(outcome_provider).__name__)},
@@ -422,8 +427,21 @@ def run_policy_episode(
             while now() < deadline:
                 check_runtime()
                 check_unreviewed_health()
-                if boundary.snapshot().readiness_reasons:
-                    raise RuntimeError("gripper_transition_arm_readiness_lost")
+                snapshot_start = now()
+                state = boundary.snapshot()
+                snapshot_end = now()
+                record.update(
+                    last_readiness_reasons=list(state.readiness_reasons),
+                    last_snapshot_start_monotonic_ns=snapshot_start,
+                    last_snapshot_end_monotonic_ns=snapshot_end,
+                    measured_state_source_age_seconds=(
+                        state.ros_now_ns - state.source_stamp_ns) / 1e9,
+                    measured_state_receive_age_seconds=(
+                        snapshot_end - state.receive_monotonic_ns) / 1e9,
+                )
+                if state.readiness_reasons:
+                    raise RuntimeError("gripper_transition_arm_readiness_lost: "
+                                       + '; '.join(state.readiness_reasons))
                 record["checks"] += 1
                 try:
                     gripper.check_inference()

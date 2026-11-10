@@ -44,7 +44,8 @@ def write_archive(directory: Path, obs: dict, actions: np.ndarray) -> None:
     directory.mkdir()
     np.savez_compressed(directory / "observation.npz", **obs)
     np.savez_compressed(directory / "actions.npz", actions=actions)
-    index = int(directory.name.removeprefix("request_"))
+    name = directory.name
+    index = int(name[len("request_"):] if name.startswith("request_") else name)
     request = {
         "observation_bundle": {"path": "observation.npz", "sha256": file_sha256(directory / "observation.npz")},
         "canonical_schema": {key: array_evidence(value) if isinstance(value, np.ndarray)

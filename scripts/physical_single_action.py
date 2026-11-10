@@ -188,6 +188,8 @@ def run(args: argparse.Namespace) -> None:
         )
 
     config = load_shadow_config(args.config)
+    from saps.physical.hardware_provenance import require_supported_arm_geometry
+    require_supported_arm_geometry(config)
     args.output_dir.mkdir(parents=True, exist_ok=False)
     started = time.monotonic()
     record: dict[str, Any] = {

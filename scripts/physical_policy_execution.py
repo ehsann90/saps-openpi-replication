@@ -18,12 +18,14 @@ def parse_args() -> argparse.Namespace:
                         default=Path("configs/physical_pi05_fr3.json"))
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--prompt", required=True)
+    parser.add_argument('--provenance-mode', choices=['strict', 'development'], default='strict',
+                        help='Strict retains experiment source gates; C4 development records dirty sources and requires positive finite rollout limits')
     parser.set_defaults(policy_episode_seed=20260827)
     parser.add_argument("--warmup-policy-seed", type=int, default=20260917)
     parser.add_argument("--max-replans", type=int, default=100,
                         help="Hard finite safety bound; never a task failure")
     parser.add_argument("--max-executed-policy-chunks", type=int, default=1,
-                        help="Test-only cap; initial physical validation requires 1")
+                        help="Positive finite executed-chunk cap; default 1; each chunk contains at most eight policy actions")
     parser.add_argument("--singularity-limit", type=float,
                         default=SINGULARITY_LOWER,
                         help="Reject measured or proposed Jacobian condition "

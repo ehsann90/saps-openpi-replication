@@ -7,11 +7,7 @@ from typing import Any
 import numpy as np
 
 from saps.physical.discrete_verifier import candidate_target
-from saps.physical.fr3_forward_kinematics import (
-    fr3_flange_fk,
-    fr3_tcp_fk,
-    fr3_tcp_jacobian,
-)
+from saps.physical.fr3_forward_kinematics import fr3_flange_jacobian
 
 STATE_AGE = 0.1
 ACTION_AGE = 1.0
@@ -55,9 +51,7 @@ def singularity_metric(
     """
     q = np.asarray(q, dtype=np.float64)
 
-    jacobian = fr3_tcp_jacobian(q).copy()
-    offset = fr3_flange_fk(q)[:3, 3] - fr3_tcp_fk(q)[:3, 3]
-    jacobian[:3] += np.cross(jacobian[3:].T, offset).T
+    jacobian = fr3_flange_jacobian(q)
 
     values = np.linalg.svd(jacobian, compute_uv=False)
 

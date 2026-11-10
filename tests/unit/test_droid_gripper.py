@@ -35,7 +35,7 @@ class DroidGripperTests(unittest.TestCase):
                 droid_gripper_decision(raw)
 
     def test_open_maps_to_move_maximum_width(self):
-        hand = Mock()
+        hand = Mock(spec=["request_move", "request_grasp", "check", "evidence", "stop"])
         hand.request_move.return_value = {
             'request_id': 0,
             'command_type': 'move',
@@ -58,7 +58,7 @@ class DroidGripperTests(unittest.TestCase):
         self.assertEqual(row['measured_before']['width_m'], .04)
 
     def test_closed_maps_to_explicit_grasp(self):
-        hand = Mock()
+        hand = Mock(spec=["request_move", "request_grasp", "check", "evidence", "stop"])
         hand.request_grasp.return_value = {
             'request_id': 0,
             'command_type': 'grasp',
@@ -89,7 +89,7 @@ class DroidGripperTests(unittest.TestCase):
         self.assertEqual(row['measured_before']['width_m'], .06)
 
     def test_closed_rejects_unconfigured_grasp_parameters(self):
-        hand = Mock()
+        hand = Mock(spec=["request_move", "request_grasp", "check", "evidence", "stop"])
 
         adapter = DroidGripper(
             hand,
@@ -127,7 +127,7 @@ class DroidGripperTests(unittest.TestCase):
                     )
 
     def test_inference_rejects_queued_replacement(self):
-        hand = Mock()
+        hand = Mock(spec=["request_move", "request_grasp", "check", "evidence", "stop"])
         hand.evidence.return_value = {
             'requests': [{'disposition': 'queued'}]
         }

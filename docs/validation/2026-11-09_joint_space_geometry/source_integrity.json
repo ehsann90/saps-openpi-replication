@@ -1,0 +1,174 @@
+{
+  "audit_date": "2026-11-09",
+  "manifest": {
+    "manifest": {
+      "path": "/home/hvl-robotics2404/saps-openpi-replication/configs/zed_robotiq_lab_sources.json",
+      "sha256": "402b4d66027b056fcc70464c10ffef3a3d809863fa75ba9787a7c6889c4365ec"
+    },
+    "matches_reviewed_manifest": false,
+    "changed": [
+      "CMakeLists.txt",
+      "README.md",
+      "docs/zed_cameras.md",
+      "fr3_lab_stack_runtime/zed_cameras.py",
+      "launch/dual_zed.launch.py",
+      "package.xml",
+      "scripts/check_rgb_rates.py",
+      "test/test_zed_cameras.py"
+    ],
+    "added": [
+      "docs/robotiq_model_audit.md",
+      "fr3_lab_stack_runtime/camera_pairing.py",
+      "fr3_lab_stack_runtime/camera_validation.py",
+      "fr3_lab_stack_runtime/tool_model.py",
+      "rviz/fr3_lab_stack_zed.rviz",
+      "scripts/check_camera_pairing.py",
+      "scripts/inspect_tool_model.py",
+      "test/test_camera_pairing.py",
+      "test/test_camera_validation.py",
+      "test/test_check_rgb_rates.py",
+      "test/test_tool_model.py"
+    ],
+    "missing": []
+  },
+  "repositories": {
+    "saps": {
+      "path": "/home/hvl-robotics2404/saps-openpi-replication",
+      "available": true,
+      "branch": "implement/physical-zed-robotiq",
+      "commit": "ee29c2c7d931a44ea1878c44c27228ac2f752c1d",
+      "status": [
+        "M Makefile",
+        " M README.md",
+        " M scripts/physical_single_action.py",
+        " M src/saps/physical/camera_launch.py",
+        " M src/saps/physical/droid_gripper.py",
+        " M src/saps/physical/fr3_forward_kinematics.py",
+        " M src/saps/physical/gripper_ros.py",
+        " M src/saps/physical/gripper_validation.py",
+        " M src/saps/physical/live_inference_hold_ros.py",
+        " M src/saps/physical/live_observation.py",
+        " M src/saps/physical/live_shadow.py",
+        " M src/saps/physical/policy_execution.py",
+        " M src/saps/physical/ros_observation.py",
+        " M src/saps/physical/shadow_config.py",
+        " M src/saps/physical/shadow_ros.py",
+        " M src/saps/physical/single_action.py",
+        " M src/saps/physical/verifier_ros.py",
+        " M tests/unit/test_droid_gripper.py",
+        " M tests/unit/test_g2_archived_gripper_sweep.py",
+        " M tests/unit/test_physical_live_observation.py",
+        " M tests/unit/test_single_action.py",
+        " M tools/diagnostics/sweep_archived_droid_gripper_state.py",
+        "?? configs/physical_pi05_fr3_c4.json",
+        "?? configs/physical_pi05_fr3_zed_robotiq.json",
+        "?? configs/zed_robotiq_lab_sources.json",
+        "?? docs/physical_c4.md",
+        "?? docs/physical_c4_execution_audit.md",
+        "?? docs/physical_joint_space_geometry_audit.md",
+        "?? docs/physical_zed_robotiq.md",
+        "?? docs/validation/2026-11-06_c4_saved_chunk/",
+        "?? docs/validation/2026-11-09_joint_space_geometry/",
+        "?? requirements-robotiq.txt",
+        "?? scripts/physical_c4.py",
+        "?? src/saps/physical/c4_observation.py",
+        "?? src/saps/physical/c4_readiness.py",
+        "?? src/saps/physical/c4_target_audit.py",
+        "?? src/saps/physical/hardware_provenance.py",
+        "?? src/saps/physical/robotiq.py",
+        "?? src/saps/physical/robotiq_hand.py",
+        "?? src/saps/physical/robotiq_node.py",
+        "?? tests/unit/test_physical_c4.py",
+        "?? tests/unit/test_physical_c4_target_audit.py",
+        "?? tests/unit/test_physical_joint_geometry.py",
+        "?? tests/unit/test_physical_robotiq.py",
+        "?? tests/unit/test_physical_robotiq_activation.py",
+        "?? tests/unit/test_physical_robotiq_observation.py",
+        "?? tests/unit/test_physical_zed_config.py",
+        "?? tools/activate_physical_env.sh",
+        "?? tools/diagnostics/audit_c4_saved_chunk.py",
+        "?? tools/prepare_c4_config.py"
+      ],
+      "dirty": true
+    },
+    "lab": {
+      "path": "/home/hvl-robotics2404/franka_ehsan_ros2_ws/src/fr3_lab_stack",
+      "available": true,
+      "branch": "implement/zed-robotiq",
+      "commit": "4bb6cdc58839dcdd94acbe1633b8f361676a4eb6",
+      "status": [
+        "M CMakeLists.txt",
+        " M README.md",
+        " M package.xml",
+        " M scripts/check_rgb_rates.py",
+        "?? docs/robotiq_model_audit.md",
+        "?? docs/zed_cameras.md",
+        "?? fr3_lab_stack_runtime/camera_pairing.py",
+        "?? fr3_lab_stack_runtime/camera_validation.py",
+        "?? fr3_lab_stack_runtime/tool_model.py",
+        "?? fr3_lab_stack_runtime/zed_cameras.py",
+        "?? launch/dual_zed.launch.py",
+        "?? rviz/fr3_lab_stack_zed.rviz",
+        "?? scripts/check_camera_pairing.py",
+        "?? scripts/inspect_tool_model.py",
+        "?? test/test_camera_pairing.py",
+        "?? test/test_camera_validation.py",
+        "?? test/test_check_rgb_rates.py",
+        "?? test/test_tool_model.py",
+        "?? test/test_zed_cameras.py"
+      ],
+      "dirty": true
+    },
+    "openpi": {
+      "path": "/home/hvl-robotics2404/saps-openpi-replication/third_party/openpi",
+      "available": true,
+      "branch": "",
+      "commit": "15a9616a00943ada6c20a0f158e3adb39df2ccac",
+      "status": [],
+      "dirty": false
+    },
+    "igd": {
+      "path": "/home/hvl-robotics2404/franka_ehsan_ros2_ws/src/igd_fr3_control",
+      "available": true,
+      "branch": "commissioning/fr3-spacemouse",
+      "commit": "438e4ae3145944042033395940848bf107cb9965",
+      "status": [
+        "M igd_fr3_control/view_capture.py",
+        "?? igd_fr3_control/display_grasp_rviz.py",
+        "?? igd_fr3_control/test_grasp.py",
+        "?? igd_fr3_control/view_capture2.py"
+      ],
+      "dirty": true
+    }
+  },
+  "baseline_tree_matches_manifest": false,
+  "manifest_extension_paths": [
+    "docs/zed_cameras.md",
+    "fr3_lab_stack_runtime/zed_cameras.py",
+    "launch/dual_zed.launch.py",
+    "test/test_zed_cameras.py"
+  ],
+  "manifest_changes_to_baseline": [
+    "CMakeLists.txt",
+    "README.md",
+    "package.xml",
+    "scripts/check_rgb_rates.py"
+  ],
+  "required_openpi_commit": "15a9616a00943ada6c20a0f158e3adb39df2ccac",
+  "lab_baseline_commit": "4bb6cdc58839dcdd94acbe1633b8f361676a4eb6",
+  "manifest_regenerated": false,
+  "commits_created": false,
+  "reviewed_new_integration_revision": null,
+  "ancestry_checks": [
+    {
+      "repository": "/home/hvl-robotics2404/saps-openpi-replication",
+      "baseline": "dc5ce5e1ee038d793f7b672cc72a5fffce8d06c2",
+      "passed": true
+    },
+    {
+      "repository": "/home/hvl-robotics2404/franka_ehsan_ros2_ws/src/fr3_lab_stack",
+      "baseline": "4bb6cdc58839dcdd94acbe1633b8f361676a4eb6",
+      "passed": true
+    }
+  ]
+}

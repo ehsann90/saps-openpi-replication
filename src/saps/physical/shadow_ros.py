@@ -68,6 +68,8 @@ def validate_graph(node: Any, config: dict[str, Any]) -> dict[str, Any]:
         "wrist_camera": (config["wrist_camera"]["topic"], "sensor_msgs/msg/Image"),
         "exterior_camera": (config["exterior_camera"]["topic"], "sensor_msgs/msg/Image"),
     }
+    if config.get('hardware_profile') == 'zed_robotiq_2f85':
+        sources['gripper_state'] = (config['robot']['gripper_state_topic'], 'std_msgs/msg/String')
     result = {}
     for role, (topic, message_type) in sources.items():
         publishers = node.get_publishers_info_by_topic(topic)
@@ -79,6 +81,8 @@ def validate_graph(node: Any, config: dict[str, Any]) -> dict[str, Any]:
             raise RuntimeError(f"Wrong message type for {topic}.")
         if role.endswith("camera") and name != config[role]["node"]:
             raise RuntimeError(f"Camera publisher {name} differs from configured {role} node.")
+        if role == 'gripper_state' and config.get('hardware_profile') == 'zed_robotiq_2f85' and name != config['gripper']['node']:
+            raise RuntimeError('Robotiq publisher does not match configured node')
         result[role] = {
             "topic": topic, "node": name, "type": publisher.topic_type,
             "publisher_gid": list(publisher.endpoint_gid),
@@ -86,7 +90,7 @@ def validate_graph(node: Any, config: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
-def camera_serial_evidence(config: dict[str, Any]) -> dict[str, Any]:
+def camera_serial_evidence(config: dict[str, Any], *, node: Any | None = None) -> dict[str, Any]:
     """Read camera serial parameters only; no robot service is contacted.
 
     ROS Image carries no device serial. A configured label alone cannot prove
@@ -95,6 +99,11 @@ def camera_serial_evidence(config: dict[str, Any]) -> dict[str, Any]:
     legacy configs use RealSense serial_no and its optional underscore.
     """
 
+    if config.get('integration_stage') == 'c4':
+        if node is None:
+            raise ValueError('C4 camera evidence requires publisher graph binding')
+        from saps.physical.c4_readiness import camera_evidence
+        return camera_evidence(node, config)
     evidence = {}
     for role in ("wrist_camera", "exterior_camera"):
         camera = config[role]
@@ -160,6 +169,8 @@ def run_shadow(args: Any, *, warmup_policy_seed: int | None = None) -> None:
             policy_episode_seed=args.policy_episode_seed,
         )
     config = load_shadow_config(args.config)
+    if config.get('integration_stage') == 'c4':
+        raise ValueError('C4 shadow requires its warm-up barrier: use scripts/physical_c4.py --mode shadow')
     args.output_dir.mkdir(parents=True, exist_ok=False)
     started = time.monotonic()
     record: dict[str, Any] = {

@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "milestone": "physical_zed_robotiq_pending_commissioning",
+  "execution_enabled": false,
+  "policy": {
+    "config": "pi05_droid",
+    "checkpoint": "gs://openpi-assets/checkpoints/pi05_droid",
+    "openpi_commit": "15a9616a00943ada6c20a0f158e3adb39df2ccac",
+    "action_shape": [
+      15,
+      8
+    ],
+    "reference_future_open_loop_horizon": 8
+  },
+  "wrist_camera": {
+    "role": "wrist",
+    "serial": "REQUIRED_ACTUAL_MINI_SERIAL",
+    "model": "ZED Mini",
+    "topic": "/wrist_camera/zed_node/rgb/image_rect_color",
+    "node": "/wrist_camera/zed_node",
+    "driver": "zed",
+    "camera_model": "zedm",
+    "serial_parameter": "general.serial_number",
+    "serial_parameter_prefix": "",
+    "orientation": "native_no_flip_rotate_mirror"
+  },
+  "exterior_camera": {
+    "role": "exterior",
+    "serial": "REQUIRED_ACTUAL_ZED2_SERIAL",
+    "model": "ZED 2",
+    "topic": "/external_camera/zed_node/rgb/image_rect_color",
+    "node": "/external_camera/zed_node",
+    "driver": "zed",
+    "camera_model": "zed2",
+    "serial_parameter": "general.serial_number",
+    "serial_parameter_prefix": "",
+    "orientation": "native_no_flip_rotate_mirror"
+  },
+  "robot": {
+    "joint_state_topic": "/franka/joint_states",
+    "gripper_state_topic": "/robotiq/status",
+    "maximum_finger_position_m": 0.0425,
+    "base_frame": "fr3_link0",
+    "tcp_frame": null
+  },
+  "native_images": {
+    "shape": [
+      720,
+      1280,
+      3
+    ],
+    "encoding": "bgra8",
+    "expected_rate_hz": 30,
+    "hardware_synchronized": false
+  },
+  "client_images": {
+    "shape": [
+      180,
+      320,
+      3
+    ],
+    "dtype": "uint8",
+    "color_order": "RGB",
+    "preprocessing": "existing centre crop to 16:9 then OpenCV INTER_AREA downsize; INTER_LINEAR for upsize"
+  },
+  "freshness": {
+    "maximum_source_age_seconds": 0.5,
+    "maximum_cross_source_skew_seconds": 0.25
+  },
+  "hardware_profile": "zed_robotiq_2f85",
+  "zed": {
+    "wrapper_version": null,
+    "resolution": "HD720",
+    "fps": 30,
+    "sdk_version": null,
+    "cuda_version": null
+  },
+  "gripper": {
+    "backend": "robotiq_2f85",
+    "port": "REQUIRED_/dev/serial/by-id/IDENTITY",
+    "slave": 9,
+    "baudrate": 115200,
+    "serial_timeout_seconds": 0.2,
+    "command_timeout_seconds": 3.0,
+    "namespace": "/robotiq",
+    "node": "/saps_robotiq",
+    "state_topic": "/robotiq/status",
+    "open_command": 0,
+    "close_command": 255,
+    "speed_register": 64,
+    "force_register": 32,
+    "calibration": {
+      "verified": false,
+      "evidence": null,
+      "open_position": null,
+      "closed_position": null,
+      "maximum_width_m": 0.085
+    }
+  },
+  "geometry": {
+    "execution_ready": false,
+    "reason": "Measured Robotiq mounting/TCP, collision geometry and payload are pending; existing Franka geometry cannot be reused"
+  }
+}

@@ -1,0 +1,2 @@
+# Optional physical Robotiq serial backend; not needed by simulation/policy code.
+pyserial==3.5
