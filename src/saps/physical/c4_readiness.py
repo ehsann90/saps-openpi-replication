@@ -55,7 +55,7 @@ def camera_qos(config: dict) -> Any:
 
 def camera_evidence(node: Any, config: dict) -> dict:
     """Reuse the audited lab C3 validator, including the depth-NONE exception."""
-    from franka_droid_stack_runtime.camera_validation import inspect_sources, provenance
+    from franka_zed_cameras.camera_validation import inspect_sources, provenance
     sources = inspect_sources(node)
     versions = provenance()
     for role, key in (('wrist', 'wrist_camera'), ('external', 'exterior_camera')):
@@ -165,6 +165,10 @@ def workspace_evidence(directory: Path) -> dict:
     gripper_source = (gripper_share / 'package.xml').resolve().parent
     if gripper_source != (directory / 'franka_robotiq').resolve():
         raise RuntimeError(f'C4 gripper overlay mismatch: {gripper_source} != {directory}')
+    camera_share = Path(get_package_share_directory('franka_zed_cameras'))
+    camera_source = (camera_share / 'package.xml').resolve().parent
+    if camera_source != (directory / 'franka_zed_cameras').resolve():
+        raise RuntimeError(f'C4 camera overlay mismatch: {camera_source} != {directory}')
     return dict(ros_distro='jazzy', package_share=str(share), source_directory=str(source))
 
 

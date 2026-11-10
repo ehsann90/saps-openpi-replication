@@ -1,7 +1,7 @@
 # C4 physical FR3 integration
 
 Current package migration (2026-11-10): source the existing ROS workspace and
-`~/franka_ehsan_ros2_ws/install-droid/setup.bash` before these workflows.
+`~/franka_ehsan_ros2_ws/install-droid-current/setup.bash` before these workflows.
 The independent repository is `~/franka_ehsan_ros2_ws/src/franka_droid_stack`;
 pass that Git root as `--lab-stack-dir`. The ROS package/module names are now
 `franka_droid_stack` / `franka_droid_stack_runtime`. Robotiq hardware commands
@@ -432,7 +432,7 @@ Reuse the accepted C3 owner, or launch once if absent:
 ```bash
 source /opt/ros/jazzy/setup.bash
 source ~/franka_ehsan_ros2_ws/install/setup.bash
-ros2 launch franka_droid_stack dual_zed.launch.py \
+ros2 launch franka_zed_cameras dual_zed.launch.py \
   wrist_serial:=15330503 exterior_serial:=32919961 exterior_model:=zed2i \
   wrapper_version:=5.5.0 resolution:=HD720 fps:=30
 ```

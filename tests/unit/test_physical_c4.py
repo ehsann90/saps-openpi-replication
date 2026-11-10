@@ -350,7 +350,7 @@ class C4EvidenceTests(unittest.TestCase):
             self.assertEqual(manifest.read_bytes(),before)
 
     def test_camera_checks_reuse_lab_contract_and_reject_wrong_effective_identity(self):
-        module = ModuleType('franka_droid_stack_runtime.camera_validation')
+        module = ModuleType('franka_zed_cameras.camera_validation')
         c = profile()
         sources = {role:dict(valid=True, parameters={
             'general.serial_number':int(c[key]['serial']),
@@ -359,8 +359,8 @@ class C4EvidenceTests(unittest.TestCase):
         module.inspect_sources = lambda node:sources
         module.provenance = lambda:dict(sdk_version_from_headers='5.5.1',
             packages={key:dict(version='5.5.0') for key in ('zed_wrapper','zed_components','zed_msgs')})
-        with patch.dict('sys.modules', {'franka_droid_stack_runtime':ModuleType('franka_droid_stack_runtime'),
-                'franka_droid_stack_runtime.camera_validation':module}):
+        with patch.dict('sys.modules', {'franka_zed_cameras':ModuleType('franka_zed_cameras'),
+                'franka_zed_cameras.camera_validation':module}):
             self.assertIn('sources',readiness.camera_evidence(object(),c))
             sources['wrist']['parameters']['general.serial_number'] = 999
             with self.assertRaisesRegex(RuntimeError,'identity disagree'):

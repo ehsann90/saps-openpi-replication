@@ -44,7 +44,7 @@ class RosPackageTests(unittest.TestCase):
         index.packages = packages
         root = Path('/fixture/personal-repo')
         shares = {name: str(root / name) for name in (
-            'franka_droid_stack', 'franka_robotiq')}
+            'franka_droid_stack', 'franka_robotiq', 'franka_zed_cameras')}
         packages.get_package_share_directory = shares.__getitem__
         with patch.dict('sys.modules', {'ament_index_python': index,
                                        'ament_index_python.packages': packages}), \
@@ -53,6 +53,10 @@ class RosPackageTests(unittest.TestCase):
                              str(root / 'franka_droid_stack'))
             shares['franka_robotiq'] = '/fixture/another/franka_robotiq'
             with self.assertRaisesRegex(RuntimeError, 'gripper overlay mismatch'):
+                workspace_evidence(root)
+            shares['franka_robotiq'] = str(root / 'franka_robotiq')
+            shares['franka_zed_cameras'] = '/fixture/another/franka_zed_cameras'
+            with self.assertRaisesRegex(RuntimeError, 'camera overlay mismatch'):
                 workspace_evidence(root)
             shares['franka_droid_stack'] = '/fixture/legacy/fr3_lab_stack'
             with self.assertRaisesRegex(RuntimeError, 'lab overlay mismatch'):

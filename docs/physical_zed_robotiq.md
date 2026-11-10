@@ -1,7 +1,7 @@
 # FR3 + ZED Mini/ZED 2 + Robotiq 2F-85
 
 Current package migration (2026-11-10): source the existing ROS workspace and
-`~/franka_ehsan_ros2_ws/install-droid/setup.bash` before these workflows.
+`~/franka_ehsan_ros2_ws/install-droid-current/setup.bash` before these workflows.
 The independent repository is `~/franka_ehsan_ros2_ws/src/franka_droid_stack`;
 pass that Git root as `--lab-stack-dir`. The ROS package/module names are now
 `franka_droid_stack` / `franka_droid_stack_runtime`. Robotiq hardware commands

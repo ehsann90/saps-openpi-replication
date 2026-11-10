@@ -103,7 +103,7 @@ are outside the current baseline.
 
 The current physical integration is prepared in the separate personal checkout
 `~/franka_ehsan_ros2_ws/src/franka_droid_stack`, with ROS packages
-`franka_droid_stack` and `franka_robotiq`. Build into `install-droid/` and source
+`franka_droid_stack`, `franka_robotiq` and `franka_zed_cameras`. Build into `install-droid-current/` and source
 that overlay after the original workspace; `tools/activate_physical_env.sh`
 loads it for the existing physical workflows. The original checkout/install
 and preservation commits remain available for rollback. Hardware Modbus/ROS
@@ -112,7 +112,7 @@ adapters, readiness and logging. Existing C4 JSON/settings are unchanged.
 `make unit-test` binds the independent pure-Python hardware package read-only;
 override `ROBOTIQ_SOURCE` if its checkout is elsewhere. `FRANKA_ROS2_WS` now
 defaults to `~/franka_ehsan_ros2_ws`; `FRANKA_DROID_INSTALL` selects its
-`install-droid` overlay. `FRANKA_LAB_STACK_DIR` or `--lab-stack-dir` can select
+`install-droid-current` overlay. `FRANKA_LAB_STACK_DIR` or `--lab-stack-dir` can select
 an explicitly retained old checkout for frozen historical protocols. The new
 layout does not automatically qualify the frozen strict source manifest.
 

@@ -46,7 +46,7 @@ def generate_launch_description() -> Any:
         )
         if config.get('hardware_profile') == 'zed_robotiq_2f85':
             driver = PathJoinSubstitution([
-                FindPackageShare('franka_droid_stack'), 'launch', 'dual_zed.launch.py'])
+                FindPackageShare('franka_zed_cameras'), 'launch', 'dual_zed.launch.py'])
             return [IncludeLaunchDescription(
                 PythonLaunchDescriptionSource(driver), launch_arguments={
                     'exterior_model': config['exterior_camera']['camera_model'],
