@@ -99,11 +99,12 @@ M3_CHARACTERISTIC_JSON ?=
 M3_CHARACTERISTIC_JSON_ARG = $(if $(strip $(M3_CHARACTERISTIC_JSON)),\
 	--output-json $(M3_CHARACTERISTIC_JSON),)
 ALLOW_LEGACY_M2 ?=
-FRANKA_ROS2_WS ?= $(HOME)/franka_ros2_ws
+FRANKA_ROS2_WS ?= $(HOME)/franka_ehsan_ros2_ws
 FRANKA_DESCRIPTION_DIR ?= $(FRANKA_ROS2_WS)/src/franka_description
 IGD_FR3_CONTROL_DIR ?= $(FRANKA_ROS2_WS)/src/igd_fr3_control
 FRANKA_ROS2_INSTALL ?= $(FRANKA_ROS2_WS)/install
-export FRANKA_ROS2_INSTALL
+FRANKA_DROID_INSTALL ?= $(FRANKA_ROS2_WS)/install-droid
+export FRANKA_ROS2_INSTALL FRANKA_DROID_INSTALL FRANKA_ROS2_WS
 REDO_EPISODES ?=
 REDO_EPISODES_ARG = $(if $(strip $(REDO_EPISODES)),--redo-episode-ids $(REDO_EPISODES),)
 MANIFEST ?= configs/operator_shared_autonomy_manifest.json
@@ -316,6 +317,7 @@ physical-pi05-shadow:
 		{ echo "Set an explicit PHYSICAL_RUN_ID and PHYSICAL_PROMPT."; exit 2; }
 	bash -c 'source /opt/ros/jazzy/setup.bash && \
 		source "$$FRANKA_ROS2_INSTALL/setup.bash" && \
+		source "$$FRANKA_DROID_INSTALL/setup.bash" && \
 		export PYTHONPATH="$$PWD/src:$$PWD/third_party/openpi/packages/openpi-client/src:$${PYTHONPATH}" && \
 		"$$PHYSICAL_PYTHON" scripts/physical_live_shadow_inference.py \
 		--config "$$PHYSICAL_CONFIG" \
@@ -330,6 +332,7 @@ physical-c1c2-warmup:
 		{ echo "Set an explicit PHYSICAL_RUN_ID and PHYSICAL_PROMPT."; exit 2; }
 	bash -c 'source /opt/ros/jazzy/setup.bash && \
 		source "$$FRANKA_ROS2_INSTALL/setup.bash" && \
+		source "$$FRANKA_DROID_INSTALL/setup.bash" && \
 		export PYTHONPATH="$$PWD/src:$$PWD/third_party/openpi/packages/openpi-client/src:$${PYTHONPATH}" && \
 		"$$PHYSICAL_PYTHON" scripts/physical_policy_warmup.py \
 		--config "$$PHYSICAL_CONFIG" \
@@ -346,6 +349,7 @@ physical-pi05-target-verify:
 		{ echo "Set an explicit PHYSICAL_RUN_ID and PHYSICAL_PROMPT."; exit 2; }
 	bash -c 'source /opt/ros/jazzy/setup.bash && \
 		source "$$FRANKA_ROS2_INSTALL/setup.bash" && \
+		source "$$FRANKA_DROID_INSTALL/setup.bash" && \
 		export PYTHONPATH="$$PWD/src:$$PWD/third_party/openpi/packages/openpi-client/src:$${PYTHONPATH}" && \
 		"$$PHYSICAL_PYTHON" scripts/physical_discrete_target_verifier.py \
 		--config "$$PHYSICAL_CONFIG" \
@@ -415,6 +419,7 @@ physical-c1c1:
 		{ echo "Set an explicit PHYSICAL_RUN_ID and PHYSICAL_PROMPT."; exit 2; }
 	bash -c 'source /opt/ros/jazzy/setup.bash && \
 		source "$$FRANKA_ROS2_INSTALL/setup.bash" && \
+		source "$$FRANKA_DROID_INSTALL/setup.bash" && \
 		export PYTHONPATH="$$PWD/src:$$PWD/third_party/openpi/packages/openpi-client/src:$${PYTHONPATH}" && \
 		"$$PHYSICAL_PYTHON" scripts/physical_live_inference_hold.py \
 		--execute \
@@ -428,6 +433,7 @@ physical-c1c1:
 physical-cameras:
 	bash -c 'source /opt/ros/jazzy/setup.bash && \
 		source "$$FRANKA_ROS2_INSTALL/setup.bash" && \
+		source "$$FRANKA_DROID_INSTALL/setup.bash" && \
 		export PYTHONPATH="$$PWD/src:$${PYTHONPATH}" && \
 		ros2 launch "$$PWD/scripts/physical_cameras.launch.py" "config:=$$PHYSICAL_CONFIG"'
 
@@ -438,6 +444,7 @@ physical-c1c2:
 		{ echo "Set an explicit PHYSICAL_RUN_ID and PHYSICAL_PROMPT."; exit 2; }
 	bash -c 'source /opt/ros/jazzy/setup.bash && \
 		source "$$FRANKA_ROS2_INSTALL/setup.bash" && \
+		source "$$FRANKA_DROID_INSTALL/setup.bash" && \
 		export PYTHONPATH="$$PWD/src:$$PWD/third_party/openpi/packages/openpi-client/src:$${PYTHONPATH}" && \
 		"$$PHYSICAL_PYTHON" scripts/physical_policy_execution.py \
 		--execute --config "$$PHYSICAL_CONFIG" \
@@ -470,6 +477,7 @@ physical-c1c2-gripper:
 		{ echo "Set an explicit PHYSICAL_RUN_ID and PHYSICAL_PROMPT."; exit 2; }
 	bash -c 'source /opt/ros/jazzy/setup.bash && \
 		source "$$FRANKA_ROS2_INSTALL/setup.bash" && \
+		source "$$FRANKA_DROID_INSTALL/setup.bash" && \
 		export PYTHONPATH="$$PWD/src:$$PWD/third_party/openpi/packages/openpi-client/src:$${PYTHONPATH}" && \
 		"$$PHYSICAL_PYTHON" scripts/physical_policy_execution.py \
 		--execute \
@@ -621,9 +629,12 @@ analyze-comparison:
 		'source /.venv/bin/activate && python /workspace/tools/analysis/analyze_operator_comparison.py --autonomous-root $(AUTONOMOUS_RESULTS) --teleoperation-root $(TELEOP_RESULTS) --shared-autonomy-root $(SHARED_RESULTS) --output-dir $(COMPARISON_OUTPUT)'
 
 .PHONY: unit-test
+ROBOTIQ_SOURCE ?= $(FRANKA_ROS2_WS)/src/franka_droid_stack/franka_robotiq
 unit-test:
-	$(RUNTIME) /bin/bash -lc \
-		'source /.venv/bin/activate && python -m unittest discover -s /workspace/tests/unit -p "test_*.py" -v'
+	@test -f "$(ROBOTIQ_SOURCE)/franka_robotiq/robotiq.py" || \
+		{ echo "Set ROBOTIQ_SOURCE to the independent franka_robotiq package."; exit 2; }
+	$(COMPOSE) run --rm --no-deps -v "$(ROBOTIQ_SOURCE):/franka_robotiq:ro" runtime /bin/bash -lc \
+		'source /.venv/bin/activate && PYTHONPATH="/franka_robotiq:$${PYTHONPATH}" python -m unittest discover -s /workspace/tests/unit -p "test_*.py" -v'
 
 .PHONY: compile
 compile:
@@ -672,12 +683,12 @@ cosine-blend:
 # These commands never start the policy or arm controller.
 .PHONY: physical-robotiq-status physical-robotiq-serve
 physical-robotiq-status:
-	PYTHONPATH=src "$(PHYSICAL_PYTHON)" -m saps.physical.robotiq_node --config "$(PHYSICAL_CONFIG)" --mode status
+	bash -c 'source "$$FRANKA_DROID_INSTALL/setup.bash" && \
+		"$$PHYSICAL_PYTHON" -m franka_robotiq.robotiq_node --config "$$PHYSICAL_CONFIG" --mode status'
 
 physical-robotiq-serve:
-	bash -c 'source /opt/ros/jazzy/setup.bash && \
-		export PYTHONPATH="$$PWD/src:$${PYTHONPATH}" && \
-		"$$PHYSICAL_PYTHON" -m saps.physical.robotiq_node --config "$$PHYSICAL_CONFIG" --mode serve'
+	bash -c 'source "$$FRANKA_DROID_INSTALL/setup.bash" && \
+		"$$PHYSICAL_PYTHON" -m franka_robotiq.robotiq_node --config "$$PHYSICAL_CONFIG" --mode serve'
 
 # C4 camera/gripper observations and shadow inference only. No --execute path.
 C4_CONFIG ?= configs/local/c4_zed_robotiq.json

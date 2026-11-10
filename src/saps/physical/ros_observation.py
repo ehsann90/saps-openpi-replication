@@ -453,7 +453,7 @@ class RosPhysicalObservationCollector:
         try:
             if self.contract.gripper_config is not None:
                 import json
-                from saps.physical.robotiq import calibrated_width
+                from franka_robotiq.robotiq import calibrated_width
                 from saps.physical.live_observation import GripperSnapshot
                 status = json.loads(message.data)
                 config = self.contract.gripper_config

@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from saps.physical.ros_packages import default_lab_stack_directory
 from saps.physical.live_inference_hold_ros import run_inference_hold
 from saps.physical.single_action import SINGULARITY_LOWER
 
@@ -51,7 +52,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--port", type=int, default=8000)
     workspace = Path.home() / "franka_ros2_ws/src"
     parser.add_argument("--lab-stack-dir", type=Path,
-                        default=workspace / "fr3_lab_stack")
+                        default=default_lab_stack_directory())
     parser.add_argument("--igd-control-dir", type=Path,
                         default=workspace / "igd_fr3_control")
     return parser.parse_args()

@@ -6,6 +6,8 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+
+from saps.physical.ros_packages import default_lab_stack_directory
 import subprocess
 import time
 import uuid
@@ -56,7 +58,7 @@ def main() -> int:
     parser.add_argument("--dry-q-refs", type=Path,
                         help="JSON array of nine independent diagnostic q[7] states")
     parser.add_argument("--lab-stack-dir", type=Path,
-                        default=Path.home() / "franka_ros2_ws/src/fr3_lab_stack")
+                        default=default_lab_stack_directory())
     args = parser.parse_args()
     if args.execute == (args.dry_q_refs is not None):
         parser.error("Supply --dry-q-refs for dry run, or --execute alone")

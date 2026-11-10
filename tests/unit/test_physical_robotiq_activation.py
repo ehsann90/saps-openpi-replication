@@ -9,8 +9,8 @@ import threading
 import unittest
 from unittest.mock import patch
 
-from saps.physical.robotiq import RobotiqStatus
-from saps.physical.robotiq_node import ActivationError, main, reset_activate
+from franka_robotiq.robotiq import RobotiqStatus
+from franka_robotiq.robotiq_node import ActivationError, main, reset_activate
 
 
 def status(*, activated: bool = True, state: int = 0,
@@ -174,11 +174,11 @@ class ActivationCliTests(unittest.TestCase):
                 return reset_activate(device, **kwargs,
                                       now=clock.now, sleep=clock.sleep)
             with patch('sys.argv', argv), patch(
-                    'saps.physical.robotiq_node.RobotiqRtu', return_value=device
+                    'franka_robotiq.robotiq_node.RobotiqRtu', return_value=device
             ) as constructor, patch(
-                    'saps.physical.robotiq_node.reset_activate', side_effect=activation
-            ), patch('saps.physical.robotiq_node.time.monotonic', clock.now), patch(
-                    'saps.physical.robotiq_node.time.sleep', clock.sleep
+                    'franka_robotiq.robotiq_node.reset_activate', side_effect=activation
+            ), patch('franka_robotiq.robotiq_node.time.monotonic', clock.now), patch(
+                    'franka_robotiq.robotiq_node.time.sleep', clock.sleep
             ), redirect_stdout(output):
                 if not authorize:
                     with self.assertRaises(SystemExit) as caught:

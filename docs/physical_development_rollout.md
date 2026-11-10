@@ -1,5 +1,18 @@
 # Bounded C4 development rollout and experiment qualification
 
+Current package migration (2026-11-10): source the existing ROS workspace and
+`~/franka_ehsan_ros2_ws/install-droid/setup.bash` before these workflows.
+The independent repository is `~/franka_ehsan_ros2_ws/src/franka_droid_stack`;
+pass that Git root as `--lab-stack-dir`. The ROS package/module names are now
+`franka_droid_stack` / `franka_droid_stack_runtime`. Robotiq hardware commands
+use `python -m franka_robotiq.robotiq_node`; the Make target names and existing
+C4 local JSON are retained. The policy-specific adapter remains in SAPS.
+The controller plugin and message types keep their original identifiers.
+Historical pins/evidence below remain historical; strict source qualification
+is not refreshed by this migration. See the independent repository's README
+and `franka_robotiq/README.md` for build, interfaces and supervised commands.
+
+
 2026-11-09. This is the current development workflow; it supersedes earlier
 C4 statements that dirty SAPS/lab trees or an outdated lab manifest must block
 every physical invocation. The autonomous joint-space path also no longer has
@@ -155,13 +168,13 @@ export PHYSICAL_PROMPT='pick up the object and hold it'
    its unchanged command after sourcing the unified workspace:
 
    ```bash
-   ros2 run fr3_lab_stack fr3_streaming_joint_target_forwarder --ros-args \
+   ros2 run franka_droid_stack fr3_streaming_joint_target_forwarder --ros-args \
      --params-file "$HOME/franka_ehsan_ros2_ws/src/fr3_lab_stack/config/streaming_joint_target_forwarder.yaml"
    ```
 3. **Dual ZED launcher:** reuse the validated C3 owner, or:
 
    ```bash
-   ros2 launch fr3_lab_stack dual_zed.launch.py \
+   ros2 launch franka_droid_stack dual_zed.launch.py \
      wrist_serial:=15330503 exterior_serial:=32919961 exterior_model:=zed2i \
      wrapper_version:=5.5.0 resolution:=HD720 fps:=30
    ```
@@ -169,7 +182,7 @@ export PHYSICAL_PROMPT='pick up the object and hold it'
    mode. Combined execution requires the explicitly authorized existing server:
 
    ```bash
-   "$PHYSICAL_PYTHON" -m saps.physical.robotiq_node \
+   "$PHYSICAL_PYTHON" -m franka_robotiq.robotiq_node \
      --config "$PHYSICAL_CONFIG" --mode serve --authorize-gripper
    ```
 
@@ -218,7 +231,7 @@ existing runtime groups ready and the researcher supervising at the emergency st
   --max-replans 1 --max-executed-policy-chunks 1 \
   --observation-timeout 30 --policy-timeout 120 \
   --application-confirmation-timeout 2 \
-  --lab-stack-dir "$HOME/franka_ehsan_ros2_ws/src/fr3_lab_stack" \
+  --lab-stack-dir "$HOME/franka_ehsan_ros2_ws/src/franka_droid_stack" \
   --igd-control-dir "$HOME/franka_ehsan_ros2_ws/src/igd_fr3_control" \
   --output-dir "outputs/physical_c1c2_gripper/c4_dev_chunk_$(date -u +%Y%m%dT%H%M%SZ)"
 ```

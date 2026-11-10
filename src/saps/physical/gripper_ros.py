@@ -133,7 +133,7 @@ def create_gripper(
 
     if config.get('hardware_profile') == 'zed_robotiq_2f85':
         from saps.physical.robotiq_hand import RosRobotiqHand
-        from saps.physical.robotiq import calibrated_width
+        from franka_robotiq.robotiq import calibrated_width
         settings = config['gripper']
         # Validate calibration before constructing any command clients.
         calibrated_width(settings['calibration']['open_position'], settings['calibration'])

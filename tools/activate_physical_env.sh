@@ -21,6 +21,8 @@ export FRANKA_ROS2_INSTALL="$FRANKA_ROS2_WS/install"
 export FRANKA_DESCRIPTION_DIR="$FRANKA_ROS2_WS/src/franka_description"
 export IGD_FR3_CONTROL_DIR="$FRANKA_ROS2_WS/src/igd_fr3_control"
 source "$FRANKA_ROS2_INSTALL/setup.bash"
+export FRANKA_DROID_INSTALL="${FRANKA_DROID_INSTALL:-$FRANKA_ROS2_WS/install-droid}"
+source "$FRANKA_DROID_INSTALL/setup.bash" || return 1
 source "$_SAPS_ROOT/.venv-physical/bin/activate"
 
 export PHYSICAL_PYTHON="$_SAPS_ROOT/.venv-physical/bin/python"

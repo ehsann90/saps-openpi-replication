@@ -1,5 +1,18 @@
 # C4 physical FR3 integration
 
+Current package migration (2026-11-10): source the existing ROS workspace and
+`~/franka_ehsan_ros2_ws/install-droid/setup.bash` before these workflows.
+The independent repository is `~/franka_ehsan_ros2_ws/src/franka_droid_stack`;
+pass that Git root as `--lab-stack-dir`. The ROS package/module names are now
+`franka_droid_stack` / `franka_droid_stack_runtime`. Robotiq hardware commands
+use `python -m franka_robotiq.robotiq_node`; the Make target names and existing
+C4 local JSON are retained. The policy-specific adapter remains in SAPS.
+The controller plugin and message types keep their original identifiers.
+Historical pins/evidence below remain historical; strict source qualification
+is not refreshed by this migration. See the independent repository's README
+and `franka_robotiq/README.md` for build, interfaces and supervised commands.
+
+
 **Current execution instructions:** use the
 [bounded development workflow](physical_development_rollout.md). The redundant
 Robotiq-profile geometry veto has been removed from joint-space execution;
@@ -394,7 +407,7 @@ Use the one existing process if already running:
 ```bash
 source /opt/ros/jazzy/setup.bash
 source ~/franka_ehsan_ros2_ws/install/setup.bash
-ros2 run fr3_lab_stack fr3_streaming_joint_target_forwarder --ros-args \
+ros2 run franka_droid_stack fr3_streaming_joint_target_forwarder --ros-args \
   --params-file "$HOME/franka_ehsan_ros2_ws/src/fr3_lab_stack/config/streaming_joint_target_forwarder.yaml"
 ```
 
@@ -419,7 +432,7 @@ Reuse the accepted C3 owner, or launch once if absent:
 ```bash
 source /opt/ros/jazzy/setup.bash
 source ~/franka_ehsan_ros2_ws/install/setup.bash
-ros2 launch fr3_lab_stack dual_zed.launch.py \
+ros2 launch franka_droid_stack dual_zed.launch.py \
   wrist_serial:=15330503 exterior_serial:=32919961 exterior_model:=zed2i \
   wrapper_version:=5.5.0 resolution:=HD720 fps:=30
 ```
@@ -440,7 +453,7 @@ commands concurrently with a server. For observation and shadow stages:
 cd ~/saps-openpi-replication
 source tools/activate_physical_env.sh
 export PHYSICAL_CONFIG="$PWD/configs/local/c4_zed_robotiq.json"
-"$PHYSICAL_PYTHON" -m saps.physical.robotiq_node \
+"$PHYSICAL_PYTHON" -m franka_robotiq.robotiq_node \
   --config "$PHYSICAL_CONFIG" --mode serve
 ```
 
@@ -454,7 +467,7 @@ Only at a later explicitly authorized command-readiness/physical stage, stop
 that read-only server and start the same implementation with authorization:
 
 ```bash
-"$PHYSICAL_PYTHON" -m saps.physical.robotiq_node \
+"$PHYSICAL_PYTHON" -m franka_robotiq.robotiq_node \
   --config "$PHYSICAL_CONFIG" --mode serve --authorize-gripper
 ```
 
@@ -571,7 +584,7 @@ The command below is a future template and is deliberately rejected today:
   --max-replans 1 --max-executed-policy-chunks 1 \
   --observation-timeout 30 --policy-timeout 120 \
   --application-confirmation-timeout 2 \
-  --lab-stack-dir "$HOME/franka_ehsan_ros2_ws/src/fr3_lab_stack" \
+  --lab-stack-dir "$HOME/franka_ehsan_ros2_ws/src/franka_droid_stack" \
   --igd-control-dir "$HOME/franka_ehsan_ros2_ws/src/igd_fr3_control" \
   --output-dir outputs/physical_c1c2_gripper/c4_first_chunk_UNIQUE_ID
 ```

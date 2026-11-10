@@ -8,7 +8,7 @@ import numpy as np
 
 from saps.physical.droid_gripper import DroidGripper, droid_gripper_decision
 from saps.physical.live_observation import decode_ros_rgb_image
-from saps.physical.robotiq import calibrated_width, crc16, decode_status, RobotiqRtu
+from franka_robotiq.robotiq import calibrated_width, crc16, decode_status, RobotiqRtu
 from saps.physical.robotiq_hand import RobotiqHand
 from saps.physical.hardware_provenance import require_supported_arm_geometry
 

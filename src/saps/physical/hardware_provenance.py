@@ -10,6 +10,7 @@ from types import SimpleNamespace
 from typing import Any
 
 from saps.physical.shadow_ros import git_identity
+from saps.physical.ros_packages import lab_runtime_file
 
 
 def hardware_timing_helpers(directory: Path, *, strict: bool = True) -> tuple[Any, dict]:
@@ -18,7 +19,7 @@ def hardware_timing_helpers(directory: Path, *, strict: bool = True) -> tuple[An
         # the reviewed experiment manifest as a physical safety mechanism.
         from saps.physical.rollout_provenance import repository_snapshot
         identity = repository_snapshot(directory)
-        helper = directory / 'fr3_lab_stack_runtime/timing_evidence.py'
+        helper = lab_runtime_file(directory, 'timing_evidence.py')
         identity.update(provenance_mode='development',
                         timing_helper_sha256=hashlib.sha256(helper.read_bytes()).hexdigest())
         return SimpleNamespace(**runpy.run_path(str(helper))), identity
@@ -39,7 +40,7 @@ def hardware_timing_helpers(directory: Path, *, strict: bool = True) -> tuple[An
         raise ValueError('New hardware execution requires a clean committed SAPS checkout')
     identity.update(source_manifest_sha256=hashlib.sha256(manifest_path.read_bytes()).hexdigest(),
                     verified_files_sha256=actual, baseline_commit=manifest['baseline_commit'])
-    return SimpleNamespace(**runpy.run_path(str(directory / 'fr3_lab_stack_runtime/timing_evidence.py'))), identity
+    return SimpleNamespace(**runpy.run_path(str(lab_runtime_file(directory, 'timing_evidence.py')))), identity
 
 
 def arm_geometry_blockers(config: dict, *, joint_space: bool = False) -> list[str]:

@@ -171,7 +171,7 @@ class C4Tests(unittest.TestCase):
         self.assertEqual(self.config_path.read_bytes(), before)
 
     def test_complete_bgra_observation_and_png_roles_without_serial_owner(self):
-        with patch('saps.physical.robotiq.RobotiqRtu', side_effect=AssertionError('second serial owner')):
+        with patch('franka_robotiq.robotiq.RobotiqRtu', side_effect=AssertionError('second serial owner')):
             collector = self.collector()
             self.node.spin()
             observation = collector.assemble()
@@ -222,7 +222,7 @@ class C4Tests(unittest.TestCase):
         record = dict(completed_requests=0)
         directory = self.root / 'shadow'
         directory.mkdir()
-        with patch('saps.physical.robotiq.RobotiqRtu', side_effect=AssertionError('serial opened')):
+        with patch('franka_robotiq.robotiq.RobotiqRtu', side_effect=AssertionError('serial opened')):
             c4.shadow_requests(collector=collector, policy=policy, config=self.config,
                 directory=directory, record=record, requests=2, observation_timeout=2,
                 spin_once=self.node.spin, ros_now=lambda:self.node.now,
@@ -350,7 +350,7 @@ class C4EvidenceTests(unittest.TestCase):
             self.assertEqual(manifest.read_bytes(),before)
 
     def test_camera_checks_reuse_lab_contract_and_reject_wrong_effective_identity(self):
-        module = ModuleType('fr3_lab_stack_runtime.camera_validation')
+        module = ModuleType('franka_droid_stack_runtime.camera_validation')
         c = profile()
         sources = {role:dict(valid=True, parameters={
             'general.serial_number':int(c[key]['serial']),
@@ -359,8 +359,8 @@ class C4EvidenceTests(unittest.TestCase):
         module.inspect_sources = lambda node:sources
         module.provenance = lambda:dict(sdk_version_from_headers='5.5.1',
             packages={key:dict(version='5.5.0') for key in ('zed_wrapper','zed_components','zed_msgs')})
-        with patch.dict('sys.modules', {'fr3_lab_stack_runtime':ModuleType('fr3_lab_stack_runtime'),
-                'fr3_lab_stack_runtime.camera_validation':module}):
+        with patch.dict('sys.modules', {'franka_droid_stack_runtime':ModuleType('franka_droid_stack_runtime'),
+                'franka_droid_stack_runtime.camera_validation':module}):
             self.assertIn('sources',readiness.camera_evidence(object(),c))
             sources['wrist']['parameters']['general.serial_number'] = 999
             with self.assertRaisesRegex(RuntimeError,'identity disagree'):

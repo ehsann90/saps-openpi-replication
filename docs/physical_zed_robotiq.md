@@ -1,5 +1,18 @@
 # FR3 + ZED Mini/ZED 2 + Robotiq 2F-85
 
+Current package migration (2026-11-10): source the existing ROS workspace and
+`~/franka_ehsan_ros2_ws/install-droid/setup.bash` before these workflows.
+The independent repository is `~/franka_ehsan_ros2_ws/src/franka_droid_stack`;
+pass that Git root as `--lab-stack-dir`. The ROS package/module names are now
+`franka_droid_stack` / `franka_droid_stack_runtime`. Robotiq hardware commands
+use `python -m franka_robotiq.robotiq_node`; the Make target names and existing
+C4 local JSON are retained. The policy-specific adapter remains in SAPS.
+The controller plugin and message types keep their original identifiers.
+Historical pins/evidence below remain historical; strict source qualification
+is not refreshed by this migration. See the independent repository's README
+and `franka_robotiq/README.md` for build, interfaces and supervised commands.
+
+
 For the commissioned **ZED 2i / wrapper 5.5.0 C4 workflow**, use
 [physical_c4.md](physical_c4.md). The earlier profile and procedures below remain
 available as implementation/commissioning history. C4 does not lift the geometry gate.
@@ -191,7 +204,7 @@ Keep camera orientation explicit and preprocessing unchanged.
    ```bash
    ls -l /dev/serial/by-id/
    # Inspect adapter identity/wiring, then set port/slave/baud in the local JSON.
-   "$PHYSICAL_PYTHON" -m saps.physical.robotiq_node --config "$PHYSICAL_CONFIG" --mode status
+   "$PHYSICAL_PYTHON" -m franka_robotiq.robotiq_node --config "$PHYSICAL_CONFIG" --mode status
    ```
 
    This does not activate the gripper. Confirm actual device model, slave,
@@ -206,7 +219,7 @@ Keep camera orientation explicit and preprocessing unchanged.
    ros2 param get /external_camera/zed_node general.serial_number
    ros2 topic info -v /wrist_camera/zed_node/rgb/image_rect_color
    ros2 topic info -v /external_camera/zed_node/rgb/image_rect_color
-   ros2 run fr3_lab_stack check_rgb_rates.py --seconds 15 --topics \
+   ros2 run franka_droid_stack check_rgb_rates.py --seconds 15 --topics \
      /wrist_camera/zed_node/rgb/image_rect_color \
      /external_camera/zed_node/rgb/image_rect_color
    ros2 topic echo /wrist_camera/zed_node/rgb/image_rect_color --once --field header
@@ -222,13 +235,13 @@ Keep camera orientation explicit and preprocessing unchanged.
    at a time. Do not run the serial server concurrently with these commands:
 
    ```bash
-   "$PHYSICAL_PYTHON" -m saps.physical.robotiq_node --config "$PHYSICAL_CONFIG" --mode activate --authorize-gripper
-   "$PHYSICAL_PYTHON" -m saps.physical.robotiq_node --config "$PHYSICAL_CONFIG" --mode open --authorize-gripper
-   "$PHYSICAL_PYTHON" -m saps.physical.robotiq_node --config "$PHYSICAL_CONFIG" --mode status
-   "$PHYSICAL_PYTHON" -m saps.physical.robotiq_node --config "$PHYSICAL_CONFIG" --mode close --authorize-gripper
-   "$PHYSICAL_PYTHON" -m saps.physical.robotiq_node --config "$PHYSICAL_CONFIG" --mode status
+   "$PHYSICAL_PYTHON" -m franka_robotiq.robotiq_node --config "$PHYSICAL_CONFIG" --mode activate --authorize-gripper
+   "$PHYSICAL_PYTHON" -m franka_robotiq.robotiq_node --config "$PHYSICAL_CONFIG" --mode open --authorize-gripper
+   "$PHYSICAL_PYTHON" -m franka_robotiq.robotiq_node --config "$PHYSICAL_CONFIG" --mode status
+   "$PHYSICAL_PYTHON" -m franka_robotiq.robotiq_node --config "$PHYSICAL_CONFIG" --mode close --authorize-gripper
+   "$PHYSICAL_PYTHON" -m franka_robotiq.robotiq_node --config "$PHYSICAL_CONFIG" --mode status
    # Explicit stop if needed (does not release automatically):
-   "$PHYSICAL_PYTHON" -m saps.physical.robotiq_node --config "$PHYSICAL_CONFIG" --mode stop --authorize-gripper
+   "$PHYSICAL_PYTHON" -m franka_robotiq.robotiq_node --config "$PHYSICAL_CONFIG" --mode stop --authorize-gripper
    ```
 
    Activation itself may move fingers. Completion/contact is not proof of
@@ -239,7 +252,7 @@ Keep camera orientation explicit and preprocessing unchanged.
    limitations. Populate calibration and evidence only after measurement:
 
    ```bash
-   "$PHYSICAL_PYTHON" -m saps.physical.robotiq_node --config "$PHYSICAL_CONFIG" --mode observation
+   "$PHYSICAL_PYTHON" -m franka_robotiq.robotiq_node --config "$PHYSICAL_CONFIG" --mode observation
    "$PHYSICAL_PYTHON" -c 'from saps.physical.droid_gripper import droid_gripper_decision as d; print([d(x) for x in (0., .5, .50001, 1.)])'
    # Subscriber-only status server for H6; no activation or command services:
    make physical-robotiq-serve PHYSICAL_CONFIG="$PHYSICAL_CONFIG"
@@ -269,7 +282,7 @@ Keep camera orientation explicit and preprocessing unchanged.
 
    ```bash
    # Separate gripper server terminal, only at an authorized later H7 session:
-   "$PHYSICAL_PYTHON" -m saps.physical.robotiq_node --config "$PHYSICAL_CONFIG" --mode serve --authorize-gripper
+   "$PHYSICAL_PYTHON" -m franka_robotiq.robotiq_node --config "$PHYSICAL_CONFIG" --mode serve --authorize-gripper
    # After verified geometry integration, clean committed sources and prior gates:
    "$PHYSICAL_PYTHON" scripts/physical_policy_execution.py --execute --enable-gripper \
      --config "$PHYSICAL_CONFIG" --output-dir outputs/physical_c1c2/H7_UNIQUE_ID \
@@ -292,7 +305,7 @@ is not exposed through the policy or ROS command services.
 ```bash
 # Prepared for the researcher; not executed by Codex. Stationary arm, clear fingers.
 # Stop any serial-owning status server first.
-"$PHYSICAL_PYTHON" -m saps.physical.robotiq_node \
+"$PHYSICAL_PYTHON" -m franka_robotiq.robotiq_node \
   --config "$PHYSICAL_CONFIG" --mode reset-activate --authorize-gripper
 ```
 
@@ -359,7 +372,7 @@ Standalone `--mode observation` now has a short read-only settling period:
 
 ```bash
 # Researcher command only; stop the serial-owning server first.
-"$PHYSICAL_PYTHON" -m saps.physical.robotiq_node --config "$PHYSICAL_CONFIG" \
+"$PHYSICAL_PYTHON" -m franka_robotiq.robotiq_node --config "$PHYSICAL_CONFIG" \
   --mode observation --feedback-settle-seconds 1
 ```
 

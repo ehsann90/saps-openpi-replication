@@ -12,7 +12,8 @@ import time
 from typing import Any
 
 from saps.physical.hardware_provenance import require_supported_arm_geometry
-from saps.physical.robotiq import calibrated_width
+from saps.physical.ros_packages import lab_package_directory
+from franka_robotiq.robotiq import calibrated_width
 
 
 class HardwareReadinessError(RuntimeError):
@@ -54,7 +55,7 @@ def camera_qos(config: dict) -> Any:
 
 def camera_evidence(node: Any, config: dict) -> dict:
     """Reuse the audited lab C3 validator, including the depth-NONE exception."""
-    from fr3_lab_stack_runtime.camera_validation import inspect_sources, provenance
+    from franka_droid_stack_runtime.camera_validation import inspect_sources, provenance
     sources = inspect_sources(node)
     versions = provenance()
     for role, key in (('wrist', 'wrist_camera'), ('external', 'exterior_camera')):
@@ -156,10 +157,14 @@ def workspace_evidence(directory: Path) -> dict:
     from ament_index_python.packages import get_package_share_directory
     if os.environ.get('ROS_DISTRO') != 'jazzy':
         raise RuntimeError('C4 requires the unified ROS 2 Jazzy environment')
-    share = Path(get_package_share_directory('fr3_lab_stack'))
+    share = Path(get_package_share_directory('franka_droid_stack'))
     source = (share / 'package.xml').resolve().parent
-    if source != directory.resolve():
+    if source != lab_package_directory(directory).resolve():
         raise RuntimeError(f'C4 lab overlay mismatch: {source} != {directory}')
+    gripper_share = Path(get_package_share_directory('franka_robotiq'))
+    gripper_source = (gripper_share / 'package.xml').resolve().parent
+    if gripper_source != (directory / 'franka_robotiq').resolve():
+        raise RuntimeError(f'C4 gripper overlay mismatch: {gripper_source} != {directory}')
     return dict(ros_distro='jazzy', package_share=str(share), source_directory=str(source))
 
 

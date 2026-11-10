@@ -10,8 +10,8 @@ from types import ModuleType, SimpleNamespace as NS
 import unittest
 from unittest.mock import Mock, patch
 
-from saps.physical.robotiq import RobotiqStatus
-from saps.physical.robotiq_node import ObservationError, main, read_observation
+from franka_robotiq.robotiq import RobotiqStatus
+from franka_robotiq.robotiq_node import ObservationError, main, read_observation
 from test_physical_robotiq_activation import Clock, Device, status
 
 
@@ -153,8 +153,8 @@ class CliLifecycleTests(unittest.TestCase):
                 return read_observation(device, cal, **kwargs,
                                         now=clock.now, sleep=clock.sleep)
             with patch.dict(sys.modules, modules), patch('sys.argv', argv), patch(
-                    'saps.physical.robotiq_node.RobotiqRtu', return_value=device
-            ) as owner, patch('saps.physical.robotiq_node.read_observation', side_effect=observe), redirect_stdout(output):
+                    'franka_robotiq.robotiq_node.RobotiqRtu', return_value=device
+            ) as owner, patch('franka_robotiq.robotiq_node.read_observation', side_effect=observe), redirect_stdout(output):
                 if setup_error or executor_error:
                     with self.assertRaises(RuntimeError):
                         main()
@@ -226,7 +226,7 @@ class CliLifecycleTests(unittest.TestCase):
             path.write_text(json.dumps(dict(gripper=settings())))
             output = io.StringIO()
             with patch('sys.argv', ['robotiq_node', '--config', str(path), '--mode', 'observation']), patch(
-                    'saps.physical.robotiq_node.RobotiqRtu', side_effect=OSError('port already owned')
+                    'franka_robotiq.robotiq_node.RobotiqRtu', side_effect=OSError('port already owned')
             ) as owner, redirect_stdout(output), self.assertRaises(SystemExit) as caught:
                 main()
             self.assertEqual(caught.exception.code, 1)
@@ -256,7 +256,7 @@ class PersistentAdapterTests(unittest.TestCase):
             RosPhysicalObservationCollector,
         )
         from test_physical_live_observation import FakeMessage, FakeRosNode
-        self.owner_patch = patch('saps.physical.robotiq.RobotiqRtu', side_effect=AssertionError('competing Modbus owner'))
+        self.owner_patch = patch('franka_robotiq.robotiq.RobotiqRtu', side_effect=AssertionError('competing Modbus owner'))
         self.owner = self.owner_patch.start()
         self.addCleanup(self.owner_patch.stop)
         self.clock_patch = patch('saps.physical.ros_observation.time.monotonic', return_value=1000.)
@@ -344,7 +344,7 @@ class PersistentAdapterTests(unittest.TestCase):
     def test_single_owner_serial_configuration_uses_exclusive_open(self) -> None:
         # Inspect the actual boundary without allowing a real serial connection.
         self.owner_patch.stop()
-        from saps.physical.robotiq import RobotiqRtu
+        from franka_robotiq.robotiq import RobotiqRtu
         serial = ModuleType('serial')
         serial.Serial = Mock()
         with patch.dict(sys.modules, {'serial': serial}):

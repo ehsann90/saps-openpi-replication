@@ -3,6 +3,7 @@
 import argparse
 from pathlib import Path
 
+from saps.physical.ros_packages import default_lab_stack_directory
 from saps.physical.c4_observation import run
 
 
@@ -24,7 +25,7 @@ def parse_args():
     parser.add_argument('--robot-description', type=Path)
     parser.add_argument('--controller-manager', default='/controller_manager')
     workspace = Path.home() / 'franka_ehsan_ros2_ws/src'
-    parser.add_argument('--lab-stack-dir', type=Path, default=workspace / 'fr3_lab_stack')
+    parser.add_argument('--lab-stack-dir', type=Path, default=default_lab_stack_directory())
     parser.add_argument('--igd-control-dir', type=Path, default=workspace / 'igd_fr3_control')
     return parser.parse_args()
 

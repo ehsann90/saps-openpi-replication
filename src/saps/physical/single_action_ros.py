@@ -2,7 +2,7 @@
 
 This module does not interpret policy actions and does not compute or modify a
 target. It sends exactly one supplied reference/target pair to the validated
-``fr3_lab_stack`` action server.
+``franka_droid_stack`` action server.
 
 ROS imports are intentionally lazy so the pure SAPS unit-test environment can
 import this module without a ROS installation.
@@ -100,7 +100,7 @@ def _validate_server_evidence(
 
 
 class JointTargetActionClient:
-    """Dedicated one-goal client for ``fr3_lab_stack``."""
+    """Dedicated one-goal client for ``franka_droid_stack``."""
 
     def __init__(
         self,

@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+
+from saps.physical.ros_packages import default_lab_stack_directory
 import threading
 import time
 from typing import Any
@@ -81,7 +83,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--lab-stack-dir",
         type=Path,
-        default=Path.home() / "franka_ros2_ws/src/fr3_lab_stack",
+        default=default_lab_stack_directory(),
     )
     parser.add_argument(
         "--execute",
