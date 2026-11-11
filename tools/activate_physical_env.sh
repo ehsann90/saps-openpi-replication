@@ -21,13 +21,13 @@ export FRANKA_ROS2_INSTALL="$FRANKA_ROS2_WS/install"
 export FRANKA_DESCRIPTION_DIR="$FRANKA_ROS2_WS/src/franka_description"
 export IGD_FR3_CONTROL_DIR="$FRANKA_ROS2_WS/src/igd_fr3_control"
 source "$FRANKA_ROS2_INSTALL/setup.bash"
-export FRANKA_DROID_INSTALL="${FRANKA_DROID_INSTALL:-$FRANKA_ROS2_WS/install-droid-current}"
+export FRANKA_DROID_INSTALL="${FRANKA_DROID_INSTALL:-$FRANKA_ROS2_INSTALL}"
 source "$FRANKA_DROID_INSTALL/setup.bash" || return 1
 source "$_SAPS_ROOT/.venv-physical/bin/activate"
 
 export PHYSICAL_PYTHON="$_SAPS_ROOT/.venv-physical/bin/python"
 
-export PHYSICAL_CONFIG="$_SAPS_ROOT/configs/local/zed_robotiq.json"
+export PHYSICAL_CONFIG="${PHYSICAL_CONFIG:-$_SAPS_ROOT/configs/local/c4_zed_robotiq.json}"
 
 export PYTHONPATH="/opt/ros/jazzy/lib/python3.12/site-packages:$_SAPS_ROOT/src:$_SAPS_ROOT/third_party/openpi/packages/openpi-client/src:${PYTHONPATH:-}"
 

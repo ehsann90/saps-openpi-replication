@@ -1,16 +1,9 @@
 # Bounded C4 development rollout and experiment qualification
 
-Current package migration (2026-11-10): source the existing ROS workspace and
-`~/franka_ehsan_ros2_ws/install-droid-current/setup.bash` before these workflows.
-The independent repository is `~/franka_ehsan_ros2_ws/src/franka_droid_stack`;
-pass that Git root as `--lab-stack-dir`. The ROS package/module names are now
-`franka_droid_stack` / `franka_droid_stack_runtime`. Robotiq hardware commands
-use `python -m franka_robotiq.robotiq_node`; the Make target names and existing
-C4 local JSON are retained. The policy-specific adapter remains in SAPS.
-The controller plugin and message types keep their original identifiers.
-Historical pins/evidence below remain historical; strict source qualification
-is not refreshed by this migration. See the independent repository's README
-and `franka_robotiq/README.md` for build, interfaces and supervised commands.
+Use the [current physical deployment](physical_zed_robotiq.md) for environment
+and hardware startup. The outer `franka_droid_stack` Git root is passed as
+`--lab-stack-dir`. Historical pins below remain unchanged and do not qualify
+the new source tree for strict experiments.
 
 
 2026-11-09. This is the current development workflow; it supersedes earlier

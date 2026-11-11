@@ -103,7 +103,7 @@ FRANKA_ROS2_WS ?= $(HOME)/franka_ehsan_ros2_ws
 FRANKA_DESCRIPTION_DIR ?= $(FRANKA_ROS2_WS)/src/franka_description
 IGD_FR3_CONTROL_DIR ?= $(FRANKA_ROS2_WS)/src/igd_fr3_control
 FRANKA_ROS2_INSTALL ?= $(FRANKA_ROS2_WS)/install
-FRANKA_DROID_INSTALL ?= $(FRANKA_ROS2_WS)/install-droid-current
+FRANKA_DROID_INSTALL ?= $(FRANKA_ROS2_INSTALL)
 export FRANKA_ROS2_INSTALL FRANKA_DROID_INSTALL FRANKA_ROS2_WS
 REDO_EPISODES ?=
 REDO_EPISODES_ARG = $(if $(strip $(REDO_EPISODES)),--redo-episode-ids $(REDO_EPISODES),)
@@ -148,7 +148,6 @@ help:
 	@echo "  make physical-g1b-grasp-release [G1B_RUN_ID=<unique>]  # stationary-arm gripper validation"
 	@echo "  make physical-c1c2-gripper PHYSICAL_RUN_ID=<unique> PHYSICAL_PROMPT=<instruction>  # opt-in arm+gripper"
 	@echo "    C1C2_SINGULARITY_LIMIT=<finite-number-above-1>  # default 17; per-run gate"
-	@echo "  make physical-cameras PHYSICAL_CONFIG=<local-json>  # Configured RealSense/ZED RGB drivers only"
 	@echo "  make autonomous-smoke"
 	@echo "  make autonomous-sweep NUM_TRIALS=20"
 	@echo "  make teleop CONDITION=nominal TRIAL=0"
@@ -429,14 +428,6 @@ physical-c1c1:
 		--policy-episode-seed "$$DROID_POLICY_SEED" \
 		--application-confirmation-timeout "$$C1C1_APPLICATION_CONFIRMATION_TIMEOUT"'
 
-.PHONY: physical-cameras
-physical-cameras:
-	bash -c 'source /opt/ros/jazzy/setup.bash && \
-		source "$$FRANKA_ROS2_INSTALL/setup.bash" && \
-		source "$$FRANKA_DROID_INSTALL/setup.bash" && \
-		export PYTHONPATH="$$PWD/src:$${PYTHONPATH}" && \
-		ros2 launch "$$PWD/scripts/physical_cameras.launch.py" "config:=$$PHYSICAL_CONFIG"'
-
 .PHONY: physical-c1c2
 physical-c1c2: export PHYSICAL_WARMUP_POLICY_SEED := $(PHYSICAL_WARMUP_POLICY_SEED)
 physical-c1c2:
@@ -679,16 +670,6 @@ fixed-blend:
 .PHONY: cosine-blend
 cosine-blend:
 	$(call RUN_SHARED_AUTONOMY,cosine_blend)
-
-# These commands never start the policy or arm controller.
-.PHONY: physical-robotiq-status physical-robotiq-serve
-physical-robotiq-status:
-	bash -c 'source "$$FRANKA_DROID_INSTALL/setup.bash" && \
-		"$$PHYSICAL_PYTHON" -m franka_robotiq.robotiq_node --config "$$PHYSICAL_CONFIG" --mode status'
-
-physical-robotiq-serve:
-	bash -c 'source "$$FRANKA_DROID_INSTALL/setup.bash" && \
-		"$$PHYSICAL_PYTHON" -m franka_robotiq.robotiq_node --config "$$PHYSICAL_CONFIG" --mode serve'
 
 # C4 camera/gripper observations and shadow inference only. No --execute path.
 C4_CONFIG ?= configs/local/c4_zed_robotiq.json

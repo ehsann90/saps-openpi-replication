@@ -50,7 +50,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--gripper-timeout", type=float, default=3.)
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8000)
-    workspace = Path.home() / "franka_ros2_ws/src"
+    workspace = default_lab_stack_directory().parent
     parser.add_argument("--lab-stack-dir", type=Path,
                         default=default_lab_stack_directory())
     parser.add_argument("--igd-control-dir", type=Path,

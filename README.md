@@ -76,12 +76,10 @@ OpenPI is pinned as `third_party/openpi`; LIBERO is pinned recursively below it.
 Project-specific compatibility changes are documented patches, not silent edits
 to either dependency.
 
-Gripper-enabled FR3 execution additionally requires the clean
-`frdedynamics/fr3_lab_stack` commit
-`4bb6cdc58839dcdd94acbe1633b8f361676a4eb6`. The G1B integration inspected
-local `franka_ros2` source revision
-`1369a2cb200d0f7b3da11c7728c7ca2e6975ca00`; no upstream `franka_ros2`
-modification is part of the SAPS G1B implementation.
+Current Robotiq/ZED deployment uses the independent `franka_droid_stack`
+repository; [deployment instructions](docs/physical_zed_robotiq.md) identify
+hardware ownership and the C4 configuration. The old Franka Hand pins remain
+historical scientific baselines, not current Robotiq prerequisites.
 
 ## Simulation validation
 
@@ -101,21 +99,12 @@ are outside the current baseline.
 
 ## Physical deployment
 
-The current physical integration is prepared in the separate personal checkout
-`~/franka_ehsan_ros2_ws/src/franka_droid_stack`, with ROS packages
-`franka_droid_stack`, `franka_robotiq` and `franka_zed_cameras`. Build into `install-droid-current/` and source
-that overlay after the original workspace; `tools/activate_physical_env.sh`
-loads it for the existing physical workflows. The original checkout/install
-and preservation commits remain available for rollback. Hardware Modbus/ROS
-ownership now lives in `franka_robotiq`; SAPS retains DROID mapping, policy
-adapters, readiness and logging. Existing C4 JSON/settings are unchanged.
-`make unit-test` binds the independent pure-Python hardware package read-only;
-override `ROBOTIQ_SOURCE` if its checkout is elsewhere. `FRANKA_ROS2_WS` now
-defaults to `~/franka_ehsan_ros2_ws`; `FRANKA_DROID_INSTALL` selects its
-`install-droid-current` overlay. `FRANKA_LAB_STACK_DIR` or `--lab-stack-dir` can select
-an explicitly retained old checkout for frozen historical protocols. The new
-layout does not automatically qualify the frozen strict source manifest.
-
+Use the [current FR3 deployment](docs/physical_zed_robotiq.md) with the independent
+`franka_droid_stack`, `franka_robotiq` and `franka_zed_cameras` ROS2 packages.
+SAPS does not launch hardware drivers. The [first operator-observed successful
+manipulation](docs/physical_rollout_20261111.md) retains its abnormal runtime
+termination separately from task outcome. Completed physical observations can
+be [exported to MP4](docs/physical_video.md) without connecting to hardware.
 
 The fixed-arm physical runtime now has separately validated arm and gripper
 mechanisms.
@@ -126,7 +115,8 @@ measured-q pre-inference holds, native `[15,8]` responses, actions `0..7` at
 independently scheduled 15 Hz deadlines, fresh measured-state anchoring, terminal
 holds, delivery audits, readiness reacquisition, and Franka health checks.
 
-G1B validates the DROID binary gripper contract and its FR3 realization. The
+The historical Franka Hand G1B run validates the DROID binary gripper contract
+and its earlier FR3 realization. The
 strict policy rule is `action[7] > 0.5` → CLOSED and otherwise OPEN. OPEN maps to
 `Move(maximum_width)`; CLOSED maps to an object-agnostic `Grasp(width=0)` with
 the fixed validated embodiment parameters. Object width is not supplied to the
@@ -135,9 +125,9 @@ approximately three seconds, then performed the explicit Stop → Move(open)
 release sequence.
 
 These are runtime-mechanism validations, not manipulation-task-success results.
-The next gate is G2: the current physical π0.5 behavior does not yet reliably
-approach and interact with the intended object. Task-level SUCCESS/FAILURE
-detection and physical SAPS operator blending also remain future work.
+The migrated Robotiq/ZED stack has one operator-observed manipulation success,
+with a later runtime abort. Repeatability, automated task-outcome detection and
+physical SAPS operator blending remain unvalidated.
 
 Physical safety remains independent of learned confidence and shared autonomy,
 using robot-native supervision, joint/workspace and timing checks, collision or
@@ -192,31 +182,11 @@ make fixed-blend CONDITION=nominal TRIAL=0 FIXED_AUTONOMY_WEIGHT=0.5
 make cosine-blend CONDITION=nominal TRIAL=0 COSINE_GAIN=6.0
 ```
 
-For supervised FR3 work, start the required robot/controller, cameras, and
-π0.5/DROID policy server first. The convenience targets preserve ROS's
-`PYTHONPATH` and keep arm-only, isolated-gripper, and arm+gripper outputs
-separate:
-
-```bash
-# Re-run the stationary-arm G1B mechanism validation.
-make physical-g1b-grasp-release
-
-# Validated C1-C2 arm-only policy execution.
-make physical-c1c2 \
-  PHYSICAL_RUN_ID=<unique> \
-  PHYSICAL_PROMPT='<instruction>'
-
-# Explicit opt-in arm + physical gripper execution.
-make physical-c1c2-gripper \
-  PHYSICAL_RUN_ID=<unique> \
-  PHYSICAL_PROMPT='<instruction>'
-```
-
-`physical-c1c2-gripper` uses the same validated fixed Grasp parameters as G1B
-and requires the clean pinned `fr3_lab_stack` revision. It is available as the
-integrated runtime path, but current task-level policy behavior remains a G2
-investigation; do not treat a run as manipulation-task success merely because
-the transport, arm, and gripper mechanisms execute correctly.
+For supervised FR3 work, follow the [current C4 deployment](docs/physical_zed_robotiq.md)
+and [bounded execution workflow](docs/physical_development_rollout.md). Hardware
+startup and controller activation belong to the independent ROS2 repository.
+The retained C1/G1B commands and pins document earlier mechanism validation;
+they do not establish task success or qualify the migrated hardware tree.
 
 The completed matched-pilot roots are frozen. Do not reuse their experiment IDs
 or output directories. Regenerate the read-only derived archive with:

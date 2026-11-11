@@ -157,18 +157,11 @@ The checked-in default remains the historical camera pair; no local profile
 is selected automatically. Export `PHYSICAL_CONFIG` in each relevant terminal
 or pass it to each Make invocation. The resolved config is saved in `run.json`.
 
-With the previous camera launcher stopped, launch the RealSense RGB streams
-from the same profile in a separate terminal:
-
-```bash
-make physical-cameras PHYSICAL_CONFIG="$PWD/configs/local/physical_pi05_fr3.json"
-```
-
-This starts only cameras, with the existing 1280x720 RGB8/30 profile and depth
-disabled. Do not run it alongside the old dual-camera launcher. It uses the
-configured node names and requires topics of the form `<node>/color/image_raw`.
-Subsequent shadow, warm-up and execution commands use the same `PHYSICAL_CONFIG`.
-No lab rebuild or commit is needed when changing camera serials.
+The preserved baseline used RealSense 1280×720 RGB8/30 streams with depth
+disabled. SAPS's camera launcher has been retired. For the current ZED hardware,
+use the independent unified launcher in [current deployment](physical_zed_robotiq.md).
+Subsequent shadow, warm-up and execution commands must use the same explicit
+`PHYSICAL_CONFIG` as their commissioned hardware profile.
 
 Other drivers must be launched separately. The runtime accepts explicit
 `serial_parameter` and `serial_parameter_prefix` fields in each camera entry;

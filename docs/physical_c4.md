@@ -1,16 +1,9 @@
 # C4 physical FR3 integration
 
-Current package migration (2026-11-10): source the existing ROS workspace and
-`~/franka_ehsan_ros2_ws/install-droid-current/setup.bash` before these workflows.
-The independent repository is `~/franka_ehsan_ros2_ws/src/franka_droid_stack`;
-pass that Git root as `--lab-stack-dir`. The ROS package/module names are now
-`franka_droid_stack` / `franka_droid_stack_runtime`. Robotiq hardware commands
-use `python -m franka_robotiq.robotiq_node`; the Make target names and existing
-C4 local JSON are retained. The policy-specific adapter remains in SAPS.
-The controller plugin and message types keep their original identifiers.
-Historical pins/evidence below remain historical; strict source qualification
-is not refreshed by this migration. See the independent repository's README
-and `franka_robotiq/README.md` for build, interfaces and supervised commands.
+Use the [current physical deployment](physical_zed_robotiq.md) for environment
+and hardware startup. The outer `franka_droid_stack` Git root is passed as
+`--lab-stack-dir`. Historical pins below remain unchanged and do not qualify
+the new source tree for strict experiments.
 
 
 **Current execution instructions:** use the
@@ -622,7 +615,7 @@ C4 production changes are confined to SAPS:
 
 - `configs/physical_pi05_fr3_c4.json`: explicit new identities/interface/profile;
   gripper calibration/port placeholders remain until operator configuration.
-- `src/saps/physical/shadow_config.py`, `camera_launch.py`: C4 validation and
+- `src/saps/physical/shadow_config.py`: C4 validation and
   explicit external model dispatch, preserving earlier profiles.
 - `ros_observation.py`, `live_observation.py`: separate camera QoS, owner binding,
   preprocessing timing and invalid-source evidence, preserving preprocessing.
@@ -662,7 +655,7 @@ PYTHONNOUSERSITE=1 PYTHONPATH=src:tests/unit .venv-physical/bin/python -m unitte
   test_physical_c4 test_physical_robotiq test_physical_robotiq_activation \
   test_physical_robotiq_observation test_physical_policy_warmup \
   test_physical_policy_execution test_physical_live_observation \
-  test_physical_live_shadow test_physical_camera_launch test_physical_zed_config -q
+  test_physical_live_shadow test_physical_zed_config -q
 make check
 bash -n tools/activate_physical_env.sh
 git diff --check
