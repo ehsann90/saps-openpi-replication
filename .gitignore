@@ -27,3 +27,6 @@ logs/
 *.log
 *.tmp
 .DS_Store
+
+# Local preservation copy requested by operator; raw evidence is never committed.
+/docs/validation/2026-11-11_physical_rollout_backup/

@@ -29,7 +29,7 @@ powered comparison of arbitration methods.
 | Live FR3 observation and spnavd input | M3 complete and live-validated |
 | FR3 measured-state-anchored policy execution | C1-C2 physically validated, including repeated 8-action chunks at 15 Hz |
 | DROID binary gripper semantics and FR3 Move/Grasp realization | G1B physically validated, including unsupported grasp/hold/release |
-| Physical task-directed π0.5 behavior | G2 pending; object-directed behavior remains unresolved |
+| Physical task-directed π0.5-DROID | First operator-observed success on FR3/Robotiq/ZED; later runtime abort, repeatability unverified |
 | Physical shared autonomy and operator blending | Not yet implemented |
 | Risk, collaboration, and intervention-learning research | Planned after the physical baseline |
 
@@ -104,7 +104,8 @@ Use the [current FR3 deployment](docs/physical_zed_robotiq.md) with the independ
 SAPS does not launch hardware drivers. The [first operator-observed successful
 manipulation](docs/physical_rollout_20261111.md) retains its abnormal runtime
 termination separately from task outcome. Completed physical observations can
-be [exported to MP4](docs/physical_video.md) without connecting to hardware.
+be [exported to MP4](docs/physical_zed_robotiq.md#offline-video-export-and-diagnostics)
+without connecting to hardware.
 
 The fixed-arm physical runtime now has separately validated arm and gripper
 mechanisms.
@@ -183,8 +184,8 @@ make cosine-blend CONDITION=nominal TRIAL=0 COSINE_GAIN=6.0
 ```
 
 For supervised FR3 work, follow the [current C4 deployment](docs/physical_zed_robotiq.md)
-and [bounded execution workflow](docs/physical_development_rollout.md). Hardware
-startup and controller activation belong to the independent ROS2 repository.
+and its bounded execution procedure. Hardware startup and controller activation
+belong to the independent ROS2 repository.
 The retained C1/G1B commands and pins document earlier mechanism validation;
 they do not establish task success or qualify the migrated hardware tree.
 
@@ -254,16 +255,3 @@ When using this replication, cite the original SAPS paper and identify the
 exact repository milestone, collection commit, analysis commit, submodule
 revisions, checkpoint, and frozen protocol hashes. A machine-readable citation
 template is provided in [CITATION.cff](CITATION.cff).
-
-The dedicated ZED Mini/ZED 2 + Robotiq physical profile and staged researcher
-commissioning commands are in [docs/physical_zed_robotiq.md](docs/physical_zed_robotiq.md).
-Hardware validation is pending; the new profile blocks arm execution until
-measured tool geometry is integrated and reviewed.
-
-
-C4 integrates the commissioned ZED Mini/ZED 2i identities and existing Robotiq
-server into subscriber-only observation and warmed shadow workflows. The
-[terminal-by-terminal C4 guide](docs/physical_c4.md) contains the runtime audit,
-new local-profile preparation, observation/shadow commands and geometry/source
-integrity NO-GO gates. It preserves the historical policy/controller contract;
-it does not authorize physical execution.

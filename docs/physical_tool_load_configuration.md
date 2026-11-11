@@ -1,15 +1,22 @@
 # FR3 mounted-tool configuration reference
 
 2026-11-10. Preparation only: no robot settings, controller settings or motion
-were changed. Workspace clearance and emergency-stop availability are
-operator verified. This procedure addresses the remaining tool/load mismatch;
-it does not change the [development rollout](physical_development_rollout.md).
+were changed. Workspace clearance and emergency-stop availability require
+operator verification for each session. This procedure addresses the remaining
+tool/load mismatch;
+it does not change the [current deployment](physical_zed_robotiq.md).
 
-The subsequent [Fusion-v13 assembly audit](validation/2026-11-10_fusion_v13_tool_profile/README.md)
-contains the pinned CAD identities, all flange-relative tool transforms,
-component inventory, calculation method and incomplete Desk profile. Its source
-is `experiment/isaacsim-fr3-droid`; it does not replace missing physical mass
-properties with simulation values or certify the old nominal local draft.
+The retained offline `tools/analysis/audit_fr3_desk_profile.py` reproduces
+Fusion-v13 frame checks from immutable source revision
+`4e1557ee2b579574c8b5c701b19df94c5c336667` (historical Isaac branch), including
+`sim/assets/FR3_2F85_ZED_transforms/fusion_v13_candidate.json` and its referenced
+frame/face measurements. It requires the matching external CAD files and
+original/nominal Desk profiles: run its `--help` for explicit inputs and a new
+output directory. No generated Fusion report is present in the active tree.
+Candidate CAD transforms and simulated grip frames do not establish measured
+physical mating faces, grasp TCP or complete mass properties. The script
+rejects missing mass/inertia inputs and produces an INCOMPLETE profile; it
+never imports/activates robot settings or substitutes simulation properties.
 
 **This is not a software prerequisite for joint-space development execution.**
 The autonomous execution path does not reject missing tool mass/CoM/inertia,
@@ -225,7 +232,7 @@ mount or object between EE and external load.
    Confirm that numeric `F_T_EE`, `EE_T_K` and hybrid gains are unchanged within
    readback precision. A service success or a plausible mass alone is insufficient.
    Reuse the existing observation/shadow checks before the supervised one-chunk
-   command in the development guide; no execution authorization is added here.
+   command in the current deployment guide; no execution authorization is added here.
 
 Read-only commands, in the hardware ROS environment (not executed in this task):
 
@@ -237,10 +244,11 @@ ros2 interface show franka_msgs/srv/SetLoad
 ros2 interface show franka_msgs/srv/SetTCPFrame
 ros2 service type /service_server/set_load
 ros2 service type /service_server/set_tcp_frame
-capture_dir="/tmp/c4_tool_readback_$(date -u +%Y%m%dT%H%M%SZ)"
-PYTHONNOUSERSITE=1 ros2 run fr3_lab_stack inspect_tool_model.py \
-  --timeout 10 --state-topic /franka_robot_state_broadcaster/robot_state \
-  --output-dir "$capture_dir"
+capture_dir="/tmp/tool_readback_$(date -u +%Y%m%dT%H%M%SZ)"
+mkdir "$capture_dir"
+# Capture raw current state; the retired commissioning inspector is not needed.
+timeout 10s ros2 topic echo /franka_robot_state_broadcaster/robot_state --once \
+  > "$capture_dir/robot_state.yaml"
 ros2 param dump /fr3_streaming_joint_impedance_controller \
   > "$capture_dir/impedance_controller.yaml"
 timeout 10s ros2 topic echo /franka_robot_state_broadcaster/robot_state \
