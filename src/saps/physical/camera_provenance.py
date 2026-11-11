@@ -4,9 +4,27 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 import re
+import subprocess
 import xml.etree.ElementTree as ET
 
 from saps.physical.shadow_ros import git_identity
+
+
+def _camera_identity(path: Path) -> dict:
+    """Preserve camera revision/diff fields while resolving checkout identity."""
+    identity = git_identity(path)
+    identity['revision'] = identity.get('commit')
+    if identity['available']:
+        try:
+            diff = subprocess.check_output(
+                ['git', '-C', identity['repository_root'], 'diff', '--binary',
+                 'HEAD'], text=True, stderr=subprocess.PIPE, timeout=10)
+            identity['tracked_diff_sha256'] = hashlib.sha256(
+                diff.strip().encode()).hexdigest()
+        except (OSError, subprocess.SubprocessError) as error:
+            identity.update(tracked_diff_sha256=None,
+                            diff_error=f'{type(error).__name__}: diff unavailable')
+    return identity
 
 
 def camera_software_provenance() -> dict:
@@ -16,8 +34,7 @@ def camera_software_provenance() -> dict:
 
     module = Path(camera_validation.__file__).resolve()
     root = module.parent.parent
-    lab_identity = git_identity(root)
-    lab_identity['revision'] = lab_identity.get('commit')
+    lab_identity = _camera_identity(root)
     result = dict(lab_repository=lab_identity, source_sha256={},
                   packages={})
     for name in ('camera_validation.py', 'camera_pairing.py', 'zed_cameras.py'):
@@ -32,8 +49,7 @@ def camera_software_provenance() -> dict:
             share = Path(get_package_share_directory(name)).resolve()
             manifest = share / 'package.xml'
             source_directory = manifest.resolve().parent
-            identity = git_identity(source_directory)
-            identity['revision'] = identity.get('commit')
+            identity = _camera_identity(source_directory)
             if not identity['available']:
                 identity['source_kind'] = 'installed_package_without_git_identity'
             result['packages'][name] = dict(

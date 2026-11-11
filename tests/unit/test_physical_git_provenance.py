@@ -100,3 +100,17 @@ class GitProvenanceTests(unittest.TestCase):
             self.assertTrue(record['available'])
             self.assertTrue(record['dirty'])
             self.assertEqual(record['commit'], 'a' * 40)
+
+    def test_camera_provenance_keeps_diff_fingerprint_at_resolved_root(self):
+        import hashlib
+        from saps.physical import camera_provenance
+        with patch.object(camera_provenance, 'git_identity', return_value=dict(
+                available=True, commit='fixture', repository_root='/outer')), \
+                patch.object(camera_provenance.subprocess, 'check_output',
+                             return_value='fixture diff\n') as call:
+            record = camera_provenance._camera_identity(Path('/outer/package'))
+        self.assertEqual(record['revision'], 'fixture')
+        self.assertEqual(record['tracked_diff_sha256'],
+                         hashlib.sha256(b'fixture diff').hexdigest())
+        self.assertEqual(call.call_args.args[0][2], '/outer')
+        self.assertEqual(call.call_args.kwargs['stderr'], subprocess.PIPE)

@@ -226,8 +226,8 @@ incorrect outer hardware checkout in this run. SAPS now gathers the same
 camera versions, SDK/header and helper hashes locally, resolves `package.xml`
 symlinks to actual source directories, then resolves outer Git roots. Checkout
 commit/dirty state is explicit; binary-only package directories record unavailable
-Git identity without stderr. Source capture hashes paths relative to the resolved
-root. Strict manifest/ancestry/policy pins are unchanged.
+Git identity without stderr. Camera revision/diff-fingerprint fields remain available for checkouts.
+Source capture hashes paths relative to the resolved root. Strict manifest/ancestry/policy pins are unchanged.
 
 Read-only inspection verified clean actual identities: hardware `3dc23e39…`,
 wrapper/components `431dcf4b1ea39caf894ca6ea294437437dbdb034`, ZED messages
@@ -260,8 +260,8 @@ The physical exporter reuses the existing saved-observation convention and
 NumPy/OpenCV stack; it does not import the simulation framework or introduce a
 video dependency. Physical timestamps need explicit irregular-frame resampling.
 
-Verification before integration: 80 focused host tests passed; `make check`
-passed 491 Docker tests with one skip (Git executable absent in that image),
+Verification before integration: 81 focused host tests passed; `make check`
+passed 492 Docker tests with one skip (Git executable absent in that image),
 and compile checks passed. The real nested-checkout test passed on the host;
 mock Git-root/installed-package tests also passed in Docker. Offline export
 and full decoding passed for all three videos, and representative final images
