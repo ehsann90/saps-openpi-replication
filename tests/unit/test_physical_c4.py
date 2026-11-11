@@ -360,7 +360,8 @@ class C4EvidenceTests(unittest.TestCase):
         module.provenance = lambda:dict(sdk_version_from_headers='5.5.1',
             packages={key:dict(version='5.5.0') for key in ('zed_wrapper','zed_components','zed_msgs')})
         with patch.dict('sys.modules', {'franka_zed_cameras':ModuleType('franka_zed_cameras'),
-                'franka_zed_cameras.camera_validation':module}):
+                'franka_zed_cameras.camera_validation':module}), patch.object(
+                    readiness, 'camera_software_provenance', module.provenance):
             self.assertIn('sources',readiness.camera_evidence(object(),c))
             sources['wrist']['parameters']['general.serial_number'] = 999
             with self.assertRaisesRegex(RuntimeError,'identity disagree'):

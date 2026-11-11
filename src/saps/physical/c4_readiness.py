@@ -11,6 +11,7 @@ import subprocess
 import time
 from typing import Any
 
+from saps.physical.camera_provenance import camera_software_provenance
 from saps.physical.hardware_provenance import require_supported_arm_geometry
 from saps.physical.ros_packages import lab_package_directory
 from franka_robotiq.robotiq import calibrated_width
@@ -55,9 +56,9 @@ def camera_qos(config: dict) -> Any:
 
 def camera_evidence(node: Any, config: dict) -> dict:
     """Reuse the audited lab C3 validator, including the depth-NONE exception."""
-    from franka_zed_cameras.camera_validation import inspect_sources, provenance
+    from franka_zed_cameras.camera_validation import inspect_sources
     sources = inspect_sources(node)
-    versions = provenance()
+    versions = camera_software_provenance()
     for role, key in (('wrist', 'wrist_camera'), ('external', 'exterior_camera')):
         source = sources[role]
         if not source['valid']:

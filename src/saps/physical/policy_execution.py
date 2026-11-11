@@ -358,6 +358,18 @@ def run_policy_episode(
                 break
             if now() >= timeout or (kind in ("policy_action", "terminal_hold")
                                    and now() - scheduled >= PERIOD_NS):
+                result.setdefault("joint_state_wait_failure", dict(
+                    kind=kind, action_index=index, phase=phase,
+                    observed_monotonic_ns=now(),
+                    eligible_monotonic_ns=eligible,
+                    scheduled_monotonic_ns=scheduled,
+                    observation_deadline_monotonic_ns=timeout,
+                    step_deadline_monotonic_ns=(scheduled + PERIOD_NS
+                        if kind in ("policy_action", "terminal_hold") else None),
+                    previous_source_stamp_ns=previous,
+                    latest_source_stamp_ns=state.source_stamp_ns,
+                    latest_receive_monotonic_ns=state.receive_monotonic_ns,
+                ))
                 raise TimeoutError("no_new_measured_q_for_step")
             sleep(.0005)
         prepared = now()

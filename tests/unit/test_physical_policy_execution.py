@@ -32,11 +32,14 @@ class Boundary(FakeBoundary):
         self.target = np.zeros(7)
         self.fail_action = None
         self.frozen_receive = False
+        self.frozen_stamp = False
 
     def snapshot(self):
         state = super().snapshot()
         if self.frozen_receive:
             state = dataclasses.replace(state, receive_monotonic_ns=1)
+        if self.frozen_stamp:
+            state = dataclasses.replace(state, source_stamp_ns=1)
         return state
 
     def publish(self, row, state, start):
@@ -142,14 +145,15 @@ class EpisodeTests(unittest.TestCase):
                     max_replans=3, seed=20260917, analyzer=analyze, gripper=None,
                     stop_after_inference_replan=None,
                     gripper_transition_timeout=3., singularity_limit=17.,
-                    config=None, provenance_mode='strict'):
+                    config=None, provenance_mode='strict',
+                    observation_timeout=.05):
         self.collector.camera_config=config
         run_policy_episode(
             boundary=self.boundary, collector=self.collector, policy=self.policy,
             config=load_shadow_config(CONFIG_PATH) if config is None else config, output_dir=self.output,
             limits={"lower_rad": np.full(7, -3.), "upper_rad": np.full(7, 3.)},
             analyzer=analyzer, expected_identity=IDENTITY, analysis_start=0,
-            application_timeout=.25, observation_timeout=.05,
+            application_timeout=.25, observation_timeout=observation_timeout,
             policy_episode_seed=20260827, warmup_policy_seed=seed,
             max_replans=max_replans, max_executed_policy_chunks=cap,
             spin_once=self.collector.spin, ros_now=lambda: self.boundary.now / 1e9,
@@ -628,6 +632,37 @@ class EpisodeTests(unittest.TestCase):
         self.run_episode()
         self.assertEqual(self.result["policy_actions_executed"], 0)
         self.assertEqual(self.result["status"], "failed")
+        self.assertIn("no_new_measured_q_for_step", self.result["error"])
+        failure = self.result["joint_state_wait_failure"]
+        self.assertLess(failure["latest_receive_monotonic_ns"],
+                        failure["eligible_monotonic_ns"])
+
+    def test_step_period_limits_wait_even_with_long_observation_timeout(self):
+        self.main_hook = lambda: setattr(self.boundary, "frozen_receive", True)
+        self.run_episode(observation_timeout=.25)
+        failure = self.result["joint_state_wait_failure"]
+        self.assertEqual(failure["kind"], "policy_action")
+        self.assertGreaterEqual(failure["observed_monotonic_ns"],
+                                failure["step_deadline_monotonic_ns"])
+        self.assertLess(failure["observed_monotonic_ns"],
+                        failure["observation_deadline_monotonic_ns"])
+        self.assertEqual(self.result["termination"]["termination_reason"],
+                         "runtime_abort")
+        self.assertEqual(self.result["policy_actions_executed"], 0)
+
+    def test_nonadvancing_source_stamp_cannot_supply_action_zero(self):
+        self.main_hook = lambda: setattr(self.boundary, "frozen_stamp", True)
+        self.run_episode()
+        self.assertEqual(self.result["status"], "failed")
+        self.assertIn("no_new_measured_q_for_step", self.result["error"])
+        self.assertEqual(self.result["policy_actions_executed"], 0)
+        failure = self.result["joint_state_wait_failure"]
+        self.assertEqual(failure["action_index"], 0)
+        self.assertEqual(failure["kind"], "policy_action")
+        self.assertEqual(failure["latest_source_stamp_ns"], 1)
+        self.assertGreaterEqual(failure["observed_monotonic_ns"],
+            min(failure["step_deadline_monotonic_ns"],
+                failure["observation_deadline_monotonic_ns"]))
 
     def test_changed_installed_hold_blocks_all_actions(self):
         def change():

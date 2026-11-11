@@ -42,21 +42,33 @@ class SubscriptionBoundary:
 def git_identity(path: Path) -> dict[str, Any]:
     """Record unrelated checkout state without requiring or making it clean."""
 
+    requested = path
+    path = path.resolve()
+    unavailable = {"path": str(requested), "available": False,
+                   "source_kind": "unavailable"}
     if not path.is_dir():
-        return {"path": str(path), "available": False}
+        return dict(unavailable, reason="directory_missing")
 
     def git(*arguments: str) -> str:
         return subprocess.check_output(
             ["git", "-C", str(path), *arguments], text=True, timeout=10,
+            stderr=subprocess.PIPE,
         ).strip()
 
-    return {
-        "path": str(path), "available": True,
-        "branch": git("branch", "--show-current"),
-        "commit": git("rev-parse", "HEAD"),
-        "status": git("status", "--short").splitlines(),
-        "dirty": bool(git("status", "--porcelain")),
-    }
+    try:
+        repository_root = git("rev-parse", "--show-toplevel")
+        path = Path(repository_root)
+        status = git("status", "--porcelain").splitlines()
+        return {
+            "path": str(requested), "repository_root": repository_root,
+            "source_kind": "git_checkout", "available": True,
+            "branch": git("branch", "--show-current"),
+            "commit": git("rev-parse", "HEAD"),
+            "status": status, "dirty": bool(status),
+        }
+    except (OSError, subprocess.SubprocessError) as error:
+        return dict(unavailable, source_kind="directory_without_git_identity",
+                    reason=f"{type(error).__name__}: Git identity unavailable")
 
 
 def validate_graph(node: Any, config: dict[str, Any]) -> dict[str, Any]:

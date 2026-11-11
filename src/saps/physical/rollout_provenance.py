@@ -26,6 +26,7 @@ def repository_snapshot(directory: Path, prefixes: tuple[str, ...] = ()) -> dict
     identity = git_identity(directory)
     if not identity.get('available'):
         return identity
+    directory = Path(identity.get('repository_root', directory))
     def git(*args):
         return subprocess.check_output(['git', '-C', str(directory), *args], timeout=10)
     identity['diff_sha256'] = {
